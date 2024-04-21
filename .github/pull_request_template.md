@@ -52,9 +52,12 @@ automatically close the issue.
 - [ ] No, and this is why: _please replace this line with details on why tests have not been included_
 - [ ] I need help with writing tests
 
-## Running tests
+## Running lint
+- [ ] I ran `pre-commit run --all-files` to fix linting issues
 
-- [ ] `pytest` is passing
+## Running test
+
+- [ ] I ran `pytest` and all tests are passing
 
 ## Updated the documentation
 
