@@ -15,11 +15,13 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 
-from collections import defaultdict 
-from typing import TypeVar, Generic
+from collections import defaultdict
+from typing import Generic, TypeVar
+
 from airflow.models.baseoperator import BaseOperator
 
-T = TypeVar('T')
+T = TypeVar("T")
+
 
 class DependencyModel(Generic[T]):
     nodes: set[T]
@@ -30,11 +32,9 @@ class DependencyModel(Generic[T]):
         self.nodes = set()
         self.forward_graph = defaultdict(set)
         self.reverse_graph = defaultdict(set)
-    
 
     def add(self, node: T):
         self.nodes.add(node)
-
 
     def add_dependency(self, dependent: T, dependencies) -> T:
         if not isinstance(dependencies, list):
@@ -43,17 +43,15 @@ class DependencyModel(Generic[T]):
         for node in dependencies:
             self.forward_graph[dependent].add(node)
             self.reverse_graph[node].add(dependent)
-        
-        return dependent
 
+        return dependent
 
     def sources(self) -> set[T]:
         sources = set()
         for node in self.nodes:
-            if len(self.reverse_graph[node]) ==  0:
+            if len(self.reverse_graph[node]) == 0:
                 sources.add(node)
         return sources
-
 
     def sinks(self) -> set[T]:
         sinks = []
@@ -61,43 +59,41 @@ class DependencyModel(Generic[T]):
             if len(self.forward_graph[node]) == 0:
                 sinks.append(node)
         return sinks
-    
 
     def graph_forward(
-            self, 
-            start_task: BaseOperator, 
-            all_tasks: dict[T, BaseOperator],
-            end_task: BaseOperator
+        self,
+        start_task: BaseOperator,
+        all_tasks: dict[T, BaseOperator],
+        end_task: BaseOperator,
     ):
         for source in self.sources():
             start_task >> all_tasks[source]
 
         for node, dependencies in self.forward_graph.items():
             node_task = all_tasks[node]
-            
+
             for dependency in dependencies:
-                dependency_task = all_tasks[dependency] 
+                dependency_task = all_tasks[dependency]
                 node_task >> dependency_task
-        
+
         for sink in self.sinks():
             all_tasks[sink] >> end_task
 
-
     def graph_reverse(
-            self, 
-            start_task: BaseOperator, 
-            all_tasks: dict[T, BaseOperator],
-            end_task: BaseOperator
+        self,
+        start_task: BaseOperator,
+        all_tasks: dict[T, BaseOperator],
+        end_task: BaseOperator,
     ):
         for sink in self.sinks():
             start_task >> all_tasks[sink]
 
         for node, dependencies in self.reverse_graph.items():
             node_task = all_tasks[node]
-            
+
             for dependency in dependencies:
-                dependency_task = all_tasks[dependency] 
+                dependency_task = all_tasks[dependency]
                 node_task >> dependency_task
-        
+
         for source in self.sources():
             all_tasks[source] >> end_task

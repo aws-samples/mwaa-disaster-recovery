@@ -15,32 +15,30 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 
-import os
 import json
+
 from airflow_cli_client import AirflowCliClient
 
+
 def handler(event, context):
-    print(f'Event: {json.dumps(event)}')
+    print(f"Event: {json.dumps(event)}")
 
-    mwaa_env_name = event['mwaa_env_name']
-    dag = event['dag']
-    bucket = event['bucket']
-    task_token = event['task_token']
-    dr_type = event['dr_type']
-    config = {
-        'bucket': bucket,
-        'task_token': task_token,
-        'dr_type': dr_type
-    }
+    mwaa_env_name = event["mwaa_env_name"]
+    mwaa_env_version = event["mwaa_env_version"]
+    dag = event["dag"]
+    bucket = event["bucket"]
+    task_token = event["task_token"]
+    dr_type = event["dr_type"]
+    config = {"bucket": bucket, "task_token": task_token, "dr_type": dr_type}
 
-    airflow_cli = AirflowCliClient(mwaa_env_name)
+    airflow_cli = AirflowCliClient(mwaa_env_name, mwaa_env_version)
 
-    print(f'Unpausing DAG {dag} ...')
+    print(f"Unpausing DAG {dag} ...")
     result = airflow_cli.unpause_dag(dag)
-    print(f'Unpausing result: {result}')
+    print(f"Unpausing result: {result}")
 
-    print(f'Triggering DAG {dag} with config {config} ...')
+    print(f"Triggering DAG {dag} with config {config} ...")
     result = airflow_cli.trigger_dag(dag, config)
-    print(f'DAG trigger result: {result}')
-    
+    print(f"DAG trigger result: {result}")
+
     return result.to_json()

@@ -17,17 +17,14 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 from mwaa_dr.v_2_5.dr_factory import DRFactory_2_5
 
-'''
-The schema and dependencies are based on ERD here: 
+"""
+The schema and dependencies are based on ERD here:
 https://airflow.apache.org/docs/apache-airflow/2.6.3/database-erd-ref.html
-'''
+"""
+
+
 class DRFactory_2_6(DRFactory_2_5):
     def __init__(
-            self, 
-            dag_id: str, 
-            path_prefix: str, 
-            storage_type: str = None, 
-            batch_size=5000
+        self, dag_id: str, path_prefix: str, storage_type: str = None, batch_size=5000
     ) -> None:
         super().__init__(dag_id, path_prefix, storage_type, batch_size)
-

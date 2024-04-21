@@ -5,4 +5,3 @@ rm -rf .pytest_cache
 rm -rf build
 rm -rf cdk.out
 find . | grep -E "(/__pycache__$|\.pyc$|\.pyo$|\.DS_Store$)" | xargs rm -rf
-

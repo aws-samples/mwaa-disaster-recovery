@@ -16,30 +16,30 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 
 import json
+
 import boto3
 
 
 def handler(event, context):
-    print(f'Event: {json.dumps(event)}')
+    print(f"Event: {json.dumps(event)}")
 
-    schedule_name = event['schedule_name']
-    client = boto3.client('scheduler')
+    schedule_name = event["schedule_name"]
+    client = boto3.client("scheduler")
 
-    print(f'Getting schedule details for {schedule_name} ...')
+    print(f"Getting schedule details for {schedule_name} ...")
     result = client.get_schedule(Name=schedule_name)
     result = json.dumps(result, default=str)
-    print(f'Result: {result}')
+    print(f"Result: {result}")
 
-
-    print(f'Disabling schedule {schedule_name} ...')
+    print(f"Disabling schedule {schedule_name} ...")
     result = json.loads(result)
 
-    result['State'] = 'DISABLED'
-    extras = ['ResponseMetadata', 'Arn', 'CreationDate', 'LastModificationDate']
+    result["State"] = "DISABLED"
+    extras = ["ResponseMetadata", "Arn", "CreationDate", "LastModificationDate"]
     for extra in extras:
         del result[extra]
 
     result = client.update_schedule(**result)
-    print(f'Result: {result}')    
+    print(f"Result: {result}")
 
     return result

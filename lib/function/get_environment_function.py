@@ -16,22 +16,23 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 
 import json
+
 import boto3
 from botocore.config import Config
 
 
 def handler(event, context):
-    print(f'Event: {json.dumps(event)}')
+    print(f"Event: {json.dumps(event)}")
 
-    env_name = event['env_name'] 
-    region = event['env_region']
+    env_name = event["env_name"]
+    region = event["env_region"]
 
-    print(f'Getting environment details for {env_name} in {region} ...')
-    
+    print(f"Getting environment details for {env_name} in {region} ...")
+
     config = Config(region_name=region)
-    client = boto3.client('mwaa', config=config)
+    client = boto3.client("mwaa", config=config)
     result = client.get_environment(Name=env_name)
-    
+
     result = json.dumps(result, default=str)
-    print(f'Result: {result}')
+    print(f"Result: {result}")
     return result

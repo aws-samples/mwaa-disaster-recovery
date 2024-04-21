@@ -14,7 +14,7 @@
 	 - Comment your code where appropriate.
 	 - Squash your commits
      - Update any related documentation.
-     - Update CHANGELOG by inserting subsections (Added, Removed, Updated, Fixed) 
+     - Update CHANGELOG by inserting subsections (Added, Removed, Updated, Fixed)
      under the Unreleased section
 -->
 
@@ -68,4 +68,3 @@ Did you update the [CHANGELOG](../CHANGELOG.md) with the changes you are making 
 Please use Added, Removed, and/or Changed subsections under the [Unreleased](../CHANGELOG.md#unreleased) section.
 - [ ] Yes
 - [ ] No, I need help
-

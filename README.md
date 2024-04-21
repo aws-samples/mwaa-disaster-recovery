@@ -7,6 +7,8 @@
 ![2.6.x](https://img.shields.io/badge/mwaa-v2.6.x-green)
 ![2.7.x](https://img.shields.io/badge/mwaa-v2.7.x-green)
 
+[![code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+
 <!-- TOC ignore:true -->
 # Contents
 <!-- TOC -->
@@ -58,9 +60,17 @@
 Amazon Managed Workflow for Apache Airflow ([MWAA](https://aws.amazon.com/managed-workflows-for-apache-airflow/)) is a managed orchestration service for [Apache Airflow](https://airflow.apache.org/). An MWAA deployment comes with meaningful defaults such as multiple availability zone (AZ) deployment of Airflow schedulers and auto-scaling of Airflow workers across multiple AZs, all of which can help customers minimize the impact of an AZ failure. However, a regional large scale event (LSE) can still adversely affect business continuity of critical workflows running on an MWAA environment. To minimize the impact of LSEs, a multi-region architecture is needed that automatically detects service disruption in the primary region and automates cut-over to the secondary region. This project offers an automated-solution for two key [disaster recovery](https://docs.aws.amazon.com/whitepapers/latest/disaster-recovery-workloads-on-aws/disaster-recovery-options-in-the-cloud.html) strategies for MWAA: **Backup Restore** and **Warm Standby**. Let's review the solution architectures and dive-deep into the two strategies next.
 
 > [!IMPORTANT]
-> This solution is a part of an AWS blog series on [MWAA Disaster Recovery](https://aws.amazon.com/blogs/big-data/disaster-recovery-strategies-for-amazon-mwaa-part-1/). Please
-> review the blog series before diving into the details of the solution. The project currently
-> supports DR for the following versions of MWAA: **2.5.x**, **2.6.x**, and **2.7.x**. 
+> This solution is a part of an AWS blog series on MWAA Disaster Recovery. Please
+> review both [Part 1](https://aws.amazon.com/blogs/big-data/disaster-recovery-strategies-for-amazon-mwaa-part-1/) and
+> [Part 2](https://aws.amazon.com/blogs/big-data/disaster-recovery-strategies-for-amazon-mwaa-part-2/)blog series before
+> diving into the details of the solution.
+
+> [!NOTE]
+> The project currently supports the following versions of MWAA:
+> - **2.5.x**
+> - **2.6.x**
+> - **2.7.x**
+> - **2.8.x**
 
 # Architecture
 
@@ -79,7 +89,7 @@ In order to recreate a new environment in secondary region when the primary envi
 
 - \[**1.a**] Assuming you host your DAGs code in a source code repository, your CICD pipeline deploys the code changes to the S3 bucket configured to host DAGs, plugins, and the requirements file.
 
-- \[**1.b**] For this architecture, we also assume that you have another S3 bucket deployed to the secondary region to host DAGs, plugins, and the requirements file with bucket versioning enabled. As a part of the CDK deployment of this project, we enable [cross-region replication](https://docs.aws.amazon.com/AmazonS3/latest/userguide/replication.html) from primary to the secondary region buckets. Any new changes to the primary DAGs bucket are replicated in the secondary region. However, for existing objects, a one-time replication will need to be performed either using [S3 Batch replication](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-batch-replication-batch.html) or directly deploying the resources from your CICD pipeline to the secondary region bucket. 
+- \[**1.b**] For this architecture, we also assume that you have another S3 bucket deployed to the secondary region to host DAGs, plugins, and the requirements file with bucket versioning enabled. As a part of the CDK deployment of this project, we enable [cross-region replication](https://docs.aws.amazon.com/AmazonS3/latest/userguide/replication.html) from primary to the secondary region buckets. Any new changes to the primary DAGs bucket are replicated in the secondary region. However, for existing objects, a one-time replication will need to be performed either using [S3 Batch replication](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-batch-replication-batch.html) or directly deploying the resources from your CICD pipeline to the secondary region bucket.
 
 - \[**1.c**] The CDK deployment of the [primary stack](lib/stacks/mwaa_primary_stack.py) deploys the [mwaa_dr](assets/dags/mwaa_dr/) framework package to the primary DAGs S3 bucket. This framework includes the ([backup_metadata](assets/dags/mwaa_dr/backup_metadata.py)) DAG, which periodically takes backup of the metadata store. The backup interval is configurable and should be based on the recovery point objective (RPO) -- the data loss time during a failure that can be sustained by the business.
 
@@ -95,7 +105,7 @@ The [BR Flow 1](#br-flow-1-periodic-backup) helps with backing up the state of t
 
 - \[**2.c.1**] When the heartbeat signals from the primary MWAA environment are detected in the metrics, the workflow moves on to storing the environment configuration subflow as follows:
 
-    - \[**2.d**] The workflow makes [GetEnvironment](https://docs.aws.amazon.com/mwaa/latest/API/API_GetEnvironment.html) API call through a Lambda function. The API returns the status among other configuration details of the MWAA environment. 
+    - \[**2.d**] The workflow makes [GetEnvironment](https://docs.aws.amazon.com/mwaa/latest/API/API_GetEnvironment.html) API call through a Lambda function. The API returns the status among other configuration details of the MWAA environment.
 
     - \[**2.e**] The workflow stores the environment configuration in the backup bucket to be later used during recovery for creating a new MWAA environment in the secondary region (step 2.h) and ends.
 
@@ -130,7 +140,7 @@ In order to restore the primary MWAA environment in the secondary region, you ha
 
 - \[**1.a**] Assuming you host your DAGs code in a source code repository, your CICD pipeline deploys the code changes to the S3 bucket configured to host DAGs, plugins, and the requirements file.
 
-- \[**1.b**] For this architecture, we also assume that you have another S3 bucket deployed to the secondary region to host DAGs, plugins, and the requirements file with bucket versioning enabled. As a part of the CDK deployment of this project, we enable [cross-region replication](https://docs.aws.amazon.com/AmazonS3/latest/userguide/replication.html) from primary to the secondary region buckets. Any new changes to the primary DAGs bucket are replicated in the secondary region. However, for existing objects, a one-time replication will need to be performed either using [S3 Batch replication](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-batch-replication-batch.html) or directly deploying the resources from your CICD pipeline to the secondary region bucket. 
+- \[**1.b**] For this architecture, we also assume that you have another S3 bucket deployed to the secondary region to host DAGs, plugins, and the requirements file with bucket versioning enabled. As a part of the CDK deployment of this project, we enable [cross-region replication](https://docs.aws.amazon.com/AmazonS3/latest/userguide/replication.html) from primary to the secondary region buckets. Any new changes to the primary DAGs bucket are replicated in the secondary region. However, for existing objects, a one-time replication will need to be performed either using [S3 Batch replication](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-batch-replication-batch.html) or directly deploying the resources from your CICD pipeline to the secondary region bucket.
 
 - \[**1.c**] The CDK deployment of the [primary stack](lib/stacks/mwaa_primary_stack.py) deploys the [mwaa_dr](assets/dags/mwaa_dr/) framework package to the primary DAGs S3 bucket. This framework includes the ([backup_metadata](assets/dags/mwaa_dr/backup_metadata.py)) DAG, which periodically takes backup of the metadata store. The backup interval is configurable and should be based on the recovery point objective (RPO) -- the data loss time during a failure that can be sustained by the business.
 
@@ -176,10 +186,10 @@ The [lib](lib) folder hosts the deployment code for the project. The project per
 [![AWS CDK v2](https://img.shields.io/badge/cdk-v2-yellow)](https://docs.aws.amazon.com/cdk/v2/guide/cli.html)
 [![Docker Latest](https://img.shields.io/badge/docker-latest-blue)](https://docs.docker.com/get-docker/)
 
-### AWS Resources Needed Pre-Deployment 
+### AWS Resources Needed Pre-Deployment
 - An AWS account with an MWAA environment deployed to the **primary** region. If you don't have an environment deployed, you can do so using the [quickstart guide](https://docs.aws.amazon.com/mwaa/latest/userguide/quick-start.html).
 
-- For [Warm Standby](#warm-standby), another identical MWAA environment deployed to the **secondary** region. Note that [Backup and Restore](#backup-and-restore) does not require a running MWAA environment in the secondary region. 
+- For [Warm Standby](#warm-standby), another identical MWAA environment deployed to the **secondary** region. Note that [Backup and Restore](#backup-and-restore) does not require a running MWAA environment in the secondary region.
 
 - DAGs S3 buckets with versioning enabled in both primary and secondary region. Copy the packages in [assets/requirements.txt](assets/requirements.txt) to requirements files in the DAGs S3 buckets if already available or upload the provided requirements file to the buckets and [configure the MWAA environments](https://docs.aws.amazon.com/mwaa/latest/userguide/working-dags-dependencies.html) to use the requirements files.
 
@@ -265,7 +275,7 @@ The [lib](lib) folder hosts the deployment code for the project. The project per
         }
     ]
 }
-``` 
+```
 
 Also add the following trust policy to the role:
 ```json
@@ -290,7 +300,7 @@ Also add the following trust policy to the role:
 
 The parameters for the solution are externalized as environment variables. You can specify these parameters as environment variables in your CICD pipeline or create a `.env` file with appropriate key and values at the root of this project for a deployment from your machine. You can find more details in the implementation sections [BR-3: Setup Environment Variables](#br-3-setup-environment-variables) and  [WS-3: Setup Environment Variables](#ws-3-setup-environment-variables). Let's review the required parameters first followed by the optional ones.
 
-### Required Parameters 
+### Required Parameters
 
 Here are the required parameters that applies to both primary and secondary region stacks:
 
@@ -346,8 +356,8 @@ Note that the [secondary region stack](lib/stacks/mwaa_secondary_stack.py) will 
 {
     "Effect": "Allow",
     "Action": [
-        "states:SendTaskFailure", 
-        "states:SendTaskHeartbeat", 
+        "states:SendTaskFailure",
+        "states:SendTaskHeartbeat",
         "states:SendTaskSuccess"
     ],
     "Resource": ["arn:aws:states:*:<account>:stateMachine:*"]
@@ -410,7 +420,7 @@ pip install -r requirements.txt
 
 ### BR-3: Setup Environment Variables
 
-Create a `.env` file at the root of the project by copying the following contents and making appropriate changes. The configuration parameters are explained in the [stack parameters](#stack-parameters) section. 
+Create a `.env` file at the root of the project by copying the following contents and making appropriate changes. The configuration parameters are explained in the [stack parameters](#stack-parameters) section.
 
 ```sh
 STACK_NAME_PREFIX=mwaa-2-5-1
@@ -530,7 +540,7 @@ pip install -r requirements.txt
 
 ### WS-3: Setup Environment Variables
 
-Create a `.env` file at the root of the project by copying the following contents and making appropriate changes. The configuration parameters are explained in the [stack parameters](#stack-parameters) section. 
+Create a `.env` file at the root of the project by copying the following contents and making appropriate changes. The configuration parameters are explained in the [stack parameters](#stack-parameters) section.
 
 ```sh
 STACK_NAME_PREFIX=mwaa-2-5-1
@@ -620,4 +630,3 @@ cdk destroy --all
 ```
 > [!CAUTION]
 > Destroying the stacks will also delete the backup S3 buckets in both primary and secondary regions. DAGs S3 buckets in both region will remain intact and the [dags/mwaa_dr](./assets/dags/mwaa_dr) folder in both buckets will need to be manually deleted. For the backup restore strategy, environment created as a result of the restore workflow in the secondary region will also need to be manually deleted either on AWS Console or through AWS CLI.
-

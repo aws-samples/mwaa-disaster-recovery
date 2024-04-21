@@ -26,7 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Initial commit with sample readme, code of conduct, and license 
+- Initial commit with sample readme, code of conduct, and license
 
 
 [unreleased]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v0.0.0...HEAD
