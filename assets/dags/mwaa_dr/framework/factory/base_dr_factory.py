@@ -25,12 +25,14 @@ from airflow.exceptions import AirflowFailException
 
 from abc import ABC, abstractmethod
 import os
+from datetime import timedelta
 
 from mwaa_dr.framework.model.base_table import BaseTable, S3
 from mwaa_dr.framework.model.dependency_model import DependencyModel
 
 BACKUP_RESTORE = 'BACKUP_RESTORE'
 WARM_STANDBY = 'WARM_STANDBY'
+EXECUTION_TIMEOUT = timedelta(minutes=5)
 
 class BaseDRFactory(ABC):
     dag_id: str
@@ -67,7 +69,7 @@ class BaseDRFactory(ABC):
     def schedule(self) -> str:
         try:
             return Variable.get('DR_BACKUP_SCHEDULE')
-        except:
+        except Exception as e:
             return '@hourly'
 
 
@@ -191,6 +193,7 @@ class BaseDRFactory(ABC):
         default_args = {
             'owner': 'airflow',
             'start_date': days_ago(1),
+            'execution_timeout': EXECUTION_TIMEOUT,
             'on_failure_callback': self.notify_failure_to_sns
         }
 
@@ -226,6 +229,7 @@ class BaseDRFactory(ABC):
         default_args = {
             'owner': 'airflow',
             'start_date': days_ago(1),
+            'execution_timeout': EXECUTION_TIMEOUT,
             'on_failure_callback': self.notify_failure_to_sfn
         }
 

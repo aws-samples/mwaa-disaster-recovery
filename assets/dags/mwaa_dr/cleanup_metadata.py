@@ -14,63 +14,85 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
-from airflow import DAG, settings
- 
-from airflow.operators.python import PythonOperator
+
+## Copied from https://docs.aws.amazon.com/mwaa/latest/userguide/samples-database-cleanup.html
+
+from airflow import settings
 from airflow.utils.dates import days_ago
-from airflow.models import (
-    DAG, DagModel, DagRun, DagTag, ImportError, Log, SlaMiss, 
-    RenderedTaskInstanceFields, TaskFail, TaskInstance, 
-    TaskReschedule, XCom
-)
-from airflow import version
-airflow_version = version.version
+from airflow.models import DagTag, DagModel, DagRun, ImportError, Log, SlaMiss, RenderedTaskInstanceFields, TaskInstance, TaskReschedule, XCom
+from airflow.decorators import dag, task
+from airflow.utils.dates import days_ago
+from time import sleep
 
-JobObject = None
-if airflow_version.startswith('2.5'):
-    from airflow.jobs.base_job import BaseJob
-    JobObject = BaseJob
-else:
+from airflow.version import version
+major_version, minor_version = int(version.split('.')[0]), int(version.split('.')[1])
+if major_version >= 2 and minor_version >= 6:
     from airflow.jobs.job import Job
-    JobObject = Job    
+else:
+    # The BaseJob class was renamed as of Apache Airflow v2.6
+    from airflow.jobs.base_job import BaseJob as Job
 
-dag_id = "cleanup_metadata"
+# Delete entries for the past 35 days to 42 days. Adjust MAX_AGE_IN_DAYS to set how far back this DAG cleans the database.
+# Note that this dag runs weekly
+MIN_AGE_IN_DAYS = 35
+MAX_AGE_IN_DAYS = 42
+DECREMENT = -7
 
-OBJECTS_TO_CLEAN = [
-    DagModel, 
-    DagRun, 
-    DagTag,
-    ImportError,
-    Log, 
-    SlaMiss,
-    RenderedTaskInstanceFields,
-    TaskFail,
-    TaskInstance,
-    TaskReschedule,
-    XCom
+# This is a list of (table, time) tuples. 
+# table = the table to clean in the metadata database
+# time  = the column in the table associated to the timestamp of an entry
+#         or None if not applicable.
+TABLES_TO_CLEAN = [[Job, Job.latest_heartbeat],
+    [TaskInstance, TaskInstance.execution_date],
+    [TaskReschedule, TaskReschedule.execution_date],
+    [DagTag, None], 
+    [DagModel, DagModel.last_parsed_time], 
+    [DagRun, DagRun.execution_date], 
+    [ImportError, ImportError.timestamp],
+    [Log, Log.dttm], 
+    [SlaMiss, SlaMiss.execution_date], 
+    [RenderedTaskInstanceFields, RenderedTaskInstanceFields.execution_date], 
+    [XCom, XCom.execution_date]     
 ]
- 
-def cleanup_db(**kwargs):
+
+@task()
+def cleanup_db_fn(x):
     session = settings.Session()
-    print("Session: ", str(session))
 
-    for obj in OBJECTS_TO_CLEAN:
-        query = session.query(obj)
-        query.delete(synchronize_session=False)
+    if x[1]:
+        for oldest_days_ago in range(MAX_AGE_IN_DAYS, MIN_AGE_IN_DAYS, DECREMENT):
+            earliest_days_ago = max(oldest_days_ago + DECREMENT, MIN_AGE_IN_DAYS)
+            print(f"deleting {str(x[0])} entries between {earliest_days_ago} and {oldest_days_ago} days old...")
+            earliest_date = days_ago(earliest_days_ago)
+            oldest_date = days_ago(oldest_days_ago)
+            query = session.query(x[0]).filter(x[1] >= oldest_date).filter(x[1] <= earliest_date)
+            query.delete(synchronize_session= False)
+            session.commit()
+            sleep(5)
+    else:
+        # No time column specified for the table. Delete all entries
+        print("deleting", str(x[0]), "...")
+        query = session.query(x[0])
+        query.delete(synchronize_session= False)
+        session.commit()
+    
+    session.close()
 
-    query = session.query(JobObject).filter(JobObject.job_type != 'SchedulerJob')
-    query.delete(synchronize_session=False)
-    session.commit()
+ 
+@dag(
+    dag_id="cleanup_db",
+    schedule_interval="@weekly",
+    start_date=days_ago(7),
+    catchup=False,
+    is_paused_upon_creation=True
+)
 
+def clean_db_dag_fn():
+    t_last=None
+    for x in TABLES_TO_CLEAN:
+        t=cleanup_db_fn(x)
+        if t_last:
+            t_last >> t
+        t_last = t
 
-default_args = {
-    'owner': 'airflow',
-    'start_date': days_ago(1)
-}
-
-with DAG(dag_id=dag_id, schedule_interval=None, catchup=False, default_args=default_args) as dag:                    
-    task = PythonOperator(
-        task_id="metadata_cleanup",
-        python_callable=cleanup_db,
-        provide_context=True     
-    )
+clean_db_dag = clean_db_dag_fn()

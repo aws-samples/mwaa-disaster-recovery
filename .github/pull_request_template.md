@@ -29,6 +29,8 @@
 - [ ] Version Update
 
 ## Description
+<!-- Describe your PR here -->
+
 
 ## Related Tickets & Documents
 
@@ -63,7 +65,7 @@ Did you update the [README](../README.md) to reflect your PR changes?
 ## Updated the Changelog
 
 Did you update the [CHANGELOG](../CHANGELOG.md) with the changes you are making in this PR?
+Please use Added, Removed, and/or Changed subsections under the [Unreleased](../CHANGELOG.md#unreleased) section.
 - [ ] Yes
 - [ ] No, I need help
-
 

@@ -57,7 +57,7 @@
 
 Amazon Managed Workflow for Apache Airflow ([MWAA](https://aws.amazon.com/managed-workflows-for-apache-airflow/)) is a managed orchestration service for [Apache Airflow](https://airflow.apache.org/). An MWAA deployment comes with meaningful defaults such as multiple availability zone (AZ) deployment of Airflow schedulers and auto-scaling of Airflow workers across multiple AZs, all of which can help customers minimize the impact of an AZ failure. However, a regional large scale event (LSE) can still adversely affect business continuity of critical workflows running on an MWAA environment. To minimize the impact of LSEs, a multi-region architecture is needed that automatically detects service disruption in the primary region and automates cut-over to the secondary region. This project offers an automated-solution for two key [disaster recovery](https://docs.aws.amazon.com/whitepapers/latest/disaster-recovery-workloads-on-aws/disaster-recovery-options-in-the-cloud.html) strategies for MWAA: **Backup Restore** and **Warm Standby**. Let's review the solution architectures and dive-deep into the two strategies next.
 
-> [**NOTE**]
+> [!IMPORTANT]
 > This solution is a part of an AWS blog series on [MWAA Disaster Recovery](https://aws.amazon.com/blogs/big-data/disaster-recovery-strategies-for-amazon-mwaa-part-1/). Please
 > review the blog series before diving into the details of the solution. The project currently
 > supports DR for the following versions of MWAA: **2.5.x**, **2.6.x**, and **2.7.x**. 
@@ -365,7 +365,7 @@ The project uses Cloud Development Kit (CDK) and is set up like a standard Pytho
 
 First, let's clone the project in your local machine:
 ```sh
-git clone git@ssh.gitlab.aws.dev:crkblogs/mwaa-disaster-recovery.git
+git clone https://github.com/aws-samples/mwaa-disaster-recovery.git
 cd mwaa-disaster-recovery
 ```
 
@@ -618,6 +618,6 @@ You can clean up the resources deployed through this solution by simply deleting
 ```sh
 cdk destroy --all
 ```
-> [**NOTE**]
+> [!CAUTION]
 > Destroying the stacks will also delete the backup S3 buckets in both primary and secondary regions. DAGs S3 buckets in both region will remain intact and the [dags/mwaa_dr](./assets/dags/mwaa_dr) folder in both buckets will need to be manually deleted. For the backup restore strategy, environment created as a result of the restore workflow in the secondary region will also need to be manually deleted either on AWS Console or through AWS CLI.
 
