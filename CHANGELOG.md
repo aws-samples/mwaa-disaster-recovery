@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.1.0] - 2024-04-21
+## [0.1.1] - 2024-04-21
 ### Added
 
 - The [mwaa_dr/](assets/dags/mwaa_dr/) framework for supporting multiple versions of MWAA
@@ -31,6 +31,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial commit with sample readme, code of conduct, and license
 
 
-[unreleased]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v0.0.0...v0.1.0
+[unreleased]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v0.0.0...v0.1.1
 [0.0.0]: https://github.com/aws-samples/mwaa-disaster-recovery/releases/tag/v0.0.0
