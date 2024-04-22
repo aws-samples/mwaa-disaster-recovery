@@ -1,0 +1,38 @@
+#!/usr/bin/env python3
+
+import sys
+
+from botocore.config import Config as AwsConfig
+
+from config import Config
+from lib.function.airflow_cli_client import AirflowCliClient, AirflowCliCommand
+
+if len(sys.argv) < 3:
+    print(
+        """
+        Invalid cli command, use: ./mwaa <region> <airflow-command> <sub-command> <resource>
+        Example 1: ./mwaa primary dags trigger backup_metadata
+        Example 2: ./mwaa secondary dags trigger restore_metadata
+
+        For list of available airflow cli commands, please visit:
+        https://airflow.apache.org/docs/apache-airflow/stable/cli-and-env-variables-ref.html
+        """
+    )
+    sys.exit(1)
+
+conf = Config()
+primary = sys.argv[1].lower().startswith("p")
+region = conf.primary_region if primary else conf.secondary_region
+env_name = (
+    conf.primary_mwaa_environment_name
+    if primary
+    else conf.secondary_mwaa_environment_name
+)
+evn_version = conf.mwaa_version
+
+aws_config = AwsConfig(region_name=region)
+client = AirflowCliClient(
+    environment_name=env_name, environment_version=evn_version, config=aws_config
+)
+command = AirflowCliCommand(command=f'{" ".join(sys.argv[2:])}')
+client.execute(command)
