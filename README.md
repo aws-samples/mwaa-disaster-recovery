@@ -60,7 +60,7 @@
         - [Using the Metadata Backup and Restore Independently](#using-the-metadata-backup-and-restore-independently)
             - [Local Runner](#local-runner)
             - [Amazon MWAA](#amazon-mwaa)
-        - [May Need Environment Restart for Plugins to Work](#may-need-environment-restart-for-plugins-to-work)
+        - [May Need to Restart Environment for Plugins to Work](#may-need-to-restart-environment-for-plugins-to-work)
 
 <!-- /TOC -->
 
@@ -68,11 +68,8 @@
 
 Amazon Managed Workflow for Apache Airflow ([MWAA](https://aws.amazon.com/managed-workflows-for-apache-airflow/)) is a managed orchestration service for [Apache Airflow](https://airflow.apache.org/). An MWAA deployment comes with meaningful defaults such as multiple availability zone (AZ) deployment of Airflow schedulers and auto-scaling of Airflow workers across multiple AZs, all of which can help customers minimize the impact of an AZ failure. However, a regional large scale event (LSE) can still adversely affect business continuity of critical workflows running on an MWAA environment. To minimize the impact of LSEs, a multi-region architecture is needed that automatically detects service disruption in the primary region and automates cut-over to the secondary region. This project offers an automated-solution for two key [disaster recovery](https://docs.aws.amazon.com/whitepapers/latest/disaster-recovery-workloads-on-aws/disaster-recovery-options-in-the-cloud.html) strategies for MWAA: **Backup Restore** and **Warm Standby**. Let's review the solution architectures and dive-deep into the two strategies next.
 
-> [!IMPORTANT]
-> This solution is a part of an AWS blog series on MWAA Disaster Recovery. Please
-> review both [Part 1](https://aws.amazon.com/blogs/big-data/disaster-recovery-strategies-for-amazon-mwaa-part-1/) and
-> [Part 2](https://aws.amazon.com/blogs/big-data/disaster-recovery-strategies-for-amazon-mwaa-part-2/)blog series before
-> diving into the details of the solution.
+This solution is a part of an AWS blog series on MWAA Disaster Recovery. Please review both [Part 1](https://aws.amazon.com/blogs/big-data/disaster-recovery-strategies-for-amazon-mwaa-part-1/) and
+[Part 2](https://aws.amazon.com/blogs/big-data/disaster-recovery-strategies-for-amazon-mwaa-part-2/)blog series before diving into the details of the solution.
 
 > [!NOTE]
 > The project currently supports the following versions of MWAA:
@@ -182,10 +179,12 @@ The [lib](lib) folder hosts the deployment code for the project. The project per
     - Sets up cross region replications for both MWAA DAGs and backup S3 buckets
     - Deploys the [mwaa_dr](assets/dags/mwaa_dr/) framework to the DAGs S3 bucket, which include DAGs for [backup](assets/dags/mwaa_dr/backup_metadata.py), [restore](assets/dags/mwaa_dr/restore_metadata.py), and [cleanup](assets/dags/mwaa_dr/cleanup_metadata.py) of metadata store
     - Deploys the [Airflow CLI](lib/constructs/airflow_cli.py) custom resource and associated lambda functions to setup necessary Airflow variables on the primary MWAA environment
+    - Deploys an SNS topic for DAG failure notification
 
 - [The Secondary Region Stack](lib/stacks/mwaa_secondary_stack.py)
     - Deploys a backup S3 bucket to the secondary region
     - Deploys a StepFunctions workflow and associated Lambda functions to the secondary region configured with EventBridge schedule for health check of the primary region MWAA environment
+    - Deploys an SNS topic for workflow failure notification
 
 ## Prerequisites
 
@@ -733,7 +732,7 @@ For running backup and restore DAGs on your Amazon MWAA environment on AWS, you 
 7. Create an Airflow Variable with the key name `DR_BACKUP_SCHEDULE` and the value containing a cron expression for running periodic backup, e.g., use `0 * * * *` for hourly backup.
 8. You can then manually trigger the backup and restore at any point. It may be worthwhile to first clean your metadata store by running the [cleanup_metadata](assets/dags/mwaa_dr/cleanup_metadata.py) DAG before performing restore operations to avoid database key constraint violations. Please make sure to use wider range for `MAX_AGE_IN_DAYS` and `MIN_AGE_IN_DAYS` (a value of `0` is suitable of min age for this use case) so that the metadata store is completely clean.
 
-### May Need Environment Restart for Plugins to Work
+### May Need to Restart Environment for Plugins to Work
 
 If you have plugins that rely on variables and connections, particularly, for the [Backup Restore](#backup-and-restore) approach, you may need to manually restart the MWAA environment after the restore is complete for the solution to work. The plugins get loaded in the secondary MWAA environment immediately after it is created before the variables and connections can be restored, thus, breaking your plugins dependencies. Restarting the environment will help mitigate this issue.
 
