@@ -15,35 +15,14 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 
-from airflow import version
+from mwaa_dr.v_2_7.dr_factory import DRFactory_2_7
 
-kwargs = {"dag_id": "restore_metadata", "path_prefix": "data", "storage_type": "S3"}
-airflow_version = version.version
-
-factory = None
-if airflow_version.startswith("2.5"):
-    from mwaa_dr.v_2_5.dr_factory import DRFactory_2_5
-
-    factory = DRFactory_2_5(**kwargs)
-
-elif airflow_version.startswith("2.6"):
-    from mwaa_dr.v_2_6.dr_factory import DRFactory_2_6
-
-    factory = DRFactory_2_6(**kwargs)
-
-elif airflow_version.startswith("2.7"):
-    from mwaa_dr.v_2_7.dr_factory import DRFactory_2_7
-
-    factory = DRFactory_2_7(**kwargs)
-
-elif airflow_version.startswith("2.8"):
-    from mwaa_dr.v_2_8.dr_factory import DRFactory_2_8
-
-    factory = DRFactory_2_8(**kwargs)
-
-else:
-    from mwaa_dr.framework.factory.default_dag_factory import DefaultDagFactory
-
-    factory = DefaultDagFactory(**kwargs)
-
-factory.create_restore_dag()
+"""
+The schema and dependencies are based on ERD here:
+https://airflow.apache.org/docs/apache-airflow/2.8.1/database-erd-ref.html
+"""
+class DRFactory_2_8(DRFactory_2_7):
+    def __init__(
+        self, dag_id: str, path_prefix: str, storage_type: str = None, batch_size=5000
+    ) -> None:
+        super().__init__(dag_id, path_prefix, storage_type, batch_size)

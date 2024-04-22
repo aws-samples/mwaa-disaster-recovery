@@ -53,11 +53,11 @@ automatically close the issue.
 - [ ] I need help with writing tests
 
 ## Running lint
-- [ ] I ran `pre-commit run --all-files` to fix linting issues
+- [ ] I have run `pre-commit run --all-files` to fix linting issues
 
 ## Running test
 
-- [ ] I ran `pytest` and all tests are passing
+- [ ] I have run `pytest` and all tests are passing
 
 ## Updated the documentation
 
