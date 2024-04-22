@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.1.1] - 2024-04-21
+## [0.1.1] - 2024-04-22
 ### Added
 
 - The [mwaa_dr/](assets/dags/mwaa_dr/) framework for supporting multiple versions of MWAA
