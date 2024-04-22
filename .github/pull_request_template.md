@@ -11,58 +11,19 @@
 
      - Provide tests for your changes.
      - Use descriptive commit messages.
-	 - Comment your code where appropriate.
-	 - Squash your commits
-     - Update any related documentation.
-     - Update CHANGELOG by inserting subsections (Added, Removed, Updated, Fixed)
-     under the Unreleased section
--->
+<!-- TOC -->
 
-## What type of PR is this? (check all applicable)
+- [What type of PR is this? check all applicable](#what-type-of-pr-is-this-check-all-applicable)
+- [Description](#description)
+- [Related Tickets & Documents](#related-tickets--documents)
+- [Added/updated tests?](#addedupdated-tests)
+- [Running lint](#running-lint)
+- [Running test](#running-test)
+- [Updated the documentation](#updated-the-documentation)
+- [Updated the Changelog](#updated-the-changelog)
+- [Terms of Contribution](#terms-of-contribution)
 
-- [ ] Refactor
-- [ ] Feature
-- [ ] Bug Fix
-- [ ] Optimization
-- [ ] Documentation Update
-- [ ] Dependency Update
-- [ ] Version Update
-
-## Description
-<!-- Describe your PR here -->
-
-
-## Related Tickets & Documents
-
-<!--
-For pull requests that relate or close an issue, please include them
-below.  We like to follow [Github's guidance on linking issues to pull requests](https://docs.github.com/en/issues/tracking-your-work-with-issues/linking-a-pull-request-to-an-issue).
-
-For example having the text: "closes #1234" would connect the current pull
-request to issue 1234.  And when we merge the pull request, Github will
-automatically close the issue.
--->
-
-- Related Issue #
-- Closes #
-
-## Added/updated tests?
-
-- [ ] Yes
-- [ ] No, and this is why: _please replace this line with details on why tests have not been included_
-- [ ] I need help with writing tests
-
-## Running lint
-- [ ] I have run `pre-commit run --all-files` to fix linting issues
-
-## Running test
-
-- [ ] I have run `pytest` and all tests are passing
-
-## Updated the documentation
-
-Did you update the [README](../README.md) to reflect your PR changes?
-- [ ] Yes
+<!-- /TOC -->
 - [ ] No, README does not need to be updated for this PR
 
 ## Updated the Changelog
@@ -71,3 +32,7 @@ Did you update the [CHANGELOG](../CHANGELOG.md) with the changes you are making 
 Please use Added, Removed, and/or Changed subsections under the [Unreleased](../CHANGELOG.md#unreleased) section.
 - [ ] Yes
 - [ ] No, I need help
+
+## Terms of Contribution
+
+By submitting this pull request, I confirm that you can use, modify, copy, and redistribute this contribution, under the terms of your choice.
