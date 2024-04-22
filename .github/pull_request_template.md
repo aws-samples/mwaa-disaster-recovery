@@ -11,24 +11,56 @@
 
      - Provide tests for your changes.
      - Use descriptive commit messages.
-<!-- TOC -->
+-->
 
-- [What type of PR is this? check all applicable](#what-type-of-pr-is-this-check-all-applicable)
-- [Description](#description)
-- [Related Tickets & Documents](#related-tickets--documents)
-- [Added/updated tests?](#addedupdated-tests)
-- [Running lint](#running-lint)
-- [Running test](#running-test)
-- [Updated the documentation](#updated-the-documentation)
-- [Updated the Changelog](#updated-the-changelog)
-- [Terms of Contribution](#terms-of-contribution)
+## What type of PR is this? (check all applicable)
 
-<!-- /TOC -->
-- [ ] No, README does not need to be updated for this PR
+- [ ] Refactor
+- [ ] Feature
+- [ ] Bug Fix
+- [ ] Optimization
+- [ ] Documentation Update
+- [ ] Dependency Update
+- [ ] Release
 
-## Updated the Changelog
+## Description
+<!-- Short description of the PR -->
 
-Did you update the [CHANGELOG](../CHANGELOG.md) with the changes you are making in this PR?
+
+## Related Tickets & Documents
+<!--
+For pull requests that relate or close an issue, please include them
+below.  We like to follow [Github's guidance on linking issues to pull requests](https://docs.github.com/en/issues/tracking-your-work-with-issues/linking-a-pull-request-to-an-issue).
+
+For example having the text: "closes #1234" would connect the current pull
+request to issue 1234.  And when we merge the pull request, Github will
+automatically close the issue.
+-->
+
+- Related Issue #
+- Closes #
+
+## Linting
+
+Have you done linting by issuing `pre-commit run --all-files` command?
+- [ ] Yes
+- [ ] No, I need help with linting
+
+
+## Testing
+
+Have you run testing by issuing `pytest` command?
+- [ ] Yes
+- [ ] No, I need help with writing tests
+
+## Documentation
+Have you updated the [README](../README.md) appropriate for this PR?
+- [ ] Yes
+- [ ] No, README does not need any changes for this PR
+
+## Changelog
+
+Have you updated the [CHANGELOG](../CHANGELOG.md) with the changes you are making in this PR?
 Please use Added, Removed, and/or Changed subsections under the [Unreleased](../CHANGELOG.md#unreleased) section.
 - [ ] Yes
 - [ ] No, I need help

@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2024-04-21
 ### Added
 
 - The [mwaa_dr/](assets/dags/mwaa_dr/) framework for supporting multiple versions of MWAA
@@ -15,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CDK [stacks](lib/stacks/) to deploy resources in both primary and secondary AWS regions
  for supporting DR
 - AWS Lambda [functions](lib/function/) for supporting cli commands and DR workflows
+- [config.py](./config.py) to support stack parameters and other project configurations
 
 ### Changed
 
@@ -22,12 +24,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Contribution guide with info on how to contribute
 
 
-## [0.0.0] - 2023-03-05
+## [0.0.0] - 2024-04-19
 
 ### Added
 
 - Initial commit with sample readme, code of conduct, and license
 
 
-[unreleased]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v0.0.0...HEAD
+[unreleased]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v0.0.0...v0.1.0
 [0.0.0]: https://github.com/aws-samples/mwaa-disaster-recovery/releases/tag/v0.0.0
