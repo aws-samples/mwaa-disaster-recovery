@@ -40,7 +40,7 @@ class DRFactory_2_7(DRFactory_2_6):
                 "map_index",
                 "run_id",
                 "task_id",
-                "custom_operator_name",
+                "custom_operator_name",  # New field
                 "duration",
                 "end_date",
                 "executor_config",
@@ -79,7 +79,12 @@ class DRFactory_2_7(DRFactory_2_6):
         return BaseTable(
             name="slot_pool",
             model=model,
-            columns=["description", "include_deferred", "pool", "slots"],
+            columns=[
+                "description",
+                "include_deferred",  # New field
+                "pool",
+                "slots",
+            ],
             export_filter="pool != 'default_pool'",
             storage_type=self.storage_type,
             path_prefix=self.path_prefix,

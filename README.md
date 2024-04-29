@@ -57,10 +57,13 @@
         - [Special Handling of Variable and Connection Tables](#special-handling-of-variable-and-connection-tables)
         - [Clean Metadata Tables Required for the Restore Workflow](#clean-metadata-tables-required-for-the-restore-workflow)
         - [Manually Triggering the Recovery Workflow](#manually-triggering-the-recovery-workflow)
-        - [Using the Metadata Backup and Restore Independently](#using-the-metadata-backup-and-restore-independently)
+        - [Using the Metadata Backup and Restore DAGs Independently](#using-the-metadata-backup-and-restore-dags-independently)
             - [Local Runner](#local-runner)
             - [Amazon MWAA](#amazon-mwaa)
         - [May Need to Restart Environment for Plugins to Work](#may-need-to-restart-environment-for-plugins-to-work)
+- [Frequently Asked Questions](#frequently-asked-questions)
+    - [FAQ-1: Failure to Read Environment Backup](#faq-1-failure-to-read-environment-backup)
+    - [FAQ-2: Failure to Create New Environment](#faq-2-failure-to-create-new-environment)
 
 <!-- /TOC -->
 
@@ -644,7 +647,7 @@ The project offers a custom solution to address the disaster recovery needs for 
 
 ### Data Loss Probability
 
-The project **only** takes metadata backup of the tasks that are not actively running in the primary environment, i.e, it excludes task instances in any of [`running`, `restarting`, `queued`, `scheduled`, `up_for_retry`, and `up_for_reschedule`] states. Hence, the solution cannot restore an actively running DAG in the secondary environment. If the primary environment fails while actively running some DAGs, then those DAGs will restart at the specified next schedules after cut over to the secondary environment. If those DAGs do not have schedules specified, then the admins will need to manually trigger them in the secondary location. 
+The project **only** takes metadata backup of the tasks that are not actively running in the primary environment, i.e, it excludes task instances in any of [`running`, `restarting`, `queued`, `scheduled`, `up_for_retry`, and `up_for_reschedule`] states. Hence, the solution cannot restore an actively running DAG in the secondary environment. If the primary environment fails while actively running some DAGs, then those DAGs will restart at the specified next schedules after cut over to the secondary environment. If those DAGs do not have schedules specified, then the admins will need to manually trigger them in the secondary location.
 
 > [!CAUTION]
 > As a side-effect of the aforementioned strategy, the metadata of the most recently run [backup_metadata](assets/dags/mwaa_dr/backup_metadata.py) DAG will be excluded from the backup, as the DAG will be in active state when its taking backup of the metadata.
@@ -654,7 +657,7 @@ The project **only** takes metadata backup of the tasks that are not actively ru
 
 ### Special Handling of Variable and Connection Tables
 
-The most recent backup of the primary environment will always override the metadata of the secondary environment except for the `variable` and `connection` tables. In many cases, the secondary Amazon MWAA environment will likely need to interact with different data sources and web services running in the secondary region. Hence, the restore workflow will not override existing entries of the variable and connection tables in the secondary MWAA environment. 
+The most recent backup of the primary environment will always override the metadata of the secondary environment except for the `variable` and `connection` tables. In many cases, the secondary Amazon MWAA environment will likely need to interact with different data sources and web services running in the secondary region. Hence, the restore workflow will not override existing entries of the variable and connection tables in the secondary MWAA environment.
 
 > [!IMPORTANT]
 > Users are encouraged to either create the needed variables and connections entries in the secondary environment manually or modify the logic in the codebase for [Variable](assets/dags/mwaa_dr/framework/model/variable_table.py#L70) and [Connection](assets/dags/mwaa_dr/framework/model/connection_table.py#L96) tables appropriately to force updates in all cases.
@@ -662,7 +665,7 @@ The most recent backup of the primary environment will always override the metad
 
 ### Clean Metadata Tables Required for the Restore Workflow
 
-The solution backs up `variable`, `connection`, `slot_pool`, `log`, `job`, `dag_run`, `trigger`, `task_instance`, and `task_fail` tables by default during the backup workflow in the primary region. If any of these tables are non-empty during a recovery workflow in the secondary region, then you will encounter database key constraint violations in the metadata store. To avoid this issue, particularly for the [Warm Standby](#warm-standby) approach, it is critical that you frequently cleanup the secondary region MWAA metadata using the [clean_metadata](assets/dags/mwaa_dr/cleanup_metadata.py) DAG. 
+The solution backs up `variable`, `connection`, `slot_pool`, `log`, `job`, `dag_run`, `trigger`, `task_instance`, and `task_fail` tables by default during the backup workflow in the primary region. If any of these tables are non-empty during a recovery workflow in the secondary region, then you will encounter database key constraint violations in the metadata store. To avoid this issue, particularly for the [Warm Standby](#warm-standby) approach, it is critical that you frequently cleanup the secondary region MWAA metadata using the [clean_metadata](assets/dags/mwaa_dr/cleanup_metadata.py) DAG.
 
 > [!IMPORTANT]
 > Please make sure to use wider range for `MAX_AGE_IN_DAYS` and `MIN_AGE_IN_DAYS` (a value of `0` is suitable of min age for this use case) so that the metadata store is completely clean when running the [cleanup_metadata](assets/dags/mwaa_dr/cleanup_metadata.py) DAG. By default, this DAG is scheduled to run weekly, and you may want to change the period or run it on demand after performing any tests in the secondary region.
@@ -690,7 +693,7 @@ To manually trigger the recovery workflow, find the Step Functions workflow in t
 This is also a great way to manually test your disaster recovery setup!
 
 
-### Using the Metadata Backup and Restore Independently
+### Using the Metadata Backup and Restore DAGs Independently
 
 There might be a situation where you simply want to backup and restore metadata without the need to utilize the full DR solution. You can run the backup and restore independently in two modes:
 
@@ -715,7 +718,7 @@ to:
 ```python
 kwargs = {"dag_id": "restore_metadata", "path_prefix": "data", "storage_type": "LOCAL_FS"}
 ```
-The metadata will be stored and restored from the `dags/data/` folder of the `mwaa-lcoal-runner` codebase. 
+The metadata will be stored and restored from the `dags/data/` folder of the `mwaa-lcoal-runner` codebase.
 
 > [!IMPORTANT]
 > Note that this is a great way to test and contribute support for a new version of MWAA.
@@ -736,5 +739,40 @@ For running backup and restore DAGs on your Amazon MWAA environment on AWS, you 
 
 If you have plugins that rely on variables and connections, particularly, for the [Backup Restore](#backup-and-restore) approach, you may need to manually restart the MWAA environment after the restore is complete for the solution to work. The plugins get loaded in the secondary MWAA environment immediately after it is created before the variables and connections can be restored, thus, breaking your plugins dependencies. Restarting the environment will help mitigate this issue.
 
+# Frequently Asked Questions
+
+This section documents some of the frequently asked questions around the solutions:
+
+## FAQ-1: Failure to Read Environment Backup
+
+**Question**: 
+I am trying to test the [Backup and Restore](#backup-and-restore) DR solution. I have set `MWAA_SIMULATE_DR=YES`, but I am getting `S3.S3Exception` with status code `403 - Access Denied` in the `Read Environment Backup` state as follows: 
+
+<img src="design/faqs/read-env-backup-s3-error.png" width="60%" >
+<img src="design/faqs/read-environment-backup-failure.png" width="60%">
+
+**Answer**:
+For the restore workflow to work, you must have one successful run of the workflow that follows the alternative path after the `Check Heartbeat` state, where it gets the primary environment details (`Get Environmnent Details`) and stores the configuration in S3 (`Store Environment Details`). In the absence of this configuration file, the `Read Environment Backup` state will fail with error.
+
+To resolve this issue, redeploy your stack with `MWAA_SIMULATE_DR=NO` and wait for the workflow to finish successfully. This run will store the primary environment configuration in the secondary backup S3 bucket. Now redeploy your stack with `MWAA_SIMULATE_DR=YES`.
+
+## FAQ-2: Failure to Create New Environment
+
+**Question**: 
+I am trying to test the [Backup and Restore](#backup-and-restore) DR solution. I have set `MWAA_SIMULATE_DR=YES`, but I am getting the following `ValidationException` in the `Create New Environment` state:
+```
+An error occurred (ValidationException) when calling the CreateEnvironment operation: Unable to access version <version-string-secondary> of <secondary-region-dags-bucket>/requirements.txt 
+```
+
+<img src="design/faqs/new-env-validation-failure.png" width="60%" >
+
+This issue occurs when the version of `requirements.txt` file in the secondary region DAGs bucket does not match that of the primary region DAGs bucket. 
+
+To resolve this issue, please carry out the following steps:
+
+1. Introduce a cosmetic change to your `requirements.txt` file, such as, a new line or space and upload the file to the primary region DAGs S3 bucket. The cross-region replication setup for the two DAGs buckets will ensure the change is replicated in the secondary region DAGs bucket. Double check the current version of `requirement.txt` in the two S3 buckets are the same before moving on. 
+2. Edit the MWAA environment in the primary region to use the newly uploaded `requirements.txt`. After you save the configuration change, the MWAA environment will undergo updates. Wait for the environment to be available.
+3. Redeploy your stack with `MWAA_SIMULATE_DR=NO` and wait for the workflow to finish successfully once. This will ensure that the latest primary environment configuration (including the current version of `requirements.txt`) is stored in the secondary region backup bucket for future use.
+4. Redeploy your stack with `MWAA_SIMULATE_DR=YES`, which should now pick up the right version of the requirements file from the secondary DAGs bucket.
 
 

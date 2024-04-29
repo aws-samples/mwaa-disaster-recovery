@@ -242,6 +242,7 @@ class MwaaSecondaryStack(MwaaBaseStack):
         restore_metadata_state = self.create_dag_trigger_state(
             state_name="Restore Metadata",
             mwaa_env_name=conf.secondary_mwaa_environment_name,
+            mwaa_env_version=conf.mwaa_version,
             dag_name=conf.metadata_import_dag_name,
             bucket=self.backup_bucket.bucket_name,
             dr_type=conf.dr_type,
