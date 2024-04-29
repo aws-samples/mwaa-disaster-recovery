@@ -5,7 +5,7 @@ repos:
     -   id: check-yaml
     -   id: end-of-file-fixer
     -   id: trailing-whitespace
-        
+
 
 -   repo: https://github.com/PyCQA/autoflake
     rev: v2.2.1
@@ -13,18 +13,12 @@ repos:
     -   id: autoflake
         args: [--remove-unused-variables, --in-place]
 
--   repo: https://github.com/pycqa/isort
-    rev: 5.13.2
-    hooks:
-    -   id: isort
-
 -   repo: https://github.com/asottile/pyupgrade
     rev: v3.15.2
     hooks:
     -   id: pyupgrade
-    
+
 -   repo: https://github.com/ambv/black
     rev: 24.4.0
     hooks:
     -   id: black
-        

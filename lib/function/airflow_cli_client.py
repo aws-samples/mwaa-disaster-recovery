@@ -118,16 +118,16 @@ class AirflowCliClient:
         return result
 
     def trigger_dag(self, dag_name: str, configuration: dict):
-        semVer = self.environment_version.split(".")
+        sem_ver = self.environment_version.split(".")
 
         command = ""
         expected_result = ""
 
-        if int(semVer[0]) <= 2 and int(semVer[1] <= 5):
+        if int(sem_ver[0]) <= 2 and int(sem_ver[1]) <= 5:
             command = f"dags trigger {dag_name}"
             expected_result = "triggered: True"
         else:
-            command = f"dags trigger -o json ${dag_name}"
+            command = f"dags trigger -o json {dag_name}"
             expected_result = '"external_trigger": "True"'
 
         result = self.execute(

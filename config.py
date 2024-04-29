@@ -130,7 +130,7 @@ class Config:
     @property
     def mwaa_version(self) -> str:
         version = self.get(MWAA_VERSION)
-        if version not in ["2.0.2", "2.2.2", "2.4.3", "2.5.1"]:
+        if version not in ["2.5.1", "2.6.3", "2.7.2", "2.8.1"]:
             raise ValueError(f"The MWAA version, {version}, is not supported!")
         return version
 
