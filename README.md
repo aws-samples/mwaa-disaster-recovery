@@ -745,8 +745,8 @@ This section documents some of the frequently asked questions around the solutio
 
 ## FAQ-1: Failure to Read Environment Backup
 
-**Question**: 
-I am trying to test the [Backup and Restore](#backup-and-restore) DR solution. I have set `MWAA_SIMULATE_DR=YES`, but I am getting `S3.S3Exception` with status code `403 - Access Denied` in the `Read Environment Backup` state as follows: 
+**Question**:
+I am trying to test the [Backup and Restore](#backup-and-restore) DR solution. I have set `MWAA_SIMULATE_DR=YES`, but I am getting `S3.S3Exception` with status code `403 - Access Denied` in the `Read Environment Backup` state as follows:
 
 <img src="design/faqs/read-env-backup-s3-error.png" width="60%" >
 <img src="design/faqs/read-environment-backup-failure.png" width="60%">
@@ -758,21 +758,19 @@ To resolve this issue, redeploy your stack with `MWAA_SIMULATE_DR=NO` and wait f
 
 ## FAQ-2: Failure to Create New Environment
 
-**Question**: 
+**Question**:
 I am trying to test the [Backup and Restore](#backup-and-restore) DR solution. I have set `MWAA_SIMULATE_DR=YES`, but I am getting the following `ValidationException` in the `Create New Environment` state:
 ```
-An error occurred (ValidationException) when calling the CreateEnvironment operation: Unable to access version <version-string-secondary> of <secondary-region-dags-bucket>/requirements.txt 
+An error occurred (ValidationException) when calling the CreateEnvironment operation: Unable to access version <version-string-secondary> of <secondary-region-dags-bucket>/requirements.txt
 ```
 
 <img src="design/faqs/new-env-validation-failure.png" width="60%" >
 
-This issue occurs when the version of `requirements.txt` file in the secondary region DAGs bucket does not match that of the primary region DAGs bucket. 
+This issue occurs when the version of `requirements.txt` file in the secondary region DAGs bucket does not match that of the primary region DAGs bucket.
 
 To resolve this issue, please carry out the following steps:
 
-1. Introduce a cosmetic change to your `requirements.txt` file, such as, a new line or space and upload the file to the primary region DAGs S3 bucket. The cross-region replication setup for the two DAGs buckets will ensure the change is replicated in the secondary region DAGs bucket. Double check the current version of `requirement.txt` in the two S3 buckets are the same before moving on. 
+1. Introduce a cosmetic change to your `requirements.txt` file, such as, a new line or space and upload the file to the primary region DAGs S3 bucket. The cross-region replication setup for the two DAGs buckets will ensure the change is replicated in the secondary region DAGs bucket. Double check the current version of `requirement.txt` in the two S3 buckets are the same before moving on.
 2. Edit the MWAA environment in the primary region to use the newly uploaded `requirements.txt`. After you save the configuration change, the MWAA environment will undergo updates. Wait for the environment to be available.
 3. Redeploy your stack with `MWAA_SIMULATE_DR=NO` and wait for the workflow to finish successfully once. This will ensure that the latest primary environment configuration (including the current version of `requirements.txt`) is stored in the secondary region backup bucket for future use.
 4. Redeploy your stack with `MWAA_SIMULATE_DR=YES`, which should now pick up the right version of the requirements file from the secondary DAGs bucket.
-
-
