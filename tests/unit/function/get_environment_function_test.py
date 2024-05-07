@@ -1,3 +1,6 @@
+# pylint: disable=missing-class-docstring
+# pylint: disable=missing-function-docstring
+
 """
 Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 
@@ -16,27 +19,19 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 
 import json
-from .airflow_cli_client import AirflowCliClient
+from sure import expect
+from tests.unit.mocks.mock_setup import aws_credentials, aws_mwaa
+from tests.unit.mocks.environment_configs import get_environment_response
+from lib.function.get_environment_function import handler
 
-def handler(event, context):
-    print(f"Event: {json.dumps(event)}")
 
-    mwaa_env_name = event["mwaa_env_name"]
-    mwaa_env_version = event["mwaa_env_version"]
-    dag = event["dag"]
-    bucket = event["bucket"]
-    task_token = event["task_token"]
-    dr_type = event["dr_type"]
-    config = {"bucket": bucket, "task_token": task_token, "dr_type": dr_type}
 
-    airflow_cli = AirflowCliClient(mwaa_env_name, mwaa_env_version)
+def test_handler(aws_mwaa):
+    event = {
+        'env_name': 'mwaa-2-8-1-public-primary',
+        'env_region': 'us-east-1'
+    }
 
-    print(f"Unpausing DAG {dag} ...")
-    result = airflow_cli.unpause_dag(dag)
-    print(f"Unpausing result: {result}")
+    response = handler(event, {})
+    expect(response).to.equal(json.dumps(get_environment_response, default=str))
 
-    print(f"Triggering DAG {dag} with config {config} ...")
-    result = airflow_cli.trigger_dag(dag, config)
-    print(f"DAG trigger result: {result}")
-
-    return result.to_json()

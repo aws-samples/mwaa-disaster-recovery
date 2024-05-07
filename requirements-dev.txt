@@ -1,0 +1,10 @@
+apache-airflow==2.8.1
+pre-commit~=3.7.0
+setuptools~=69.5.1
+pytest~=8.2.0
+coverage~=7.5.0
+pytest-mock~=3.14.0
+requests~=2.31.0
+moto~=5.0.6
+sure~=2.0.1
+httpretty~=1.1.4
