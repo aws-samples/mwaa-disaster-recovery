@@ -22,7 +22,7 @@ from moto import mock_aws
 from tests.unit.mocks.mock_setup import aws_credentials, aws_mwaa
 import pytest
 from botocore.config import Config as AwsConfig
-from lib.function.airflow_cli_client import AirflowCliClient, AirflowCliException, AirflowCliCommand, AirflowCliResult
+from lib.functions.airflow_cli_client import AirflowCliClient, AirflowCliException, AirflowCliCommand, AirflowCliResult
 from sure import expect
 import httpretty
 from unittest.mock import Mock

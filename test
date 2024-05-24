@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+rm -rf coverage
+mkdir -p coverage
+coverage run -m pytest \
+    && coverage lcov -o coverage/coverage.lcov \
+    && coverage html \
+    && coverage report -m

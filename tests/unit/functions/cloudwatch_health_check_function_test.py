@@ -24,7 +24,7 @@ import boto3
 from unittest.mock import patch
 from sure import expect
 from tests.unit.mocks.mock_setup import boto_make_api_call, aws_credentials
-from lib.function.cloudwatch_health_check_function import handler
+from lib.functions.cloudwatch_health_check_function import handler
 
 heartbeat_missing_response = {
     "MetricDataResults": [

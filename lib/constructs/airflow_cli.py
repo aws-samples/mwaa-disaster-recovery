@@ -25,7 +25,7 @@ from aws_cdk import custom_resources as cr
 from constructs import Construct
 from dataclasses_json import dataclass_json
 
-from lib.function.airflow_cli_client import AirflowCliInput
+from lib.functions.airflow_cli_client import AirflowCliInput
 
 
 @dataclass_json
@@ -37,18 +37,6 @@ class VpcInfo:
 
 
 class AirflowCli(Construct):
-    @property
-    def custom_resource(self) -> CustomResource:
-        return self._custom_resource
-
-    @property
-    def provider(self) -> cr.Provider:
-        return self._provider
-
-    @property
-    def cli_function(self) -> _lambda.Function:
-        return self._cli_function
-
     def __init__(
         self,
         scope: Construct,
@@ -138,7 +126,7 @@ class AirflowCli(Construct):
             id,
             runtime=_lambda.Runtime.PYTHON_3_11,
             code=_lambda.Code.from_asset(
-                path="lib/function",
+                path="lib/functions",
                 bundling=BundlingOptions(
                     image=_lambda.Runtime.PYTHON_3_11.bundling_image,
                     command=[

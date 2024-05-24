@@ -354,7 +354,7 @@ class MwaaSecondaryStack(MwaaBaseStack):
             conf.get_name("get-environment-function"),
             runtime=_lambda.Runtime.PYTHON_3_11,
             code=_lambda.Code.from_asset(
-                path="lib/function",
+                path="lib/functions",
                 bundling=cdk.BundlingOptions(
                     image=_lambda.Runtime.PYTHON_3_11.bundling_image,
                     command=[
@@ -407,7 +407,7 @@ class MwaaSecondaryStack(MwaaBaseStack):
             logical_id,
             runtime=_lambda.Runtime.PYTHON_3_11,
             code=_lambda.Code.from_asset(
-                path="lib/function",
+                path="lib/functions",
                 bundling=cdk.BundlingOptions(
                     image=_lambda.Runtime.PYTHON_3_11.bundling_image,
                     command=[
@@ -528,7 +528,7 @@ class MwaaSecondaryStack(MwaaBaseStack):
             conf.get_name("create-environment-function"),
             runtime=_lambda.Runtime.PYTHON_3_11,
             code=_lambda.Code.from_asset(
-                path="lib/function",
+                path="lib/functions",
                 bundling=cdk.BundlingOptions(
                     image=_lambda.Runtime.PYTHON_3_11.bundling_image,
                     command=[
@@ -661,7 +661,7 @@ class MwaaSecondaryStack(MwaaBaseStack):
             conf.get_name("disable-scheduler-function"),
             runtime=_lambda.Runtime.PYTHON_3_11,
             code=_lambda.Code.from_asset(
-                path="lib/function",
+                path="lib/functions",
                 bundling=cdk.BundlingOptions(
                     image=_lambda.Runtime.PYTHON_3_11.bundling_image,
                     command=[
@@ -694,7 +694,7 @@ class MwaaSecondaryStack(MwaaBaseStack):
             conf.get_name("cloudwatch-health-check-function"),
             runtime=_lambda.Runtime.PYTHON_3_11,
             code=_lambda.Code.from_asset(
-                path="lib/function",
+                path="lib/functions",
                 bundling=cdk.BundlingOptions(
                     image=_lambda.Runtime.PYTHON_3_11.bundling_image,
                     command=[

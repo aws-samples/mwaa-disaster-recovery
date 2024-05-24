@@ -53,6 +53,12 @@ omit = [
 include = [
   "lib/**/*.py",
   "assets/**/*.py",
-  "app.py",
-  "mwaa"
+  "./config.py",
 ]
+branch = true
+
+[tool.coverage.report]
+ignore_errors = true
+
+[tool.coverage.html]
+directory = "coverage/html"

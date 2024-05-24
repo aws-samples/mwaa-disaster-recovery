@@ -23,7 +23,7 @@ import boto3
 from unittest.mock import patch
 from sure import expect
 from tests.unit.mocks.mock_setup import boto_make_api_call, aws_credentials
-from lib.function.disable_scheduler_function import handler
+from lib.functions.disable_scheduler_function import handler
 
 schedule = {
     "ResponseMetadata": {

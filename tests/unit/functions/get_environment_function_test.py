@@ -22,7 +22,7 @@ import json
 from sure import expect
 from tests.unit.mocks.mock_setup import aws_credentials, aws_mwaa
 from tests.unit.mocks.environment_configs import get_environment_response
-from lib.function.get_environment_function import handler
+from lib.functions.get_environment_function import handler
 
 
 

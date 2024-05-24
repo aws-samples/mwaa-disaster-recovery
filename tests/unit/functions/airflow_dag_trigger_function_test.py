@@ -23,8 +23,8 @@ from unittest.mock import patch
 from sure import expect
 from moto import mock_aws
 from tests.unit.mocks.mock_setup import aws_credentials, aws_mwaa
-from lib.function.airflow_cli_client import AirflowCliClient, AirflowCliCommand, AirflowCliInput, AirflowCliResult, AirflowCliException
-from lib.function.airflow_dag_trigger_function import handler
+from lib.functions.airflow_cli_client import AirflowCliClient, AirflowCliCommand, AirflowCliInput, AirflowCliResult, AirflowCliException
+from lib.functions.airflow_dag_trigger_function import handler
 
 @mock_aws
 def test_handler(aws_mwaa):

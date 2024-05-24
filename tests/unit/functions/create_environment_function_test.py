@@ -22,7 +22,7 @@ import json
 import pytest
 from sure import expect
 from tests.unit.mocks.mock_setup import aws_credentials, aws_mwaa
-from lib.function.create_environment_function import handler
+from lib.functions.create_environment_function import handler
 from tests.unit.mocks.environment_configs import mwaa_environment_with_tags, mwaa_environment_without_tags, create_environment_response
 
 def test_handler_without_env_tags(aws_mwaa):
