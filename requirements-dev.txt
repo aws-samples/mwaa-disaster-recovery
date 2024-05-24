@@ -1,4 +1,4 @@
-apache-airflow==2.8.1
+apache-airflow==2.9.1
 pre-commit~=3.7.0
 setuptools~=69.5.1
 pytest~=8.2.0
