@@ -23,20 +23,23 @@ import pytest
 from sure import expect
 from tests.unit.mocks.mock_setup import aws_credentials, aws_mwaa
 from lib.functions.create_environment_function import handler
-from tests.unit.mocks.environment_configs import mwaa_environment_with_tags, mwaa_environment_without_tags, create_environment_response
+from tests.unit.mocks.environment_configs import (
+    mwaa_environment_with_tags,
+    mwaa_environment_without_tags,
+    create_environment_response,
+)
+
 
 def test_handler_without_env_tags(aws_mwaa):
     event = {
-        'execution_role_arn': 'arn:aws:iam::123456789999:role/mwaa-exec-role',
-        'name': 'mwaa-2-8-1-public-secondary',
-        'network': {
-            'subnet_ids': ['subnet-12345678', 'subnet-87654321'],
-            'security_group_ids': ['sg-12345678'],
+        "execution_role_arn": "arn:aws:iam::123456789999:role/mwaa-exec-role",
+        "name": "mwaa-2-8-1-public-secondary",
+        "network": {
+            "subnet_ids": ["subnet-12345678", "subnet-87654321"],
+            "security_group_ids": ["sg-12345678"],
         },
-        'source_bucket_arn': 'arn:aws:s3:::secondary-bucket',
-        'environment': json.dumps({
-            'Environment': mwaa_environment_without_tags
-        })
+        "source_bucket_arn": "arn:aws:s3:::secondary-bucket",
+        "environment": json.dumps({"Environment": mwaa_environment_without_tags}),
     }
 
     expect(handler(event, None)).to.equal(create_environment_response)
@@ -44,16 +47,14 @@ def test_handler_without_env_tags(aws_mwaa):
 
 def test_handler_with_env_tags(aws_mwaa):
     event = {
-        'execution_role_arn': 'arn:aws:iam::123456789999:role/mwaa-exec-role',
-        'name': 'mwaa-2-8-1-public-secondary',
-        'network': {
-            'subnet_ids': ['subnet-12345678', 'subnet-87654321'],
-            'security_group_ids': ['sg-12345678'],
+        "execution_role_arn": "arn:aws:iam::123456789999:role/mwaa-exec-role",
+        "name": "mwaa-2-8-1-public-secondary",
+        "network": {
+            "subnet_ids": ["subnet-12345678", "subnet-87654321"],
+            "security_group_ids": ["sg-12345678"],
         },
-        'source_bucket_arn': 'arn:aws:s3:::secondary-bucket',
-        'environment': json.dumps({
-            'Environment': mwaa_environment_with_tags
-        })
+        "source_bucket_arn": "arn:aws:s3:::secondary-bucket",
+        "environment": json.dumps({"Environment": mwaa_environment_with_tags}),
     }
 
     expect(handler(event, None)).to.equal(create_environment_response)

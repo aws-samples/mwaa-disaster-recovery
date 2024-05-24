@@ -18,157 +18,165 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 
-import os
 from unittest.mock import patch
 from sure import expect
 from moto import mock_aws
 from tests.unit.mocks.mock_setup import aws_credentials, aws_mwaa, warm_standby_env_vars
-from lib.functions.airflow_cli_client import AirflowCliCommand, AirflowCliInput, AirflowCliResult, AirflowCliException
+from lib.functions.airflow_cli_client import (
+    AirflowCliCommand,
+    AirflowCliInput,
+    AirflowCliResult,
+    AirflowCliException,
+)
 from lib.functions.airflow_cli_function import on_event, on_create, on_update, on_delete
 
+
 def test_on_event_create():
-    with patch('lib.functions.airflow_cli_function.on_create') as on_create_mock:
-        event = {
-            "RequestType": "Create"
-        }
+    with patch("lib.functions.airflow_cli_function.on_create") as on_create_mock:
+        event = {"RequestType": "Create"}
         on_event(event, None)
     on_create_mock.assert_called_once_with(event)
 
 
 def test_on_event_update():
-    with patch('lib.functions.airflow_cli_function.on_update') as on_update_mock:
-        event = {
-            "RequestType": "Update"
-        }
+    with patch("lib.functions.airflow_cli_function.on_update") as on_update_mock:
+        event = {"RequestType": "Update"}
         on_event(event, None)
     on_update_mock.assert_called_once_with(event)
 
 
 def test_on_event_delete():
-    with patch('lib.functions.airflow_cli_function.on_delete') as on_delete_mock:
-        event = {
-            "RequestType": "Delete"
-        }
+    with patch("lib.functions.airflow_cli_function.on_delete") as on_delete_mock:
+        event = {"RequestType": "Delete"}
         on_event(event, None)
     on_delete_mock.assert_called_once_with(event)
 
 
 def test_on_event_others():
-    event = {
-        "RequestType": "SomethingElse"
-    }
-    on_event.when.called_with(event, None).should.have.raised(AirflowCliException, "Invalid request type: SomethingElse")
+    event = {"RequestType": "SomethingElse"}
+    on_event.when.called_with(event, None).should.have.raised(
+        AirflowCliException, "Invalid request type: SomethingElse"
+    )
 
 
 cli_input = AirflowCliInput(
     create=[
-        AirflowCliCommand(command='variables set KEY-A VALUE-A'),
-        AirflowCliCommand(command='variables set KEY-B VALUE-B'),
+        AirflowCliCommand(command="variables set KEY-A VALUE-A"),
+        AirflowCliCommand(command="variables set KEY-B VALUE-B"),
     ],
     update=[
-        AirflowCliCommand(command='variables set KEY-A VALUE-A'),
-        AirflowCliCommand(command='variables set KEY-B VALUE-B'),
+        AirflowCliCommand(command="variables set KEY-A VALUE-A"),
+        AirflowCliCommand(command="variables set KEY-B VALUE-B"),
     ],
     delete=[
-        AirflowCliCommand(command='variables delete KEY-A'),
-        AirflowCliCommand(command='variables delete KEY-B'),
+        AirflowCliCommand(command="variables delete KEY-A"),
+        AirflowCliCommand(command="variables delete KEY-B"),
     ],
 )
+
 
 @mock_aws
 def test_on_create(aws_mwaa, warm_standby_env_vars):
     event = {
-        'RequestId': 'request-id',
-        'RequestType': "Create",
-        'ResourceProperties': {
-            'airflow_cli_input': cli_input.to_json()
-        }
+        "RequestId": "request-id",
+        "RequestType": "Create",
+        "ResourceProperties": {"airflow_cli_input": cli_input.to_json()},
     }
     results = [
-        AirflowCliResult(stdout='Variable KEY-A created', stderr='').to_json(),
-        AirflowCliResult(stdout='Variable KEY-B created', stderr='').to_json(),
+        AirflowCliResult(stdout="Variable KEY-A created", stderr="").to_json(),
+        AirflowCliResult(stdout="Variable KEY-B created", stderr="").to_json(),
     ]
     expected_result = {
         "PhysicalResourceId": "airflow-cli-request-id",
-        "Data": {
-            "results": results
-        },
+        "Data": {"results": results},
         "Reason": "Successfully executed Airflow CLI commands",
     }
 
     def mock_execute_command(self, command):
         command_terms = command.command.split()
-        if command_terms[0] != 'variables' and command_terms[0] != 'set':
-            raise NotImplementedError(f'Mock for the command not implemented: {command.command}')
+        if command_terms[0] != "variables" and command_terms[0] != "set":
+            raise NotImplementedError(
+                f"Mock for the command not implemented: {command.command}"
+            )
 
-        return AirflowCliResult(stdout=f'Variable {command_terms[2]} created', stderr='')
+        return AirflowCliResult(
+            stdout=f"Variable {command_terms[2]} created", stderr=""
+        )
 
-    with patch('lib.functions.airflow_cli_client.AirflowCliClient.execute', new=mock_execute_command):
+    with patch(
+        "lib.functions.airflow_cli_client.AirflowCliClient.execute",
+        new=mock_execute_command,
+    ):
         expect(on_create(event)).to.equal(expected_result)
 
 
 @mock_aws
 def test_on_update(aws_mwaa, warm_standby_env_vars):
     event = {
-        'RequestId': 'id-1',
-        'PhysicalResourceId': 'airflow-cli-id-1',
-        'RequestType': "Update",
-        'ResourceProperties': {
-            'airflow_cli_input': cli_input.to_json()
-        }
+        "RequestId": "id-1",
+        "PhysicalResourceId": "airflow-cli-id-1",
+        "RequestType": "Update",
+        "ResourceProperties": {"airflow_cli_input": cli_input.to_json()},
     }
     results = [
-        AirflowCliResult(stdout='Variable KEY-A created', stderr='').to_json(),
-        AirflowCliResult(stdout='Variable KEY-B created', stderr='').to_json(),
+        AirflowCliResult(stdout="Variable KEY-A created", stderr="").to_json(),
+        AirflowCliResult(stdout="Variable KEY-B created", stderr="").to_json(),
     ]
     expected_result = {
-        'PhysicalResourceId': 'airflow-cli-id-1',
-        'Data': {
-            'results': results
-        },
-        'Reason': 'Successfully executed Airflow CLI commands',
+        "PhysicalResourceId": "airflow-cli-id-1",
+        "Data": {"results": results},
+        "Reason": "Successfully executed Airflow CLI commands",
     }
 
     def mock_execute_command(self, command):
         command_terms = command.command.split()
-        if command_terms[0] != 'variables' and command_terms[0] != 'set':
-            raise NotImplementedError(f'Mock for the command not implemented: {command.command}')
+        if command_terms[0] != "variables" and command_terms[0] != "set":
+            raise NotImplementedError(
+                f"Mock for the command not implemented: {command.command}"
+            )
 
-        return AirflowCliResult(stdout=f'Variable {command_terms[2]} created', stderr='')
+        return AirflowCliResult(
+            stdout=f"Variable {command_terms[2]} created", stderr=""
+        )
 
-    with patch('lib.functions.airflow_cli_client.AirflowCliClient.execute', new=mock_execute_command):
+    with patch(
+        "lib.functions.airflow_cli_client.AirflowCliClient.execute",
+        new=mock_execute_command,
+    ):
         expect(on_update(event)).to.equal(expected_result)
 
 
 @mock_aws
 def test_on_delete(aws_mwaa, warm_standby_env_vars):
     event = {
-        'RequestId': 'id-1',
-        'PhysicalResourceId': 'airflow-cli-id-1',
-        'RequestType': "Update",
-        'ResourceProperties': {
-            'airflow_cli_input': cli_input.to_json()
-        }
+        "RequestId": "id-1",
+        "PhysicalResourceId": "airflow-cli-id-1",
+        "RequestType": "Update",
+        "ResourceProperties": {"airflow_cli_input": cli_input.to_json()},
     }
     results = [
-        AirflowCliResult(stdout='Variable KEY-A deleted', stderr='').to_json(),
-        AirflowCliResult(stdout='Variable KEY-B deleted', stderr='').to_json(),
+        AirflowCliResult(stdout="Variable KEY-A deleted", stderr="").to_json(),
+        AirflowCliResult(stdout="Variable KEY-B deleted", stderr="").to_json(),
     ]
     expected_result = {
-        'PhysicalResourceId': 'airflow-cli-id-1',
-        'Data': {
-            'results': results
-        },
-        'Reason': 'Successfully executed Airflow CLI commands',
+        "PhysicalResourceId": "airflow-cli-id-1",
+        "Data": {"results": results},
+        "Reason": "Successfully executed Airflow CLI commands",
     }
 
     def mock_execute_command(self, command):
         command_terms = command.command.split()
-        if command_terms[0] != 'variables' and command_terms[0] != 'delete':
-            raise NotImplementedError(f'Mock for the command not implemented: {command.command}')
+        if command_terms[0] != "variables" and command_terms[0] != "delete":
+            raise NotImplementedError(
+                f"Mock for the command not implemented: {command.command}"
+            )
 
-        return AirflowCliResult(stdout=f'Variable {command_terms[2]} deleted', stderr='')
+        return AirflowCliResult(
+            stdout=f"Variable {command_terms[2]} deleted", stderr=""
+        )
 
-    with patch('lib.functions.airflow_cli_client.AirflowCliClient.execute', new=mock_execute_command):
+    with patch(
+        "lib.functions.airflow_cli_client.AirflowCliClient.execute",
+        new=mock_execute_command,
+    ):
         expect(on_delete(event)).to.equal(expected_result)
-

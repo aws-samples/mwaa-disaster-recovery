@@ -25,13 +25,8 @@ from tests.unit.mocks.environment_configs import get_environment_response
 from lib.functions.get_environment_function import handler
 
 
-
 def test_handler(aws_mwaa):
-    event = {
-        'env_name': 'mwaa-2-8-1-public-primary',
-        'env_region': 'us-east-1'
-    }
+    event = {"env_name": "mwaa-2-8-1-public-primary", "env_region": "us-east-1"}
 
     response = handler(event, {})
     expect(response).to.equal(json.dumps(get_environment_response, default=str))
-

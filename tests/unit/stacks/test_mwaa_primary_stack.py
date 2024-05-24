@@ -24,25 +24,25 @@ from sure import expect
 from tests.unit.mocks.mock_setup import aws_credentials, warm_standby_env_vars
 from tests.unit.mocks.stacks import warm_standby_stacks
 
+
 class TestMwaaPrimaryStack:
     def test_primary_stack(self, warm_standby_stacks):
-        primary_stack = warm_standby_stacks['primary']
+        primary_stack = warm_standby_stacks["primary"]
 
         expect(primary_stack.source_bucket).to.be.truthy
         expect(primary_stack.cross_region_replication_role).to.be.truthy
-        
+
         primary_template = Template.from_stack(primary_stack)
 
-        primary_template.resource_count_is('AWS::S3::Bucket', 1)
-        primary_template.resource_count_is('AWS::Lambda::Function', 7)
-        primary_template.resource_count_is('AWS::Lambda::LayerVersion', 1)
-        primary_template.resource_count_is('AWS::IAM::Role', 8)
-        primary_template.resource_count_is('AWS::IAM::Policy', 7)
-        primary_template.resource_count_is('AWS::S3::BucketPolicy', 1)
-        primary_template.resource_count_is('Custom::S3AutoDeleteObjects', 1)
-        primary_template.resource_count_is('Custom::CDKBucketDeployment', 1)
-        primary_template.resource_count_is('AWS::SNS::Topic', 1)
-        primary_template.resource_count_is('AWS::SNS::Subscription', 1)
-        primary_template.resource_count_is('AWS::SNS::TopicPolicy', 1)
-        primary_template.resource_count_is('Custom::AirflowCli', 2)
-
+        primary_template.resource_count_is("AWS::S3::Bucket", 1)
+        primary_template.resource_count_is("AWS::Lambda::Function", 7)
+        primary_template.resource_count_is("AWS::Lambda::LayerVersion", 1)
+        primary_template.resource_count_is("AWS::IAM::Role", 8)
+        primary_template.resource_count_is("AWS::IAM::Policy", 7)
+        primary_template.resource_count_is("AWS::S3::BucketPolicy", 1)
+        primary_template.resource_count_is("Custom::S3AutoDeleteObjects", 1)
+        primary_template.resource_count_is("Custom::CDKBucketDeployment", 1)
+        primary_template.resource_count_is("AWS::SNS::Topic", 1)
+        primary_template.resource_count_is("AWS::SNS::Subscription", 1)
+        primary_template.resource_count_is("AWS::SNS::TopicPolicy", 1)
+        primary_template.resource_count_is("Custom::AirflowCli", 2)

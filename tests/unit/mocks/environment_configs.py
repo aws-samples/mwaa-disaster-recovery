@@ -29,49 +29,40 @@ mwaa_environment_without_tags = {
     "EndpointManagement": "SERVICE",
     "EnvironmentClass": "mw1.small",
     "ExecutionRoleArn": "arn:aws:iam::123456789999:role/mwaa-exec-role",
-    "LastUpdate": {
-        "CreatedAt": "2024-04-29 18:09:22+00:00",
-        "Status": "SUCCESS"
-    },
+    "LastUpdate": {"CreatedAt": "2024-04-29 18:09:22+00:00", "Status": "SUCCESS"},
     "LoggingConfiguration": {
         "DagProcessingLogs": {
             "CloudWatchLogGroupArn": "arn:aws:logs:us-east-1:123456789999:log-group:airflow-mwaa-2-8-1-public-primary-DAGProcessing",
             "Enabled": True,
-            "LogLevel": "WARNING"
+            "LogLevel": "WARNING",
         },
         "SchedulerLogs": {
             "CloudWatchLogGroupArn": "arn:aws:logs:us-east-1:123456789999:log-group:airflow-mwaa-2-8-1-public-primary-Scheduler",
             "Enabled": True,
-            "LogLevel": "WARNING"
+            "LogLevel": "WARNING",
         },
         "TaskLogs": {
             "CloudWatchLogGroupArn": "arn:aws:logs:us-east-1:123456789999:log-group:airflow-mwaa-2-8-1-public-primary-Task",
             "Enabled": True,
-            "LogLevel": "INFO"
+            "LogLevel": "INFO",
         },
         "WebserverLogs": {
             "CloudWatchLogGroupArn": "arn:aws:logs:us-east-1:123456789999:log-group:airflow-mwaa-2-8-1-public-primary-WebServer",
             "Enabled": True,
-            "LogLevel": "WARNING"
+            "LogLevel": "WARNING",
         },
         "WorkerLogs": {
             "CloudWatchLogGroupArn": "arn:aws:logs:us-east-1:123456789999:log-group:airflow-mwaa-2-8-1-public-primary-Worker",
             "Enabled": True,
-            "LogLevel": "WARNING"
-        }
+            "LogLevel": "WARNING",
+        },
     },
     "MaxWorkers": 10,
     "MinWorkers": 1,
     "Name": "mwaa-2-8-1-public-primary",
     "NetworkConfiguration": {
-        "SecurityGroupIds": [
-            "sg-xxxxxxxxxxxxxxxxxxx",
-            "sg-xxxxxxxxxxxxxxxxxxx"
-        ],
-        "SubnetIds": [
-            "subnet-xxxxxxxxxxxxxxxxxxx",
-            "subnet-xxxxxxxxxxxxxxxxxxx"
-        ]
+        "SecurityGroupIds": ["sg-xxxxxxxxxxxxxxxxxxx", "sg-xxxxxxxxxxxxxxxxxxx"],
+        "SubnetIds": ["subnet-xxxxxxxxxxxxxxxxxxx", "subnet-xxxxxxxxxxxxxxxxxxx"],
     },
     "RequirementsS3ObjectVersion": "xxxxxxxxxxxxxxxxxxx",
     "RequirementsS3Path": "requirements.txt",
@@ -82,7 +73,7 @@ mwaa_environment_without_tags = {
     "Tags": {},
     "WebserverAccessMode": "PUBLIC_ONLY",
     "WebserverUrl": "aaaaaaaa-bbbb-1111-cc22-111222333444.a11.us-east-1.airflow.amazonaws.com",
-    "WeeklyMaintenanceWindowStart": "FRI:12:00"
+    "WeeklyMaintenanceWindowStart": "FRI:12:00",
 }
 
 mwaa_environment_with_tags = {
@@ -96,49 +87,40 @@ mwaa_environment_with_tags = {
     "EndpointManagement": "SERVICE",
     "EnvironmentClass": "mw1.small",
     "ExecutionRoleArn": "arn:aws:iam::123456789999:role/mwaa-exec-role",
-    "LastUpdate": {
-        "CreatedAt": "2024-04-29 18:09:22+00:00",
-        "Status": "SUCCESS"
-    },
+    "LastUpdate": {"CreatedAt": "2024-04-29 18:09:22+00:00", "Status": "SUCCESS"},
     "LoggingConfiguration": {
         "DagProcessingLogs": {
             "CloudWatchLogGroupArn": "arn:aws:logs:us-east-1:123456789999:log-group:airflow-mwaa-2-8-1-public-primary-DAGProcessing",
             "Enabled": True,
-            "LogLevel": "WARNING"
+            "LogLevel": "WARNING",
         },
         "SchedulerLogs": {
             "CloudWatchLogGroupArn": "arn:aws:logs:us-east-1:123456789999:log-group:airflow-mwaa-2-8-1-public-primary-Scheduler",
             "Enabled": True,
-            "LogLevel": "WARNING"
+            "LogLevel": "WARNING",
         },
         "TaskLogs": {
             "CloudWatchLogGroupArn": "arn:aws:logs:us-east-1:123456789999:log-group:airflow-mwaa-2-8-1-public-primary-Task",
             "Enabled": True,
-            "LogLevel": "INFO"
+            "LogLevel": "INFO",
         },
         "WebserverLogs": {
             "CloudWatchLogGroupArn": "arn:aws:logs:us-east-1:123456789999:log-group:airflow-mwaa-2-8-1-public-primary-WebServer",
             "Enabled": True,
-            "LogLevel": "WARNING"
+            "LogLevel": "WARNING",
         },
         "WorkerLogs": {
             "CloudWatchLogGroupArn": "arn:aws:logs:us-east-1:123456789999:log-group:airflow-mwaa-2-8-1-public-primary-Worker",
             "Enabled": True,
-            "LogLevel": "WARNING"
-        }
+            "LogLevel": "WARNING",
+        },
     },
     "MaxWorkers": 10,
     "MinWorkers": 1,
     "Name": "mwaa-2-8-1-public-primary",
     "NetworkConfiguration": {
-        "SecurityGroupIds": [
-            "sg-xxxxxxxxxxxxxxxxxxx",
-            "sg-xxxxxxxxxxxxxxxxxxx"
-        ],
-        "SubnetIds": [
-            "subnet-xxxxxxxxxxxxxxxxxxx",
-            "subnet-xxxxxxxxxxxxxxxxxxx"
-        ]
+        "SecurityGroupIds": ["sg-xxxxxxxxxxxxxxxxxxx", "sg-xxxxxxxxxxxxxxxxxxx"],
+        "SubnetIds": ["subnet-xxxxxxxxxxxxxxxxxxx", "subnet-xxxxxxxxxxxxxxxxxxx"],
     },
     "RequirementsS3ObjectVersion": "xxxxxxxxxxxxxxxxxxx",
     "RequirementsS3Path": "requirements.txt",
@@ -146,12 +128,10 @@ mwaa_environment_with_tags = {
     "ServiceRoleArn": "arn:aws:iam::123456789999:role/aws-service-role/airflow.amazonaws.com/AWSServiceRoleForAmazonMWAA",
     "SourceBucketArn": "arn:aws:s3:::primary-bucket",
     "Status": "AVAILABLE",
-    "Tags": {
-        "Department": "DataEngineering"
-    },
+    "Tags": {"Department": "DataEngineering"},
     "WebserverAccessMode": "PUBLIC_ONLY",
     "WebserverUrl": "aaaaaaaa-bbbb-1111-cc22-111222333444.a11.us-east-1.airflow.amazonaws.com",
-    "WeeklyMaintenanceWindowStart": "FRI:12:00"
+    "WeeklyMaintenanceWindowStart": "FRI:12:00",
 }
 
 
@@ -166,11 +146,11 @@ create_environment_response = {
             "connection": "keep-alive",
             "x-amzn-requestid": "5c27cb79-0fa5-42e6-b6c6-f39b315492c5",
             "x-amz-apigw-id": "XAFc_FC9iYcEtPA=",
-            "x-amzn-trace-id": "Root=1-662fe91d-63cc089d101a6b025408e42f"
+            "x-amzn-trace-id": "Root=1-662fe91d-63cc089d101a6b025408e42f",
         },
-        "RetryAttempts": 0
+        "RetryAttempts": 0,
     },
-    "Arn": "arn:aws:airflow:us-east-2:123456789999:environment/mwaa-2-8-1-public-secondary"
+    "Arn": "arn:aws:airflow:us-east-2:123456789999:environment/mwaa-2-8-1-public-secondary",
 }
 
 get_environment_response = {
@@ -184,9 +164,9 @@ get_environment_response = {
             "connection": "keep-alive",
             "x-amzn-requestid": "a6ed8532-ece2-4375-a936-4c18c0e1a7f7",
             "x-amz-apigw-id": "XAJJPEFiCYcElgQ=",
-            "x-amzn-trace-id": "Root=1-662fef07-1acab55336c678d614c6c39c"
+            "x-amzn-trace-id": "Root=1-662fef07-1acab55336c678d614c6c39c",
         },
-        "RetryAttempts": 0
+        "RetryAttempts": 0,
     },
-    "Environment": mwaa_environment_with_tags    
+    "Environment": mwaa_environment_with_tags,
 }

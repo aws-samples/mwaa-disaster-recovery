@@ -23,27 +23,34 @@ from unittest.mock import patch
 from sure import expect
 from moto import mock_aws
 from tests.unit.mocks.mock_setup import aws_credentials, aws_mwaa
-from lib.functions.airflow_cli_client import AirflowCliClient, AirflowCliCommand, AirflowCliInput, AirflowCliResult, AirflowCliException
+from lib.functions.airflow_cli_client import (
+    AirflowCliClient,
+    AirflowCliCommand,
+    AirflowCliInput,
+    AirflowCliResult,
+    AirflowCliException,
+)
 from lib.functions.airflow_dag_trigger_function import handler
+
 
 @mock_aws
 def test_handler(aws_mwaa):
-    event ={
-        'mwaa_env_name': 'test-env',
-        "mwaa_env_version": '2.8.1',
-        'dag': 'test-dag',
-        'bucket': 'test-bucket',
-        'task_token': 'test-sfn-token',
-        'dr_type': 'BACKUP_RESTORE',        
+    event = {
+        "mwaa_env_name": "test-env",
+        "mwaa_env_version": "2.8.1",
+        "dag": "test-dag",
+        "bucket": "test-bucket",
+        "task_token": "test-sfn-token",
+        "dr_type": "BACKUP_RESTORE",
     }
 
-    unpause_result = AirflowCliResult(stdout='Dag: test-dag, paused: False', stderr='')
+    unpause_result = AirflowCliResult(stdout="Dag: test-dag, paused: False", stderr="")
     trigger_result_obj = [
         {
             "conf": {
                 "bucket": "backup-bucket",
                 "task_token": "sfn-task-token",
-                "dr_type": "WARM_STANDBY"
+                "dr_type": "WARM_STANDBY",
             },
             "dag_id": "test-dag",
             "dag_run_id": "manual__2024-04-29T19:17:11+00:00",
@@ -55,16 +62,16 @@ def test_handler(aws_mwaa):
             "logical_date": "2024-04-29 19:17:11+00:00",
             "run_type": "manual",
             "start_date": None,
-            "state": "queued"
+            "state": "queued",
         }
     ]
     trigger_result = AirflowCliResult(
         stdout=json.dumps(trigger_result_obj),
-        stderr='UserWarning: Could not import graphviz.'
+        stderr="UserWarning: Could not import graphviz.",
     )
 
-    with patch.object(AirflowCliClient, 'unpause_dag', return_value=unpause_result):
-        with patch.object(AirflowCliClient, 'trigger_dag', return_value=trigger_result):
+    with patch.object(AirflowCliClient, "unpause_dag", return_value=unpause_result):
+        with patch.object(AirflowCliClient, "trigger_dag", return_value=trigger_result):
             result = handler(event, None)
-    
+
     expect(result).to.equal(trigger_result.to_json())

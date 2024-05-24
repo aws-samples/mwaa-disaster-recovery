@@ -18,6 +18,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 import json
 from .airflow_cli_client import AirflowCliClient
 
+
 def handler(event, context):
     print(f"Event: {json.dumps(event)}")
 

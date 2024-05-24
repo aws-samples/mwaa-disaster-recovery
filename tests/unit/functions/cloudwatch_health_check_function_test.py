@@ -33,7 +33,7 @@ heartbeat_missing_response = {
             "Label": "SchedulerHeartbeat",
             "Timestamps": [],
             "Values": [],
-            "StatusCode": "Complete"
+            "StatusCode": "Complete",
         }
     ],
     "Messages": [],
@@ -44,10 +44,10 @@ heartbeat_missing_response = {
             "x-amzn-requestid": "3cbf2ff0-47f3-4788-a9e8-309d10b61fe8",
             "content-type": "text/xml",
             "content-length": "518",
-            "date": "Mon, 29 Apr 2024 18:38:18 GMT"
+            "date": "Mon, 29 Apr 2024 18:38:18 GMT",
         },
-        "RetryAttempts": 0
-    }
+        "RetryAttempts": 0,
+    },
 }
 
 heartbeat_active_response = {
@@ -55,13 +55,9 @@ heartbeat_active_response = {
         {
             "Id": "scheduler_heartbeat",
             "Label": "SchedulerHeartbeat",
-            "Timestamps": [
-                "2024-04-29 18:28:00+00:00"
-            ],
-            "Values": [
-                1.9
-            ],
-            "StatusCode": "Complete"
+            "Timestamps": ["2024-04-29 18:28:00+00:00"],
+            "Values": [1.9],
+            "StatusCode": "Complete",
         }
     ],
     "Messages": [],
@@ -72,66 +68,55 @@ heartbeat_active_response = {
             "x-amzn-requestid": "cbda0fd9-4671-4481-a635-cd75b4d6fc20",
             "content-type": "text/xml",
             "content-length": "635",
-            "date": "Mon, 29 Apr 2024 18:33:58 GMT"
+            "date": "Mon, 29 Apr 2024 18:33:58 GMT",
         },
-        "RetryAttempts": 0
-    }
+        "RetryAttempts": 0,
+    },
 }
+
 
 @pytest.fixture(scope="function")
 def aws_cloudwatch(aws_credentials):
-    """ Mocked AWS cloudwatch client. """
+    """Mocked AWS cloudwatch client."""
     with patch(boto_make_api_call, new=mock_api_call):
         yield boto3.client("cloudwatch", region_name="us-east-1")
 
 
 def mock_api_call(self, operation, kwarg):
-    if operation == 'GetMetricData':
+    if operation == "GetMetricData":
         kwarg_text = json.dumps(kwarg)
-        if 'DummyEnvForSimulatingDR' in kwarg_text:
+        if "DummyEnvForSimulatingDR" in kwarg_text:
             return heartbeat_missing_response
         else:
             return heartbeat_active_response
 
-    raise NotImplementedError(f'The mock operation {operation} is not implemented')
+    raise NotImplementedError(f"The mock operation {operation} is not implemented")
 
 
 @pytest.fixture(scope="function")
 def aws_cloudwatch_impaired(aws_credentials):
-    """ Mocked AWS cloudwatch client that always fails API call. """
+    """Mocked AWS cloudwatch client that always fails API call."""
 
     def cloudwath_failure(self, operation, kwarg):
-        raise Exception('503 Service Unavailable')
-    
+        raise Exception("503 Service Unavailable")
+
     with patch(boto_make_api_call, new=cloudwath_failure):
         yield boto3.client("cloudwatch", region_name="us-east-1")
 
 
 def test_health_check_function_normal_operation(aws_cloudwatch):
-    event = {
-        'region': 'us-east-1',
-        'env_name': 'test-env',
-        'simulate_dr': 'NO'
-    }
+    event = {"region": "us-east-1", "env_name": "test-env", "simulate_dr": "NO"}
 
-    expect(handler(event, None)).to.equal('HEALTHY')
+    expect(handler(event, None)).to.equal("HEALTHY")
 
 
 def test_health_check_function_mwaa_impaired(aws_cloudwatch):
-    event = {
-        'region': 'us-east-1',
-        'env_name': 'test-env',
-        'simulate_dr': 'YES'
-    }
+    event = {"region": "us-east-1", "env_name": "test-env", "simulate_dr": "YES"}
 
-    expect(handler(event, None)).to.equal('UNHEALTHY')
+    expect(handler(event, None)).to.equal("UNHEALTHY")
 
 
 def test_health_check_function_cloud_watch_impaired(aws_cloudwatch_impaired):
-    event = {
-        'region': 'us-east-1',
-        'env_name': 'test-env',
-        'simulate_dr': 'YES'
-    }
+    event = {"region": "us-east-1", "env_name": "test-env", "simulate_dr": "YES"}
 
-    expect(handler(event, None)).to.equal('UNHEALTHY')
+    expect(handler(event, None)).to.equal("UNHEALTHY")

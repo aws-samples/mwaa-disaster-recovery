@@ -33,16 +33,14 @@ schedule = {
             "x-amzn-requestid": "d7a7c8b1-6b4e-43bd-be3e-0fa0495db22d",
             "content-type": "application/json",
             "content-length": "975",
-            "date": "Mon, 29 Apr 2024 18:38:21 GMT"
+            "date": "Mon, 29 Apr 2024 18:38:21 GMT",
         },
-        "RetryAttempts": 0
+        "RetryAttempts": 0,
     },
     "ActionAfterCompletion": "NONE",
     "Arn": "arn:aws:scheduler:us-east-2:123456789999:schedule/default/mwaa-2-8-1-public-scheduler",
     "CreationDate": "2024-04-29 13:47:52.516000+00:00",
-    "FlexibleTimeWindow": {
-        "Mode": "OFF"
-    },
+    "FlexibleTimeWindow": {"Mode": "OFF"},
     "GroupName": "default",
     "LastModificationDate": "2024-04-29 18:35:20.020000+00:00",
     "Name": "mwaa-2-8-1-public-scheduler",
@@ -51,20 +49,15 @@ schedule = {
     "State": "ENABLED",
     "Target": {
         "Arn": "arn:aws:states:us-east-2:123456789999:stateMachine:mwaa281publicstatemachine9B69F6BA-ofukfWgQcD8C",
-        "Input": "{\"simulate_dr\": \"YES\"}",
-        "RetryPolicy": {
-            "MaximumEventAgeInSeconds": 86400,
-            "MaximumRetryAttempts": 185
-        },
-        "RoleArn": "arn:aws:iam::123456789999:role/mwaa-2-8-1-public-seconda-mwaa281publicschedulerrol-mmt5AABnhyis"
-    }
+        "Input": '{"simulate_dr": "YES"}',
+        "RetryPolicy": {"MaximumEventAgeInSeconds": 86400, "MaximumRetryAttempts": 185},
+        "RoleArn": "arn:aws:iam::123456789999:role/mwaa-2-8-1-public-seconda-mwaa281publicschedulerrol-mmt5AABnhyis",
+    },
 }
 
 schedule_update_request = {
     "ActionAfterCompletion": "NONE",
-    "FlexibleTimeWindow": {
-        "Mode": "OFF"
-    },
+    "FlexibleTimeWindow": {"Mode": "OFF"},
     "GroupName": "default",
     "Name": "mwaa-2-8-1-public-scheduler",
     "ScheduleExpression": "rate(5 minutes)",
@@ -72,50 +65,46 @@ schedule_update_request = {
     "State": "DISABLED",
     "Target": {
         "Arn": "arn:aws:states:us-east-2:123456789999:stateMachine:mwaa281publicstatemachine9B69F6BA-ofukfWgQcD8C",
-        "Input": "{\"simulate_dr\": \"YES\"}",
-        "RetryPolicy": {
-            "MaximumEventAgeInSeconds": 86400,
-            "MaximumRetryAttempts": 185
-        },
-        "RoleArn": "arn:aws:iam::123456789999:role/mwaa-2-8-1-public-seconda-mwaa281publicschedulerrol-mmt5AABnhyis"
-    }
+        "Input": '{"simulate_dr": "YES"}',
+        "RetryPolicy": {"MaximumEventAgeInSeconds": 86400, "MaximumRetryAttempts": 185},
+        "RoleArn": "arn:aws:iam::123456789999:role/mwaa-2-8-1-public-seconda-mwaa281publicschedulerrol-mmt5AABnhyis",
+    },
 }
 
 
 schedule_update_response = {
-    'ResponseMetadata': {
-        'RequestId': '820f0775-7de0-4705-ac77-3267b85acb43', 
-        'HTTPStatusCode': 200, 
-        'HTTPHeaders': {
-            'x-amzn-requestid': '820f0775-7de0-4705-ac77-3267b85acb43', 
-            'content-type': 'application/json', 
-            'content-length': '103', 
-            'date': 'Mon, 29 Apr 2024 18:38:21 GMT'
-        }, 
-        'RetryAttempts': 0
-    }, 
-    'ScheduleArn': 'arn:aws:scheduler:us-east-2:988740490609:schedule/default/mwaa-2-8-1-public-scheduler'
+    "ResponseMetadata": {
+        "RequestId": "820f0775-7de0-4705-ac77-3267b85acb43",
+        "HTTPStatusCode": 200,
+        "HTTPHeaders": {
+            "x-amzn-requestid": "820f0775-7de0-4705-ac77-3267b85acb43",
+            "content-type": "application/json",
+            "content-length": "103",
+            "date": "Mon, 29 Apr 2024 18:38:21 GMT",
+        },
+        "RetryAttempts": 0,
+    },
+    "ScheduleArn": "arn:aws:scheduler:us-east-2:988740490609:schedule/default/mwaa-2-8-1-public-scheduler",
 }
 
 
 @pytest.fixture(scope="function")
 def aws_scheduler(aws_credentials):
-    """ Mocked AWS scheduler client. """
+    """Mocked AWS scheduler client."""
     with patch(boto_make_api_call, new=mock_api_call):
         yield boto3.client("scheduler", region_name="us-east-1")
 
 
 def mock_api_call(self, operation, kwarg):
-    if operation == 'GetSchedule' and kwarg == {'Name': 'dr-schedule'}:
+    if operation == "GetSchedule" and kwarg == {"Name": "dr-schedule"}:
         return schedule
-    elif operation == 'UpdateSchedule' and kwarg == schedule_update_request:
+    elif operation == "UpdateSchedule" and kwarg == schedule_update_request:
         return schedule_update_response
 
-    raise NotImplementedError(f'The mock operation {operation} is not implemented')
+    raise NotImplementedError(f"The mock operation {operation} is not implemented")
 
 
 def test_handler(aws_scheduler):
-    event = { "schedule_name": "dr-schedule" }
+    event = {"schedule_name": "dr-schedule"}
     response = handler(event, {})
     expect(response).to.equal(schedule_update_response)
-

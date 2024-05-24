@@ -19,12 +19,17 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 
 import aws_cdk as cdk
-from tests.unit.mocks.mock_setup import aws_credentials, backup_restore_env_vars, warm_standby_env_vars
+from tests.unit.mocks.mock_setup import (
+    aws_credentials,
+    backup_restore_env_vars,
+    warm_standby_env_vars,
+)
 
 import config
 from lib.stacks.mwaa_primary_stack import MwaaPrimaryStack
 from lib.stacks.mwaa_secondary_stack import MwaaSecondaryStack
 import pytest
+
 
 @pytest.fixture(scope="function")
 def backup_restore_stacks(aws_credentials, backup_restore_env_vars):
@@ -47,7 +52,7 @@ def create_stacks(conf, app):
         conf=conf,
         env=cdk.Environment(account=conf.aws_account_id, region=conf.secondary_region),
     )
-    
+
     primary_stack = MwaaPrimaryStack(
         app,
         conf.get_name("primary-stack"),
