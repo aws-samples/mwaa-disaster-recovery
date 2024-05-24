@@ -27,7 +27,7 @@ from constructs import Construct
 
 import config
 from lib.constructs.airflow_cli import AirflowCli, VpcInfo
-from lib.function.airflow_cli_client import AirflowCliCommand, AirflowCliInput
+from lib.functions.airflow_cli_client import AirflowCliCommand, AirflowCliInput
 from lib.stacks.mwaa_base_stack import MwaaBaseStack
 
 

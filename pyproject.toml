@@ -37,6 +37,28 @@ Repository = "https://github.com/aws-samples/mwaa-disaster-recovery.git"
 "Bug Tracker" = "https://github.com/aws-samples/mwaa-disaster-recovery/issues"
 Changelog = "https://github.com/aws-samples/mwaa-disaster-recovery/blob/main/CHANGELOG.md"
 
-[project.scripts]
-clean = "clean"
-lint = "pre-commit run --all-files"
+[tool.pytest.ini_options]
+pythonpath = [
+  ".",
+  "lib"
+]
+testpaths = [
+  "tests"
+]
+
+[tool.coverage.run]
+omit = [
+  "tests/*"
+]
+include = [
+  "lib/**/*.py",
+  "assets/**/*.py",
+  "./config.py",
+]
+branch = true
+
+[tool.coverage.report]
+ignore_errors = true
+
+[tool.coverage.html]
+directory = "coverage/html"

@@ -1,4 +1,5 @@
-#!/usr/bin/env python3
+# pylint: disable=missing-class-docstring
+# pylint: disable=missing-function-docstring
 
 """
 Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
@@ -17,31 +18,15 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 
-import aws_cdk as cdk
+import json
+from sure import expect
+from tests.unit.mocks.mock_setup import aws_credentials, aws_mwaa
+from tests.unit.mocks.environment_configs import get_environment_response
+from lib.functions.get_environment_function import handler
 
-import config
-from lib.stacks.mwaa_primary_stack import MwaaPrimaryStack
-from lib.stacks.mwaa_secondary_stack import MwaaSecondaryStack
 
-conf = config.Config()
-app = cdk.App()
+def test_handler(aws_mwaa):
+    event = {"env_name": "mwaa-2-8-1-public-primary", "env_region": "us-east-1"}
 
-secondary_stack = MwaaSecondaryStack(
-    app,
-    conf.get_name("secondary-stack"),
-    conf=conf,
-    env=cdk.Environment(account=conf.aws_account_id, region=conf.secondary_region),
-)
-
-primary_stack = MwaaPrimaryStack(
-    app,
-    conf.get_name("primary-stack"),
-    conf=conf,
-    secondary_backup_bucket=secondary_stack.backup_bucket,
-    secondary_source_bucket=secondary_stack.source_bucket,
-    env=cdk.Environment(account=conf.aws_account_id, region=conf.primary_region),
-)
-
-primary_stack.add_dependency(secondary_stack)
-
-app.synth()
+    response = handler(event, {})
+    expect(response).to.equal(json.dumps(get_environment_response, default=str))

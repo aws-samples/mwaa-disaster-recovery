@@ -18,7 +18,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 import json
 import os
 
-from airflow_cli_client import AirflowCliClient, AirflowCliInput
+from .airflow_cli_client import AirflowCliClient, AirflowCliInput, AirflowCliException
 
 
 def on_event(event, context):
@@ -35,7 +35,7 @@ def on_event(event, context):
     if request_type == "Delete":
         return on_delete(event)
 
-    raise Exception(f"Invalid request type: {request_type}")
+    raise AirflowCliException(f"Invalid request type: {request_type}")
 
 
 def on_create(event):
