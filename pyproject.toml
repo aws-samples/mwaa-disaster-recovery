@@ -40,7 +40,8 @@ Changelog = "https://github.com/aws-samples/mwaa-disaster-recovery/blob/main/CHA
 [tool.pytest.ini_options]
 pythonpath = [
   ".",
-  "lib"
+  "lib",
+  "assets/dags"
 ]
 testpaths = [
   "tests"

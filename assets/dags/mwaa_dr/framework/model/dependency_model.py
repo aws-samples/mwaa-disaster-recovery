@@ -33,8 +33,9 @@ class DependencyModel(Generic[T]):
         self.forward_graph = defaultdict(set)
         self.reverse_graph = defaultdict(set)
 
-    def add(self, node: T):
+    def add(self, node: T) -> T:
         self.nodes.add(node)
+        return node
 
     def add_dependency(self, dependent: T, dependencies) -> T:
         if not isinstance(dependencies, list):
@@ -60,7 +61,7 @@ class DependencyModel(Generic[T]):
                 sinks.append(node)
         return sinks
 
-    def graph_forward(
+    def apply(
         self,
         start_task: BaseOperator,
         all_tasks: dict[T, BaseOperator],
@@ -78,22 +79,3 @@ class DependencyModel(Generic[T]):
 
         for sink in self.sinks():
             all_tasks[sink] >> end_task
-
-    def graph_reverse(
-        self,
-        start_task: BaseOperator,
-        all_tasks: dict[T, BaseOperator],
-        end_task: BaseOperator,
-    ):
-        for sink in self.sinks():
-            start_task >> all_tasks[sink]
-
-        for node, dependencies in self.reverse_graph.items():
-            node_task = all_tasks[node]
-
-            for dependency in dependencies:
-                dependency_task = all_tasks[dependency]
-                node_task >> dependency_task
-
-        for source in self.sources():
-            all_tasks[source] >> end_task

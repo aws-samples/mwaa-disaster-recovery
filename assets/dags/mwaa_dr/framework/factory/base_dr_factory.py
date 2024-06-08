@@ -251,7 +251,7 @@ class BaseDRFactory(ABC):
                 )
 
             restore_end_t = DummyOperator(task_id="restore_end")
-            self.model.graph_forward(restore_start_t, restore_tasks, restore_end_t)
+            self.model.apply(restore_start_t, restore_tasks, restore_end_t)
 
             teardown_t = PythonOperator(
                 task_id="teardown",
