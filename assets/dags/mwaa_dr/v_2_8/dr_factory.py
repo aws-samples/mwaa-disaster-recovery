@@ -19,19 +19,30 @@ from mwaa_dr.framework.model.base_table import BaseTable
 from mwaa_dr.framework.model.dependency_model import DependencyModel
 from mwaa_dr.v_2_7.dr_factory import DRFactory_2_7
 
-"""
-The schema and dependencies are based on ERD here:
-https://airflow.apache.org/docs/apache-airflow/2.8.1/database-erd-ref.html
-"""
-
-
 class DRFactory_2_8(DRFactory_2_7):
-    def __init__(
-        self, dag_id: str, path_prefix: str, storage_type: str = None, batch_size=5000
-    ) -> None:
-        super().__init__(dag_id, path_prefix, storage_type, batch_size)
+    """
+    Factory class for creating database models for Apache Airflow 2.8.0.
+
+    This class inherits from DRFactory_2_7 and extends it to support the new
+    features and schema changes introduced in Apache Airflow 2.8.0: https://airflow.apache.org/docs/apache-airflow/2.8.1/database-erd-ref.html
+
+    Args:
+        dag_id (str): The ID of the DAG.
+        path_prefix (str, optional): The prefix for the backup/restore path. Defaults to "data".
+        storage_type (str, optional): The type of storage used for backup/restore. Defaults to S3.
+        batch_size (int, optional): The batch size for backup/restore operations. Defaults to 5000.    
+    """
 
     def dag_run(self, model: DependencyModel[BaseTable]) -> BaseTable:
+        """
+        Create a BaseTable model for the dag_run table in Apache Airflow 2.8.1.
+        In particular, adds the `clear_number` field to the 2.7.3 dag_run table.
+        Args:
+            model (DependencyModel[BaseTable]): The dependency model for the dag_run table.
+
+        Returns:
+            BaseTable: The BaseTable model for the dag_run table.
+        """
         return BaseTable(
             name="dag_run",
             model=model,
@@ -55,13 +66,22 @@ class DRFactory_2_8(DRFactory_2_7):
                 "state",
                 "updated_at",
             ],
-            export_mappings=dict(conf="'\\x' || encode(conf,'hex') as conf"),
+            export_mappings={ "conf": "'\\x' || encode(conf,'hex') as conf" },
             storage_type=self.storage_type,
             path_prefix=self.path_prefix,
             batch_size=self.batch_size,
         )
 
     def log(self, model: DependencyModel[BaseTable]) -> BaseTable:
+        """
+        Create a BaseTable model for the log table in Apache Airflow 2.8.1.
+        In particular, adds the `owner_display_name` field to the 2.7.3 log table.
+        Args:
+            model (DependencyModel[BaseTable]): The dependency model for the log table.
+
+        Returns:
+            BaseTable: The BaseTable model for the log table.        
+        """
         return BaseTable(
             name="log",
             model=model,

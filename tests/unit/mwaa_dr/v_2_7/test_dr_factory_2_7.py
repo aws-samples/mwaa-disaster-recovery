@@ -20,8 +20,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 from sure import expect
 
-from mwaa_dr.v_2_7.dr_factory import DRFactory_2_7
 from tests.unit.mwaa_dr.v_2_5.test_dr_factory_2_5 import check_base_table
+from mwaa_dr.v_2_7.dr_factory import DRFactory_2_7
 
 class TestDRFactory_2_7:
     def test_task_instance(self):
@@ -83,4 +83,3 @@ class TestDRFactory_2_7:
             ],
             expected_export_filter="pool != 'default_pool'"
         )
-        
