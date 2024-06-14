@@ -15,16 +15,21 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 
+# Based on schema: https://airflow.apache.org/docs/apache-airflow/2.6.3/database-erd-ref.html
+
 from mwaa_dr.v_2_5.dr_factory import DRFactory_2_5
 
-"""
-The schema and dependencies are based on ERD here:
-https://airflow.apache.org/docs/apache-airflow/2.6.3/database-erd-ref.html
-"""
-
-
 class DRFactory_2_6(DRFactory_2_5):
-    def __init__(
-        self, dag_id: str, path_prefix: str, storage_type: str = None, batch_size=5000
-    ) -> None:
-        super().__init__(dag_id, path_prefix, storage_type, batch_size)
+    """
+    DRFactory_2_6 is a class that inherits from DRFactory_2_5 and is responsible for creating
+    instances of various classes related to disaster recovery (DR) operations in Apache Airflow 2.6.
+
+    This class is designed to work with the Apache Airflow database schema version 2.6.3, as
+    described in the official Airflow documentation: https://airflow.apache.org/docs/apache-airflow/2.6.3/database-erd-ref.html
+
+    Args:
+        dag_id (str): The ID of the DAG.
+        path_prefix (str, optional): The prefix for the backup/restore path. Defaults to "data".
+        storage_type (str, optional): The type of storage used for backup/restore. Defaults to S3.
+        batch_size (int, optional): The batch size for backup/restore operations. Defaults to 5000.
+    """

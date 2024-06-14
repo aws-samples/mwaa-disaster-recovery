@@ -60,6 +60,11 @@ branch = true
 
 [tool.coverage.report]
 ignore_errors = true
+exclude_also = [
+  "raise AssertionError",
+  "raise NotImplementedError",
+  "@(abc\\.)?abstractmethod",
+]
 
 [tool.coverage.html]
 directory = "coverage/html"

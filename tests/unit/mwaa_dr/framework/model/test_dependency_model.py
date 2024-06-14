@@ -28,7 +28,8 @@ from airflow.utils.state import DagRunState, TaskInstanceState
 from airflow.utils.types import DagRunType
 from airflow.operators.bash import BashOperator
 
-from assets.dags.mwaa_dr.framework.model.dependency_model import DependencyModel
+from mwaa_dr.framework.model.base_table import BaseTable
+from mwaa_dr.framework.model.dependency_model import DependencyModel
 
 class TestDependencyModel:
     def test_construction(self):
@@ -175,3 +176,113 @@ class TestDependencyModel:
         expect(end_task.upstream_list).to.have.length_of(2)
         expect(end_task.upstream_list).to.contain(node_to_task[sink1])        
         expect(end_task.upstream_list).to.contain(node_to_task[sink2])
+
+    def test_search(self):
+        model = DependencyModel()
+
+        table1 = BaseTable("table1", model)
+        table2 = BaseTable("table2", model)
+        table3 = BaseTable("table3", model)
+        table4 = BaseTable("table4", model)
+
+        model.add_dependency(table1, [table2, table3])
+        model.add_dependency(table2, table4)
+        model.add_dependency(table3, table4)
+
+        expect(model.search('name', 'table1')).to.equal(table1)
+        expect(model.search('name', 'table3')).to.equal(table3)
+        expect(model.search('name', 'table4')).to.equal(table4)
+        expect(model.search('name', 'table5')).to.be(None)
+        
+    def test_dependencies(self):
+        model = DependencyModel()
+
+        table1 = BaseTable("table1", model)
+        table2 = BaseTable("table2", model)
+        table3 = BaseTable("table3", model)
+        table4 = BaseTable("table4", model)
+
+        model.add_dependency(table1, [table2, table3])
+        model.add_dependency(table2, table4)
+        model.add_dependency(table3, table4)
+
+        expect(model.dependencies(table1)).to.have.length_of(2)
+        expect(model.dependencies(table1)).to.contain(table2)
+        expect(model.dependencies(table1)).to.contain(table3)
+
+        expect(model.dependencies(table2)).to.have.length_of(1)
+        expect(model.dependencies(table2)).to.contain(table4)
+
+        expect(model.dependencies(table3)).to.have.length_of(1)
+        expect(model.dependencies(table3)).to.contain(table4)
+
+        expect(model.dependencies(table4)).to.be.empty
+
+    def test_dependents(self):
+        model = DependencyModel()
+
+        table1 = BaseTable("table1", model)
+        table2 = BaseTable("table2", model)
+        table3 = BaseTable("table3", model)
+        table4 = BaseTable("table4", model)
+
+        model.add_dependency(table1, [table2, table3])
+        model.add_dependency(table2, table4)
+        model.add_dependency(table3, table4)
+
+        expect(model.dependents(table4)).to.have.length_of(2)
+        expect(model.dependents(table4)).to.contain(table2)
+        expect(model.dependents(table4)).to.contain(table3)
+
+        expect(model.dependents(table2)).to.have.length_of(1)
+        expect(model.dependents(table2)).to.contain(table1)
+
+        expect(model.dependents(table3)).to.have.length_of(1)
+        expect(model.dependents(table3)).to.contain(table1)
+
+        expect(model.dependents(table1)).to.be.empty
+
+    def test_eq(self):
+        model1 = DependencyModel()
+
+        table1 = BaseTable("table1", model1)
+        table2 = BaseTable("table2", model1)
+        table3 = BaseTable("table3", model1)
+        table4 = BaseTable("table4", model1)
+
+        model1.add_dependency(table1, [table2, table3])
+        model1.add_dependency(table2, table4)
+        model1.add_dependency(table3, table4)
+
+        expect(model1).to.equal(model1)
+
+        model2 = DependencyModel()
+
+        table5 = BaseTable("table1", model2)
+        table6 = BaseTable("table2", model2)
+        table7 = BaseTable("table3", model2)
+        table8 = BaseTable("table4", model2)
+
+        model2.add_dependency(table5, [table6, table7])
+        model2.add_dependency(table6, table8)
+        model2.add_dependency(table7, table8)
+
+        expect(model1).to.equal(model2)
+        expect(model1).should_not.equal("model1")
+
+    def test_hash(self):
+        model = DependencyModel()
+
+        table1 = BaseTable("table1", model)
+        table2 = BaseTable("table2", model)
+        table3 = BaseTable("table3", model)
+        table4 = BaseTable("table4", model)
+
+        model.add_dependency(table1, [table2, table3])
+        model.add_dependency(table2, table4)
+        model.add_dependency(table3, table4)
+
+        model.__hash__.when.called_with().should.throw(
+            TypeError,
+            'Unhasable type: DepdendencyModel'
+        )
