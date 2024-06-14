@@ -30,27 +30,27 @@ from mwaa_dr.framework.model.active_dag_table import ActiveDagTable
 from mwaa_dr.framework.factory.base_dr_factory import BaseDRFactory
 from mwaa_dr.v_2_5.dr_factory import DRFactory_2_5
 
-class TestDRFactory_2_5:
-    def check_base_table(self,
-            factory: BaseDRFactory,
-            actual_table: BaseTable,
-            expected_name: str,
-            expected_columns: list[str] = None,
-            expected_mappings: dict[str, str] = None,
-            expected_export_filter: str = None
-    ) -> None:
-        expected_table = BaseTable(
-            name=expected_name,
-            model=factory.model,
-            columns=expected_columns,
-            export_mappings=expected_mappings,
-            export_filter=expected_export_filter,
-            storage_type=factory.storage_type,
-            path_prefix=factory.path_prefix,
-            batch_size=factory.batch_size
-        )
-        expect(actual_table).to.equal(expected_table)
+def check_base_table(
+        factory: BaseDRFactory,
+        actual_table: BaseTable,
+        expected_name: str,
+        expected_columns: list[str] = None,
+        expected_mappings: dict[str, str] = None,
+        expected_export_filter: str = None
+) -> None:
+    expected_table = BaseTable(
+        name=expected_name,
+        model=factory.model,
+        columns=expected_columns,
+        export_mappings=expected_mappings,
+        export_filter=expected_export_filter,
+        storage_type=factory.storage_type,
+        path_prefix=factory.path_prefix,
+        batch_size=factory.batch_size
+    )
+    expect(actual_table).to.equal(expected_table)
 
+class TestDRFactory_2_5:
     def test_active_dag_creation(self):
         factory = DRFactory_2_5("dag")
         expected = ActiveDagTable(
@@ -89,7 +89,7 @@ class TestDRFactory_2_5:
     
     def test_dag_run_creation(self):
         factory = DRFactory_2_5("dag")
-        self.check_base_table(
+        check_base_table(
             factory=factory,
             actual_table=factory.dag_run(factory.model),
             expected_name='dag_run',
@@ -117,7 +117,7 @@ class TestDRFactory_2_5:
 
     def test_task_instance_creation(self):
         factory = DRFactory_2_5("dag")
-        self.check_base_table(
+        check_base_table(
             factory=factory,
             actual_table=factory.task_instance(factory.model),
             expected_name='task_instance',
@@ -159,7 +159,7 @@ class TestDRFactory_2_5:
 
     def test_slot_pool(self):
         factory = DRFactory_2_5("dag")
-        self.check_base_table(
+        check_base_table(
             factory=factory,
             actual_table=factory.slot_pool(factory.model),
             expected_name='slot_pool',
@@ -173,7 +173,7 @@ class TestDRFactory_2_5:
 
     def test_log(self):
         factory = DRFactory_2_5("dag")
-        self.check_base_table(
+        check_base_table(
             factory=factory,
             actual_table=factory.log(factory.model),
             expected_name='log',
@@ -191,7 +191,7 @@ class TestDRFactory_2_5:
 
     def test_task_fail(self):
         factory = DRFactory_2_5("dag")
-        self.check_base_table(
+        check_base_table(
             factory=factory,
             actual_table=factory.task_fail(factory.model),
             expected_name='task_fail',
@@ -208,7 +208,7 @@ class TestDRFactory_2_5:
 
     def test_job(self):
         factory = DRFactory_2_5("dag")
-        self.check_base_table(
+        check_base_table(
             factory=factory,
             actual_table=factory.job(factory.model),
             expected_name='job',
@@ -227,7 +227,7 @@ class TestDRFactory_2_5:
 
     def test_trigger(self):
         factory = DRFactory_2_5("dag")
-        self.check_base_table(
+        check_base_table(
             factory=factory,
             actual_table=factory.trigger(factory.model),
             expected_name='trigger',

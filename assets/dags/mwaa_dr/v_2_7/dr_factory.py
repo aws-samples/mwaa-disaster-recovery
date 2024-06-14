@@ -19,19 +19,31 @@ from mwaa_dr.framework.model.base_table import BaseTable
 from mwaa_dr.framework.model.dependency_model import DependencyModel
 from mwaa_dr.v_2_6.dr_factory import DRFactory_2_6
 
-"""
-The schema and dependencies are based on ERD here:
-https://airflow.apache.org/docs/apache-airflow/2.7.2/database-erd-ref.html
-"""
-
-
 class DRFactory_2_7(DRFactory_2_6):
-    def __init__(
-        self, dag_id: str, path_prefix: str, storage_type: str = None, batch_size=5000
-    ) -> None:
-        super().__init__(dag_id, path_prefix, storage_type, batch_size)
+    """
+    Factory class for creating database models for Apache Airflow 2.7.2.
+
+    This class inherits from DRFactory_2_6 and extends it to support the new
+    features and schema changes introduced in Apache Airflow 2.7.2: https://airflow.apache.org/docs/apache-airflow/2.7.2/database-erd-ref.html
+
+    Args:
+        dag_id (str): The ID of the DAG.
+        path_prefix (str, optional): The prefix for the backup/restore path. Defaults to "data".
+        storage_type (str, optional): The type of storage used for backup/restore. Defaults to S3.
+        batch_size (int, optional): The batch size for backup/restore operations. Defaults to 5000.
+    """
 
     def task_instance(self, model: DependencyModel[BaseTable]) -> BaseTable:
+        """
+        Create a BaseTable model for the task_instance table in Apache Airflow 2.7.2.
+        In particular, adds the `custom_operator_name` field to the 2.6.3 task_instance table.
+
+        Args:
+            model (DependencyModel[BaseTable]): The dependency model for the task_instance table.
+
+        Returns:
+            BaseTable: The BaseTable model for the task_instance table.
+        """        
         return BaseTable(
             name="task_instance",
             model=model,
@@ -66,9 +78,9 @@ class DRFactory_2_7(DRFactory_2_6):
                 "unixname",
                 "updated_at",
             ],
-            export_mappings=dict(
-                executor_config="'\\x' || encode(executor_config,'hex') as executor_config"
-            ),
+            export_mappings={
+                "executor_config": "'\\x' || encode(executor_config,'hex') as executor_config"
+            },
             export_filter="state NOT IN ('running','restarting','queued','scheduled', 'up_for_retry','up_for_reschedule')",
             storage_type=self.storage_type,
             path_prefix=self.path_prefix,
@@ -76,6 +88,16 @@ class DRFactory_2_7(DRFactory_2_6):
         )
 
     def slot_pool(self, model: DependencyModel[BaseTable]) -> BaseTable:
+        """
+        Create a BaseTable model for the slot_pool table in Apache Airflow 2.7.2.
+        In particular, adds the `include_deferred` field to the 2.6.3 slot_pool table.
+
+        Args:
+            model (DependencyModel[BaseTable]): The dependency model for the slot_pool table.
+
+        Returns:
+            BaseTable: The BaseTable model for the slot_pool table.
+        """
         return BaseTable(
             name="slot_pool",
             model=model,
