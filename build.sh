@@ -40,7 +40,7 @@ prompt() {
     echo "  unit: Runs all unit tests by default. Takes a path as an optional argument to run test cases in the supplied path."
     echo "      e.g. $./build.sh unit"
     echo "      e.g. $./build.sh unit tests/unit/mwaa_dr"
-    echo "  integration: Runs all integration tests."
+    echo "  integration: Runs all integration tests. (Under Development)"
     echo "      e.g. $./build.sh integration"
     echo "  setup: Setups up integration test environment by starting mwaa local runner container. Takes mwaa version as an argument -- one of [2_5, 2_6, 2_7, 2_8]."
     echo "      e.g. $./build.sh setup 2_8"
@@ -171,10 +171,8 @@ stop_mwaa() {
 
 integration_test_setup() {
     version=$1
-
     echo "Setting up integration tests for MWAA version $version ..."
 
-    # Check if image exists and build the docker image if needed
     check_image $version
     local result=$?
 
@@ -194,7 +192,8 @@ integration_test_teardown() {
 }
 
 integration_test() {
-    pytest -rP tests/integration
+    echo "Integration test feature is under development!"
+    # pytest -rP tests/integration
 }
 
 trigger_dag() {
