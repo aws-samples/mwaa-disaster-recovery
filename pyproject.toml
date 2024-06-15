@@ -51,10 +51,10 @@ testpaths = [
 omit = [
   "tests/*"
 ]
-include = [
-  "lib/**/*.py",
-  "assets/**/*.py",
-  "./config.py",
+source = [
+  "lib",
+  "assets",
+  "config.py",
 ]
 branch = true
 relative_files = true
