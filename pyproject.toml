@@ -66,6 +66,3 @@ exclude_also = [
   "raise NotImplementedError",
   "@(abc\\.)?abstractmethod",
 ]
-
-[tool.coverage.html]
-directory = "coverage/html"
