@@ -27,17 +27,11 @@ jobs:
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
 
-      # - name: Run Linting
-      #   run: ./build.sh lint
+      - name: Run Linting
+        run: ./build.sh lint
 
       - name: Run Unit Tests
         run: ./build.sh unit
-
-      - name: Check root .gitignore
-        run: cat .gitignore && ls -lah htmlcov
-
-      - name: Check htmlcov .gitignore
-        run: cat htmlcov/.gitignore
 
       - name: Coverage Comment
         id: coverage_comment

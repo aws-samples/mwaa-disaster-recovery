@@ -2,11 +2,11 @@
 <!-- TOC ignore:true -->
 # MWAA Disaster Recovery
 
-![mwaa](https://img.shields.io/badge/mwaa-2.8.1_|_2.7.2_|_2.6.3_|_2.5.1-green)
-![python](https://img.shields.io/badge/python-3.4+-blue)
-![cdk](https://img.shields.io/badge/cdk-python-orange)
-[![black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
-
+![MWAA](https://img.shields.io/badge/MWAA-2.8.1_|_2.7.2_|_2.6.3_|_2.5.1-blue)
+![CDK](https://img.shields.io/badge/CDK-Python-orange)
+![Python](https://img.shields.io/badge/Python-3.4+-blue)
+[![Black](https://img.shields.io/badge/Code%20Style-Black-000000.svg)](https://github.com/psf/black)
+[![CodeCoverage](https://raw.githubusercontent.com/aws-samples/mwaa-disaster-recovery/python-coverage-comment-action-data/badge.svg)](https://htmlpreview.github.io/?https://github.com/aws-samples/mwaa-disaster-recovery/blob/python-coverage-comment-action-data/htmlcov/index.html)
 
 <!-- TOC ignore:true -->
 # Contents
@@ -63,6 +63,7 @@
 - [Frequently Asked Questions](#frequently-asked-questions)
     - [FAQ-1: Failure to Read Environment Backup](#faq-1-failure-to-read-environment-backup)
     - [FAQ-2: Failure to Create New Environment](#faq-2-failure-to-create-new-environment)
+- [Development Notes](#development-notes)
 
 <!-- /TOC -->
 
@@ -97,7 +98,7 @@ In order to recreate a new environment in secondary region when the primary envi
 
 - \[**1.a**] Assuming you host your DAGs code in a source code repository, your CICD pipeline deploys the code changes to the S3 bucket configured to host DAGs, plugins, and the requirements file.
 
-- \[**1.b**] For this architecture, we also assume that you have another S3 bucket deployed to the secondary region to host DAGs, plugins, and the requirements file with bucket versioning enabled. As a part of the CDK deployment of this project, we enable [cross-region replication](https://docs.aws.amazon.com/AmazonS3/latest/userguide/replication.html) from primary to the secondary region buckets. Any new changes to the primary DAGs bucket are replicated in the secondary region. However, for existing objects, a one-time replication will need to be performed either using [S3 Batch replication](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-batch-replication-batch.html) or directly deploying the resources from your CICD pipeline to the secondary region bucket.
+- \[**1.b**] For this architecture, we also assume that you have another S3 bucket deployed to the secondary region to host DAGs, plugins, and the requirements file with bucket versioning enabled. As a part of the CDK deployment of this project, we enable [cross-region replication](https://docs.aws.amazon.com/AmazonS3/latest/userguide/replication.html) from primary to the secondary region buckets. Any new changes to the primary DAGs bucket are replicated in the secondary region. However, for existing objects, a one-time replication will need to be performed using [S3 Batch replication](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-batch-replication-batch.html) to the secondary region bucket.
 
 - \[**1.c**] The CDK deployment of the [primary stack](lib/stacks/mwaa_primary_stack.py) deploys the [mwaa_dr](assets/dags/mwaa_dr/) framework package to the primary DAGs S3 bucket. This framework includes the ([backup_metadata](assets/dags/mwaa_dr/backup_metadata.py)) DAG, which periodically takes backup of the metadata store. The backup interval is configurable and should be based on the recovery point objective (RPO) -- the data loss time during a failure that can be sustained by the business.
 
@@ -148,7 +149,7 @@ In order to restore the primary MWAA environment in the secondary region, you ha
 
 - \[**1.a**] Assuming you host your DAGs code in a source code repository, your CICD pipeline deploys the code changes to the S3 bucket configured to host DAGs, plugins, and the requirements file.
 
-- \[**1.b**] For this architecture, we also assume that you have another S3 bucket deployed to the secondary region to host DAGs, plugins, and the requirements file with bucket versioning enabled. As a part of the CDK deployment of this project, we enable [cross-region replication](https://docs.aws.amazon.com/AmazonS3/latest/userguide/replication.html) from primary to the secondary region buckets. Any new changes to the primary DAGs bucket are replicated in the secondary region. However, for existing objects, a one-time replication will need to be performed either using [S3 Batch replication](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-batch-replication-batch.html) or directly deploying the resources from your CICD pipeline to the secondary region bucket.
+- \[**1.b**] For this architecture, we also assume that you have another S3 bucket deployed to the secondary region to host DAGs, plugins, and the requirements file with bucket versioning enabled. As a part of the CDK deployment of this project, we enable [cross-region replication](https://docs.aws.amazon.com/AmazonS3/latest/userguide/replication.html) from primary to the secondary region buckets. Any new changes to the primary DAGs bucket are replicated in the secondary region. However, for existing objects, a one-time replication will need to be performed using [S3 Batch replication](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-batch-replication-batch.html) to the secondary region bucket.
 
 - \[**1.c**] The CDK deployment of the [primary stack](lib/stacks/mwaa_primary_stack.py) deploys the [mwaa_dr](assets/dags/mwaa_dr/) framework package to the primary DAGs S3 bucket. This framework includes the ([backup_metadata](assets/dags/mwaa_dr/backup_metadata.py)) DAG, which periodically takes backup of the metadata store. The backup interval is configurable and should be based on the recovery point objective (RPO) -- the data loss time during a failure that can be sustained by the business.
 
@@ -763,3 +764,17 @@ To resolve this issue, you can try one of the following two approaches:
 2. Edit the MWAA environment in the primary region to use the newly uploaded version of `requirements.txt`. After you save the configuration change, the MWAA environment will undergo updates. Wait for the environment to be available.
 3. Redeploy your stack with `MWAA_SIMULATE_DR=NO` and wait for the StepFunctions workflow in the secondary region stack to finish successfully at least once. This will ensure that the latest primary environment configuration (including the current version of `requirements.txt`) is stored in the secondary region backup bucket for future use.
 4. Redeploy your stack with `MWAA_SIMULATE_DR=YES`, which should now pick up the right version of the requirements file from the secondary DAGs bucket.
+
+# Development Notes
+
+The [contributing guide](contributing.md) explains the process of forking the project before creating a pull request. After you have cloned your forked repository locally and made some code changes, please ensure that you have run the following commands supplied in [build.sh](build.sh) script as follows:
+
+```bash
+./build.sh lint # To run linting
+./build.sh unit # To run unit tests
+```
+
+> [!IMPORTANT]
+> - You will need to have [Docker](https://www.docker.com/) running for the unit test to work.
+> - You may need to enable [Windows Subsystem for Linux](https://blogs.windows.com/windowsdeveloper/2016/03/30/run-bash-on-ubuntu-on-windows/) to run the build scripts.
+> - Please ensure that the code coverage has not decreased after your changes before creating a pull request.
