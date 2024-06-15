@@ -57,6 +57,7 @@ include = [
   "./config.py",
 ]
 branch = true
+relative_files = true
 
 [tool.coverage.report]
 ignore_errors = true
