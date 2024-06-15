@@ -70,10 +70,7 @@ unit_test() {
     path="${1:-tests/unit}"
     rm -rf coverage
     mkdir -p coverage
-    coverage run -m pytest $path \
-        && coverage lcov -o coverage/coverage.lcov \
-        && coverage html \
-        && coverage report -m
+    coverage run -m pytest $path && coverage report -m
 }
 
 
