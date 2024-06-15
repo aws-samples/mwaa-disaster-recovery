@@ -43,7 +43,7 @@ class DefaultDagFactory(BaseDRFactory):
         path_prefix (str): The prefix for the storage path.
         storage_type (str): The type of storage to use.
         batch_size (int): The batch size for data transfer operations.
-    """    
+    """
 
     def setup_tables(self, model: DependencyModel[BaseTable]) -> list[BaseTable]:
         """
@@ -56,13 +56,13 @@ class DefaultDagFactory(BaseDRFactory):
 
         Returns:
             list[BaseTable]: An empty list.
-        """        
+        """
         return []
 
     def fail_task(self):
         """
         Raise an AirflowFailException with a message indicating that the current Airflow version is not supported.
-        """        
+        """
         raise AirflowFailException(
             f"The DR factory does not currently support your Airflow version {version.version}"
         )
@@ -75,7 +75,7 @@ class DefaultDagFactory(BaseDRFactory):
 
         Returns:
             DAG: The created backup DAG.
-        """        
+        """
         return self.create_dag()
 
     def create_restore_dag(self) -> DAG:
@@ -86,7 +86,7 @@ class DefaultDagFactory(BaseDRFactory):
 
         Returns:
             DAG: The created restore DAG.
-        """        
+        """
         return self.create_dag()
 
     def create_dag(self) -> DAG:
@@ -98,7 +98,7 @@ class DefaultDagFactory(BaseDRFactory):
 
         Returns:
             DAG: The created DAG.
-        """        
+        """
         default_args = {
             "owner": "airflow",
             "start_date": datetime(2022, 1, 1),

@@ -60,7 +60,7 @@ class DependencyModel(Generic[T]):
 
         Returns:
             T: The added node.
-        """        
+        """
         self.nodes.add(node)
         return node
 
@@ -125,7 +125,7 @@ class DependencyModel(Generic[T]):
             all_tasks (dict[T, BaseOperator]): A dictionary mapping nodes to their corresponding
                 Airflow tasks.
             end_task (BaseOperator): The end task in the Airflow DAG.
-        """        
+        """
         for source in self.sources():
             start_task >> all_tasks[source]
 
@@ -138,7 +138,6 @@ class DependencyModel(Generic[T]):
 
         for sink in self.sinks():
             all_tasks[sink] >> end_task
-
 
     def search(self, field_name: str, value) -> T:
         """
@@ -198,14 +197,13 @@ class DependencyModel(Generic[T]):
             return False
 
         return (
-            self.nodes == other.nodes and
-            self.forward_graph == other.forward_graph and
-            self.reverse_graph == other.reverse_graph
+            self.nodes == other.nodes
+            and self.forward_graph == other.forward_graph
+            and self.reverse_graph == other.reverse_graph
         )
 
     def __hash__(self):
         """
         Raises unhasable error as a DependencyModel object  is mutable.
         """
-        raise TypeError('Unhasable type: DepdendencyModel')
-
+        raise TypeError("Unhasable type: DepdendencyModel")

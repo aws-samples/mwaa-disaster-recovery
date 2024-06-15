@@ -19,6 +19,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 from mwaa_dr.v_2_5.dr_factory import DRFactory_2_5
 
+
 class DRFactory_2_6(DRFactory_2_5):
     """
     DRFactory_2_6 is a class that inherits from DRFactory_2_5 and is responsible for creating

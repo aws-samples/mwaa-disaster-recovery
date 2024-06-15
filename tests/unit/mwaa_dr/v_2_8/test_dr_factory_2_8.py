@@ -23,14 +23,15 @@ from sure import expect
 from tests.unit.mwaa_dr.v_2_5.test_dr_factory_2_5 import check_base_table
 from mwaa_dr.v_2_8.dr_factory import DRFactory_2_8
 
+
 class TestDRFactory_2_8:
     def test_dag_run(self):
-        factory = DRFactory_2_8('dag')
+        factory = DRFactory_2_8("dag")
 
         check_base_table(
             factory=factory,
             actual_table=factory.dag_run(factory.model),
-            expected_name='dag_run',
+            expected_name="dag_run",
             expected_columns=[
                 "clear_number",  # New Field
                 "conf",
@@ -49,18 +50,18 @@ class TestDRFactory_2_8:
                 "run_type",
                 "start_date",
                 "state",
-                "updated_at",                
+                "updated_at",
             ],
-            expected_mappings={ "conf": "'\\x' || encode(conf,'hex') as conf" },
+            expected_mappings={"conf": "'\\x' || encode(conf,'hex') as conf"},
         )
 
     def test_log(self):
-        factory = DRFactory_2_8('log')
+        factory = DRFactory_2_8("log")
 
         check_base_table(
             factory=factory,
             actual_table=factory.log(factory.model),
-            expected_name='log',
+            expected_name="log",
             expected_columns=[
                 "dag_id",
                 "dttm",
@@ -71,5 +72,5 @@ class TestDRFactory_2_8:
                 "owner",
                 "owner_display_name",  # New Field
                 "task_id",
-            ]
+            ],
         )

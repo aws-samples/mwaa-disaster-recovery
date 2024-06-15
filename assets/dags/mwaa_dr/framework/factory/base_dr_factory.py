@@ -56,6 +56,7 @@ class BaseDRFactory(ABC):
         model (DependencyModel[BaseTable]): The dependency model for the tables.
         tables_cache (list[BaseTable]): A cache for the list of tables.
     """
+
     dag_id: str
     path_prefix: str
     storage_type: str
@@ -64,7 +65,11 @@ class BaseDRFactory(ABC):
     tables_cache: list[BaseTable]
 
     def __init__(
-        self, dag_id: str, path_prefix: str = None, storage_type: str = None, batch_size=5000
+        self,
+        dag_id: str,
+        path_prefix: str = None,
+        storage_type: str = None,
+        batch_size=5000,
     ) -> None:
         self.dag_id = dag_id
         self.path_prefix = path_prefix or "data"
@@ -84,7 +89,6 @@ class BaseDRFactory(ABC):
         Returns:
             list[BaseTable]: The list of tables for backup/restore operations.
         """
-        pass
 
     def tables(self) -> list[BaseTable]:
         """
@@ -106,7 +110,7 @@ class BaseDRFactory(ABC):
 
         Returns:
             str: The S3 bucket name.
-        """        
+        """
         return BaseTable.bucket(context)
 
     def schedule(self) -> str:
@@ -127,7 +131,7 @@ class BaseDRFactory(ABC):
 
         Returns:
             str: The task token.
-        """        
+        """
         dag_run = context.get("dag_run")
         return dag_run.conf["task_token"]
 
@@ -154,7 +158,7 @@ class BaseDRFactory(ABC):
 
         Args:
             **context: The Airflow context dictionary.
-        """        
+        """
         result = self.dag_run_result(context)
         result["status"] = "Success"
 
@@ -179,7 +183,7 @@ class BaseDRFactory(ABC):
 
         Args:
             context (dict): The Airflow context dictionary.
-        """        
+        """
         result = self.dag_run_result(context)
         result["status"] = "Fail"
 
@@ -231,7 +235,7 @@ class BaseDRFactory(ABC):
 
         Returns:
             str: The disaster recovery type.
-        """        
+        """
         if context:
             dag_run = context.get("dag_run")
             if "dr_type" in dag_run.conf:
@@ -245,7 +249,7 @@ class BaseDRFactory(ABC):
 
         Args:
             **context: The Airflow context dictionary.
-        """        
+        """
         print("Executing the backup workflow setup ...")
 
         if self.storage_type == S3:
@@ -276,10 +280,10 @@ class BaseDRFactory(ABC):
 
         Args:
             **context: The Airflow context dictionary.
-        """        
+        """
         dr_type = self.dr_type(context)
         print(f"Executing the restore workflow setup for {dr_type} ...")
-    
+
         if self.storage_type != S3:
             print("Checking folder path before local restore!")
 
@@ -287,8 +291,10 @@ class BaseDRFactory(ABC):
             path = os.path.join(AIRFLOW_HOME, "dags", self.path_prefix)
 
             if not os.path.exists(path):
-                raise AirflowFailException(f"The data directory at ({path}) does not exists!")
-            
+                raise AirflowFailException(
+                    f"The data directory at ({path}) does not exists!"
+                )
+
             print(f"All folders in the path ({path}) exists for restore!")
 
     def teardown_restore(self, **context):
@@ -319,21 +325,16 @@ class BaseDRFactory(ABC):
             catchup=False,
             default_args=default_args,
         ) as dag:
-            setup_t = PythonOperator(
-                task_id="setup",
-                python_callable=self.setup_backup
-            )
+            setup_t = PythonOperator(task_id="setup", python_callable=self.setup_backup)
 
             with TaskGroup(group_id="export_tables") as export_tables_t:
                 for table in self.tables():
                     PythonOperator(
-                        task_id=f"export_{table.name}s",
-                        python_callable=table.backup
+                        task_id=f"export_{table.name}s", python_callable=table.backup
                     )
 
             teardown_t = PythonOperator(
-                task_id="teardown",
-                python_callable=self.teardown_backup
+                task_id="teardown", python_callable=self.teardown_backup
             )
 
             setup_t >> export_tables_t >> teardown_t
@@ -362,8 +363,7 @@ class BaseDRFactory(ABC):
             default_args=default_args,
         ) as dag:
             setup_t = PythonOperator(
-                task_id="setup",
-                python_callable=self.setup_restore
+                task_id="setup", python_callable=self.setup_restore
             )
 
             restore_start_t = DummyOperator(task_id="restore_start")
@@ -372,22 +372,19 @@ class BaseDRFactory(ABC):
             restore_tasks = {}
             for table in tables:
                 restore_tasks[table] = PythonOperator(
-                    task_id=f"restore_{table.name}",
-                    python_callable=table.restore
+                    task_id=f"restore_{table.name}", python_callable=table.restore
                 )
 
             restore_end_t = DummyOperator(task_id="restore_end")
             self.model.apply(restore_start_t, restore_tasks, restore_end_t)
 
             teardown_t = PythonOperator(
-                task_id="teardown",
-                python_callable=self.teardown_restore
+                task_id="teardown", python_callable=self.teardown_restore
             )
             restore_end_t >> teardown_t
 
             notify_success_t = PythonOperator(
-                task_id="notify_success",
-                python_callable=self.notify_success_to_sfn
+                task_id="notify_success", python_callable=self.notify_success_to_sfn
             )
             teardown_t >> notify_success_t
 

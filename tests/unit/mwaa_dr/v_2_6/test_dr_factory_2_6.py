@@ -22,7 +22,8 @@ from sure import expect
 
 from mwaa_dr.v_2_6.dr_factory import DRFactory_2_6
 
+
 class TestDRFactory_2_6:
     def test_construction(self):
-        factory = DRFactory_2_6(dag_id='dag')
-        expect(factory.dag_id).to.equal('dag')
+        factory = DRFactory_2_6(dag_id="dag")
+        expect(factory.dag_id).to.equal("dag")

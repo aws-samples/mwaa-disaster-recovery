@@ -36,7 +36,8 @@ class VariableTable(BaseTable):
         storage_type (str, optional): The storage type to use (e.g. 'S3', 'LOCAL_FS'). Defaults to S3.
         path_prefix (str, optional): The path prefix for storage location. Defaults to None.
         batch_size (int, optional): The batch size for writing to storage. Defaults to 5000.
-    """    
+    """
+
     def __init__(
         self,
         model: DependencyModel,
@@ -72,7 +73,11 @@ class VariableTable(BaseTable):
                 writer = csv.DictWriter(buffer, keys)
                 for row in rows:
                     writer.writerow(
-                        {keys[0]: row.key, keys[1]: row.get_val(), keys[2]: row.description}
+                        {
+                            keys[0]: row.key,
+                            keys[1]: row.get_val(),
+                            keys[2]: row.description,
+                        }
                     )
 
             self.write(buffer.getvalue(), context)
@@ -80,7 +85,7 @@ class VariableTable(BaseTable):
     def restore(self, **context):
         """
         Restore the Airflow Variables from the configured storage location.
-        Only variables that do not already exist will be restored from backup.        
+        Only variables that do not already exist will be restored from backup.
 
         Args:
             **context: Additional context parameters passed from the Airflow task.
@@ -93,7 +98,7 @@ class VariableTable(BaseTable):
 
         with (
             settings.Session() as session,
-            open(backup_file, encoding='utf-8') as csv_file
+            open(backup_file, encoding="utf-8") as csv_file,
         ):
             reader = csv.reader(csv_file)
             for row in reader:

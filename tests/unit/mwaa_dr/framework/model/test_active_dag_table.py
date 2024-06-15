@@ -28,26 +28,23 @@ from types import SimpleNamespace
 from mwaa_dr.framework.model.active_dag_table import ActiveDagTable
 from mwaa_dr.framework.model.dependency_model import DependencyModel
 
+
 class TestActiveDagTable:
     def test_construction(self):
         model = DependencyModel()
         table = ActiveDagTable(
-            model=model,
-            storage_type='LOCAL_FS',
-            path_prefix='data',
-            batch_size=1000
+            model=model, storage_type="LOCAL_FS", path_prefix="data", batch_size=1000
         )
 
-        expect(table.name).to.equal('active_dag')
+        expect(table.name).to.equal("active_dag")
         expect(table.model).to.equal(model)
-        expect(table.storage_type).to.equal('LOCAL_FS')
-        expect(table.path_prefix).to.equal('data')
+        expect(table.storage_type).to.equal("LOCAL_FS")
+        expect(table.path_prefix).to.equal("data")
         expect(table.batch_size).to.equal(1000)
-
 
     @pytest.fixture(scope="function")
     def mock_session_execution_with_contents(self):
-        with patch('sqlalchemy.orm.Session') as Session:
+        with patch("sqlalchemy.orm.Session") as Session:
             session = Session.return_value
             all = session.execute.return_value.all
             all.return_value = (("dag_id_1"), ("dag_id_2"))
@@ -55,7 +52,7 @@ class TestActiveDagTable:
 
     @pytest.fixture(scope="function")
     def mock_session_execution_without_contents(self):
-        with patch('sqlalchemy.orm.Session.execute') as execution:
+        with patch("sqlalchemy.orm.Session.execute") as execution:
             all = execution.return_value.all
             all.return_value = ()
             yield Session
@@ -63,20 +60,20 @@ class TestActiveDagTable:
     def test_backup_with_active_dags(self):
         model = DependencyModel()
         table = ActiveDagTable(
-            model=model,
-            storage_type='LOCAL_FS',
-            path_prefix='data',
-            batch_size=1000
+            model=model, storage_type="LOCAL_FS", path_prefix="data", batch_size=1000
         )
         context = dict()
 
         with (
-            patch.object(table, 'write') as write,
-            patch('sqlalchemy.orm.Session.execute') as execute,
-            patch('sqlalchemy.orm.Session.commit') as commit,
-            patch('sqlalchemy.orm.Session.close') as close
+            patch.object(table, "write") as write,
+            patch("sqlalchemy.orm.Session.execute") as execute,
+            patch("sqlalchemy.orm.Session.commit") as commit,
+            patch("sqlalchemy.orm.Session.close") as close,
         ):
-            execute.return_value.all.return_value = [SimpleNamespace(dag_id='dag_id_1'), SimpleNamespace(dag_id='dag_id_2')]
+            execute.return_value.all.return_value = [
+                SimpleNamespace(dag_id="dag_id_1"),
+                SimpleNamespace(dag_id="dag_id_2"),
+            ]
             table.backup(**context)
 
             expect(execute.call_count).to.be(3)
@@ -85,26 +82,23 @@ class TestActiveDagTable:
                 call(
                     "CREATE TABLE active_dags AS SELECT dag_id FROM dag WHERE NOT is_paused AND is_active AND dag_id NOT IN ('backup_metadata', 'restore_metadata')"
                 ),
-                call("SELECT * FROM active_dags")
+                call("SELECT * FROM active_dags"),
             ]
-            execute.assert_has_calls(calls) 
-            write.assert_called_once_with('dag_id_1\ndag_id_2\n', context)
+            execute.assert_has_calls(calls)
+            write.assert_called_once_with("dag_id_1\ndag_id_2\n", context)
 
     def test_backup_without_active_dags(self):
         model = DependencyModel()
         table = ActiveDagTable(
-            model=model,
-            storage_type='LOCAL_FS',
-            path_prefix='data',
-            batch_size=1000
+            model=model, storage_type="LOCAL_FS", path_prefix="data", batch_size=1000
         )
         context = dict()
 
         with (
-            patch.object(table, 'write') as write,
-            patch('sqlalchemy.orm.Session.execute') as execute,
-            patch('sqlalchemy.orm.Session.commit') as commit,
-            patch('sqlalchemy.orm.Session.close') as close
+            patch.object(table, "write") as write,
+            patch("sqlalchemy.orm.Session.execute") as execute,
+            patch("sqlalchemy.orm.Session.commit") as commit,
+            patch("sqlalchemy.orm.Session.close") as close,
         ):
             execute.return_value.all.return_value = []
             table.backup(**context)
@@ -115,29 +109,26 @@ class TestActiveDagTable:
                 call(
                     "CREATE TABLE active_dags AS SELECT dag_id FROM dag WHERE NOT is_paused AND is_active AND dag_id NOT IN ('backup_metadata', 'restore_metadata')"
                 ),
-                call("SELECT * FROM active_dags")
+                call("SELECT * FROM active_dags"),
             ]
-            execute.assert_has_calls(calls) 
-            write.assert_called_once_with('', context)
+            execute.assert_has_calls(calls)
+            write.assert_called_once_with("", context)
 
     def test_restore(self):
         model = DependencyModel()
         table = ActiveDagTable(
-            model=model,
-            storage_type='LOCAL_FS',
-            path_prefix='data',
-            batch_size=1000
+            model=model, storage_type="LOCAL_FS", path_prefix="data", batch_size=1000
         )
         context = dict()
 
         with (
             io.BytesIO() as store,
-            patch.object(table, 'read', return_value='active_dag.csv') as read,
-            patch('sqlalchemy.orm.Session.execute') as execute,
-            patch('sqlalchemy.orm.Session.commit') as commit,
-            patch('sqlalchemy.orm.Session.close') as close,
-            patch('sqlalchemy.engine.Engine.raw_connection') as connection,
-            patch('builtins.open', return_value=store)
+            patch.object(table, "read", return_value="active_dag.csv") as read,
+            patch("sqlalchemy.orm.Session.execute") as execute,
+            patch("sqlalchemy.orm.Session.commit") as commit,
+            patch("sqlalchemy.orm.Session.close") as close,
+            patch("sqlalchemy.engine.Engine.raw_connection") as connection,
+            patch("builtins.open", return_value=store),
         ):
             table.restore(**context)
 
@@ -148,13 +139,14 @@ class TestActiveDagTable:
             expect(close.call_count).to.be(1)
             calls = [
                 call("CREATE TABLE IF NOT EXISTS active_dags(dag_id VARCHAR(250))"),
-                call("UPDATE dag d SET is_paused=false FROM active_dags ad WHERE d.dag_id = ad.dag_id")
+                call(
+                    "UPDATE dag d SET is_paused=false FROM active_dags ad WHERE d.dag_id = ad.dag_id"
+                ),
             ]
             execute.assert_has_calls(calls)
 
             connection.return_value.cursor.return_value.copy_expert.assert_called_once_with(
-                "COPY active_dags FROM STDIN WITH (FORMAT CSV, HEADER FALSE)",
-                store
+                "COPY active_dags FROM STDIN WITH (FORMAT CSV, HEADER FALSE)", store
             )
             expect(connection.return_value.commit.call_count).to.be(1)
             expect(connection.return_value.close.call_count).to.be(1)

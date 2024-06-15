@@ -19,9 +19,9 @@ from airflow import version
 from airflow.models import Variable
 
 kwargs = {
-    "dag_id": "backup_metadata", 
-    "path_prefix": "data", 
-    "storage_type": Variable.get("DR_STORAGE_TYPE", default_var="S3")
+    "dag_id": "backup_metadata",
+    "path_prefix": "data",
+    "storage_type": Variable.get("DR_STORAGE_TYPE", default_var="S3"),
 }
 airflow_version = version.version
 

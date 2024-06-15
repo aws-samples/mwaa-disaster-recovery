@@ -30,8 +30,8 @@ class ConnectionTable(BaseTable):
 
     This class inherits from the BaseTable class and is responsible for backing up
     and restoring the connection table in Apache Airflow. Only the connections that do
-    not exist in the restored environment will be restored by this class. 
-    The connection table stores connection information for various data sources, 
+    not exist in the restored environment will be restored by this class.
+    The connection table stores connection information for various data sources,
     such as databases, APIs, and file systems.
 
     Args:
@@ -42,7 +42,8 @@ class ConnectionTable(BaseTable):
 
     Attributes:
         columns (list): A list of column names in the connection table.
-    """    
+    """
+
     def __init__(
         self,
         model: DependencyModel,
@@ -120,8 +121,8 @@ class ConnectionTable(BaseTable):
         backup_file = self.read(context)
 
         with (
-            open(backup_file, encoding='utf-8') as csv_file,
-            settings.Session() as session
+            open(backup_file, encoding="utf-8") as csv_file,
+            settings.Session() as session,
         ):
             reader = csv.reader(csv_file)
             new_connections = []
@@ -149,7 +150,7 @@ class ConnectionTable(BaseTable):
                         schema=connection[8],
                     )
                     print(connection)
-                    new_connections.append(connection)       
+                    new_connections.append(connection)
 
             if new_connections:
                 session.add_all(new_connections)

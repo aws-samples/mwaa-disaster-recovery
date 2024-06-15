@@ -23,14 +23,15 @@ from sure import expect
 from tests.unit.mwaa_dr.v_2_5.test_dr_factory_2_5 import check_base_table
 from mwaa_dr.v_2_7.dr_factory import DRFactory_2_7
 
+
 class TestDRFactory_2_7:
     def test_task_instance(self):
-        factory = DRFactory_2_7('dag')
+        factory = DRFactory_2_7("dag")
 
         check_base_table(
             factory=factory,
             actual_table=factory.task_instance(factory.model),
-            expected_name='task_instance',            
+            expected_name="task_instance",
             expected_columns=[
                 "dag_id",
                 "map_index",
@@ -60,26 +61,26 @@ class TestDRFactory_2_7:
                 "trigger_timeout",
                 "try_number",
                 "unixname",
-                "updated_at"
+                "updated_at",
             ],
             expected_mappings={
                 "executor_config": "'\\x' || encode(executor_config,'hex') as executor_config"
             },
-            expected_export_filter="state NOT IN ('running','restarting','queued','scheduled', 'up_for_retry','up_for_reschedule')"
+            expected_export_filter="state NOT IN ('running','restarting','queued','scheduled', 'up_for_retry','up_for_reschedule')",
         )
 
     def test_slot_pool(self):
-        factory = DRFactory_2_7('dag')
+        factory = DRFactory_2_7("dag")
 
         check_base_table(
             factory=factory,
             actual_table=factory.slot_pool(factory.model),
-            expected_name='slot_pool',
+            expected_name="slot_pool",
             expected_columns=[
                 "description",
                 "include_deferred",  # New field
                 "pool",
                 "slots",
             ],
-            expected_export_filter="pool != 'default_pool'"
+            expected_export_filter="pool != 'default_pool'",
         )

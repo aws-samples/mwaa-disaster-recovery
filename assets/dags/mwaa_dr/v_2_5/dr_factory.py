@@ -23,7 +23,6 @@ from mwaa_dr.framework.model.dependency_model import DependencyModel
 from mwaa_dr.framework.model.variable_table import VariableTable
 
 
-
 class DRFactory_2_5(BaseDRFactory):
     """
     A factory class for creating and managing database tables and their dependencies
@@ -55,7 +54,7 @@ class DRFactory_2_5(BaseDRFactory):
 
         Returns:
             list[BaseTable]: A list of BaseTable instances representing the tables and their dependencies.
-        """        
+        """
         active_dag = self.active_dag(model)
 
         variable = self.variable(model)
@@ -106,7 +105,7 @@ class DRFactory_2_5(BaseDRFactory):
 
         Returns:
             BaseTable: An instance of the ActiveDagTable.
-        """        
+        """
         return ActiveDagTable(
             model=model,
             storage_type=self.storage_type,
@@ -140,7 +139,7 @@ class DRFactory_2_5(BaseDRFactory):
 
         Returns:
             BaseTable: An instance of the ConnectionTable.
-        """        
+        """
         return ConnectionTable(
             model=model,
             storage_type=self.storage_type,
@@ -180,7 +179,7 @@ class DRFactory_2_5(BaseDRFactory):
                 "state",
                 "updated_at",
             ],
-            export_mappings={ "conf": "'\\x' || encode(conf,'hex') as conf" },
+            export_mappings={"conf": "'\\x' || encode(conf,'hex') as conf"},
             storage_type=self.storage_type,
             path_prefix=self.path_prefix,
             batch_size=self.batch_size,
@@ -195,7 +194,7 @@ class DRFactory_2_5(BaseDRFactory):
 
         Returns:
             BaseTable: An instance of the BaseTable representing the 'task_instance' table.
-        """        
+        """
         return BaseTable(
             name="task_instance",
             model=model,
@@ -247,7 +246,7 @@ class DRFactory_2_5(BaseDRFactory):
 
         Returns:
             BaseTable: An instance of the BaseTable representing the 'slot_pool' table.
-        """        
+        """
         return BaseTable(
             name="slot_pool",
             model=model,
@@ -267,7 +266,7 @@ class DRFactory_2_5(BaseDRFactory):
 
         Returns:
             BaseTable: An instance of the BaseTable representing the 'log' table.
-        """        
+        """
         return BaseTable(
             name="log",
             model=model,
@@ -295,7 +294,7 @@ class DRFactory_2_5(BaseDRFactory):
 
         Returns:
             BaseTable: An instance of the BaseTable representing the 'task_fail' table.
-        """        
+        """
         return BaseTable(
             name="task_fail",
             model=model,
@@ -322,7 +321,7 @@ class DRFactory_2_5(BaseDRFactory):
 
         Returns:
             BaseTable: An instance of the BaseTable representing the 'job' table.
-        """        
+        """
         return BaseTable(
             name="job",
             model=model,

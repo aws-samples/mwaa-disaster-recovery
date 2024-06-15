@@ -19,6 +19,7 @@ from mwaa_dr.framework.model.base_table import BaseTable
 from mwaa_dr.framework.model.dependency_model import DependencyModel
 from mwaa_dr.v_2_7.dr_factory import DRFactory_2_7
 
+
 class DRFactory_2_8(DRFactory_2_7):
     """
     Factory class for creating database models for Apache Airflow 2.8.0.
@@ -30,7 +31,7 @@ class DRFactory_2_8(DRFactory_2_7):
         dag_id (str): The ID of the DAG.
         path_prefix (str, optional): The prefix for the backup/restore path. Defaults to "data".
         storage_type (str, optional): The type of storage used for backup/restore. Defaults to S3.
-        batch_size (int, optional): The batch size for backup/restore operations. Defaults to 5000.    
+        batch_size (int, optional): The batch size for backup/restore operations. Defaults to 5000.
     """
 
     def dag_run(self, model: DependencyModel[BaseTable]) -> BaseTable:
@@ -66,7 +67,7 @@ class DRFactory_2_8(DRFactory_2_7):
                 "state",
                 "updated_at",
             ],
-            export_mappings={ "conf": "'\\x' || encode(conf,'hex') as conf" },
+            export_mappings={"conf": "'\\x' || encode(conf,'hex') as conf"},
             storage_type=self.storage_type,
             path_prefix=self.path_prefix,
             batch_size=self.batch_size,
@@ -80,7 +81,7 @@ class DRFactory_2_8(DRFactory_2_7):
             model (DependencyModel[BaseTable]): The dependency model for the log table.
 
         Returns:
-            BaseTable: The BaseTable model for the log table.        
+            BaseTable: The BaseTable model for the log table.
         """
         return BaseTable(
             name="log",

@@ -112,7 +112,7 @@ build_image() {
 
     echo "Switching from branch $previous_branch to $current_branch ..."
     git checkout $current_branch
-    
+
     cp -f ../assets/requirements.txt ./requirements
     ./mwaa-local-env build-image
 
@@ -120,7 +120,7 @@ build_image() {
     git reset --hard
     git checkout $previous_branch
     cd ..
-    
+
     echo "Completed building docker image for MWAA version ${!semver} ..."
 }
 
@@ -140,7 +140,7 @@ start_mwaa() {
 
     echo "Switching from branch $previous_branch to $current_branch ..."
     git checkout $current_branch
-    
+
     rm -rf db-data
     rm -rf dags/*
     cp -f ../assets/requirements.txt ./requirements
@@ -190,7 +190,7 @@ integration_test_setup() {
 
 integration_test_teardown() {
     version=$1
-    stop_mwaa $version    
+    stop_mwaa $version
 }
 
 integration_test() {
@@ -198,7 +198,7 @@ integration_test() {
 }
 
 trigger_dag() {
-    dag_name=$1    
+    dag_name=$1
 }
 
 # Driver

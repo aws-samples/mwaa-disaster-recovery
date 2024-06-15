@@ -24,8 +24,8 @@ from mwaa_dr.framework.model.dependency_model import DependencyModel
 
 class ActiveDagTable(BaseTable):
     """
-    A class representing the active DAG table that is temporarily created in the Apache 
-    Airflow metadata database to unpause active dags after the completion of DR 
+    A class representing the active DAG table that is temporarily created in the Apache
+    Airflow metadata database to unpause active dags after the completion of DR
     restore operations.
 
     This class inherits from the `BaseTable` class and provides methods to backup and restore
@@ -41,6 +41,7 @@ class ActiveDagTable(BaseTable):
     Attributes:
         name (str): The name of the table, which is "active_dag".
     """
+
     def __init__(
         self,
         model: DependencyModel,
@@ -97,16 +98,22 @@ class ActiveDagTable(BaseTable):
 
         with (
             settings.Session() as session,
-            open(backup_file, encoding='utf-8') as backup
+            open(backup_file, encoding="utf-8") as backup,
         ):
-            session.execute("CREATE TABLE IF NOT EXISTS active_dags(dag_id VARCHAR(250))")
+            session.execute(
+                "CREATE TABLE IF NOT EXISTS active_dags(dag_id VARCHAR(250))"
+            )
             session.commit()
 
             conn = settings.engine.raw_connection()
             cursor = conn.cursor()
-            cursor.copy_expert("COPY active_dags FROM STDIN WITH (FORMAT CSV, HEADER FALSE)", backup)
+            cursor.copy_expert(
+                "COPY active_dags FROM STDIN WITH (FORMAT CSV, HEADER FALSE)", backup
+            )
             conn.commit()
             conn.close()
 
-            session.execute("UPDATE dag d SET is_paused=false FROM active_dags ad WHERE d.dag_id = ad.dag_id")
+            session.execute(
+                "UPDATE dag d SET is_paused=false FROM active_dags ad WHERE d.dag_id = ad.dag_id"
+            )
             session.commit()

@@ -21,41 +21,36 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 import subprocess
 import pytest
 
-V_2_5 = '2_5'
-V_2_6 = '2_6'
-V_2_7 = '2_7'
-V_2_8 = '2_8'
+V_2_5 = "2_5"
+V_2_6 = "2_6"
+V_2_7 = "2_7"
+V_2_8 = "2_8"
+
 
 def setup(version: str):
     result = subprocess.run(
-        ['./build.sh', 'setup', version],        
-        capture_output=True,
-        text=True,
-        shell=True
+        ["./build.sh", "setup", version], capture_output=True, text=True, shell=True
     )
     output = result.stdout.strip()
     print(output)
+
 
 def teardown(version: str):
     result = subprocess.run(
-        ['./build.sh', 'teardown', version],        
-        capture_output=True,
-        text=True,
-        shell=True
+        ["./build.sh", "teardown", version], capture_output=True, text=True, shell=True
     )
     output = result.stdout.strip()
     print(output)
 
+
 def trigger_dag(dag_name: str):
-    print(f'Triggering {dag_name} ...')
+    print(f"Triggering {dag_name} ...")
     result = subprocess.run(
-        ['./build.sh', 'trigger', dag_name],
-        capture_output=True,
-        text=True,
-        shell=True
+        ["./build.sh", "trigger", dag_name], capture_output=True, text=True, shell=True
     )
     output = result.stdout.strip()
     print(output)
+
 
 @pytest.fixture
 def mwaa_local_runner(request):
@@ -63,6 +58,7 @@ def mwaa_local_runner(request):
     yield request.param
     # teardown(request.param)
 
-@pytest.mark.parametrize('mwaa_local_runner', [V_2_8], indirect=True)
+
+@pytest.mark.parametrize("mwaa_local_runner", [V_2_8], indirect=True)
 def test_import_export(mwaa_local_runner):
-    print(f'{mwaa_local_runner} test dummy done!')
+    print(f"{mwaa_local_runner} test dummy done!")

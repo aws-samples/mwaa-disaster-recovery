@@ -18,7 +18,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 import csv
 import os
 from io import StringIO
-from copy import copy, deepcopy
+from copy import deepcopy
 
 from airflow import settings
 from mwaa_dr.framework.model.dependency_model import DependencyModel
@@ -41,7 +41,7 @@ class BaseTable:
         storage_type (str, optional): The storage type for the backup (e.g., S3 or local). Defaults to None.
         path_prefix (str, optional): The path prefix for the backup file. Defaults to None.
         batch_size (int, optional): The batch size for fetching data from the table. Defaults to 5000.
-    
+
     Attributes:
         model (DependencyModel): The dependency model for the table.
         name (str): The name of the table.
@@ -106,6 +106,7 @@ class BaseTable:
                 return dag_run.conf["bucket"]
 
         from airflow.models import Variable
+
         return Variable.get("DR_BACKUP_BUCKET", default_var="--dummy-bucket--")
 
     def __str__(self):
@@ -167,18 +168,18 @@ class BaseTable:
         """
         if self is other:
             return True
-        
+
         if self.__class__ is not other.__class__:
             return False
 
         return (
-            self.name == other.name and
-            self.columns == other.columns and
-            self.export_mappings == other.export_mappings and
-            self.export_filter == other.export_filter and
-            self.storage_type == other.storage_type and
-            self.path_prefix == other.path_prefix and
-            self.batch_size == other.batch_size
+            self.name == other.name
+            and self.columns == other.columns
+            and self.export_mappings == other.export_mappings
+            and self.export_filter == other.export_filter
+            and self.storage_type == other.storage_type
+            and self.path_prefix == other.path_prefix
+            and self.batch_size == other.batch_size
         )
 
     def __hash__(self):
@@ -199,7 +200,7 @@ class BaseTable:
 
         Returns:
             others (BaseTable or list[BaseTable]): The table(s) that depend on this table.
-        """        
+        """
         self.model.add_dependency(self, others)
         return others
 
@@ -227,7 +228,7 @@ class BaseTable:
 
         Returns:
             str: The name of the table.
-        """        
+        """
         return self.name
 
     def all_columns(self) -> str:
@@ -239,7 +240,7 @@ class BaseTable:
 
         Returns:
             str: A comma-separated string of column names for the table.
-        """        
+        """
         if not self.columns:
             return "*"
 
@@ -325,7 +326,7 @@ class BaseTable:
 
         conn = settings.engine.raw_connection()
         try:
-            with open(backup_file, encoding='utf-8') as backup:
+            with open(backup_file, encoding="utf-8") as backup:
                 cursor = conn.cursor()
                 cursor.copy_expert(restore_sql, backup)
                 conn.commit()
@@ -343,7 +344,7 @@ class BaseTable:
         The file is stored in the following locations:
         - S3: s3://<bucket_name>/<path_prefix>/<table_name>.csv
         - Local: <AIRFLOW_HOME>/dags/<path_prefix>/<table_name>.csv
-        """        
+        """
         if self.storage_type == S3:
             self.write_to_s3(body, self.name, context)
         else:
@@ -351,7 +352,8 @@ class BaseTable:
 
     def write_to_s3(self, body: str, file_name, context):
         import boto3
-        s3_client = boto3.client('s3')
+
+        s3_client = boto3.client("s3")
         key = f"{self.path_prefix}/{file_name}.csv"
         s3_client.put_object(Bucket=self.bucket(context), Key=key, Body=body)
 

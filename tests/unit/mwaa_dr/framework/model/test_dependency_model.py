@@ -31,13 +31,14 @@ from airflow.operators.bash import BashOperator
 from mwaa_dr.framework.model.base_table import BaseTable
 from mwaa_dr.framework.model.dependency_model import DependencyModel
 
+
 class TestDependencyModel:
     def test_construction(self):
         model = DependencyModel()
         expect(model.nodes).to.be.empty
         expect(model.forward_graph).to.be.empty
         expect(model.reverse_graph).to.be.empty
-        
+
     def test_add(self):
         model = DependencyModel()
 
@@ -48,7 +49,6 @@ class TestDependencyModel:
         model.add("test2")
         expect(model.nodes).to.have.length_of(2)
         expect(model.nodes).to.contain("test2")
-
 
     def test_single_source_single_sink(self):
         model = DependencyModel()
@@ -62,17 +62,17 @@ class TestDependencyModel:
         # source -> [node1, node2] -> node3 -> sink
         source = model.add_dependency("source", ["node1", "node2"])
         node1 = model.add_dependency("node1", "node3")
-        node2= model.add_dependency("node2", "node3")
+        node2 = model.add_dependency("node2", "node3")
         node3 = model.add_dependency("node3", "sink")
 
-        expect(source).to.equal('source')
-        expect(node3).to.equal('node3')
+        expect(source).to.equal("source")
+        expect(node3).to.equal("node3")
 
         expect(model.sources()).to.have.length_of(1)
         expect(model.sources()).to.contain(source)
 
         expect(model.sinks()).to.have.length_of(1)
-        expect(model.sinks()).to.contain('sink')
+        expect(model.sinks()).to.contain("sink")
 
         expect(model.forward_graph[source]).to.have.length_of(2)
         expect(model.forward_graph[source]).to.contain(node1)
@@ -82,15 +82,13 @@ class TestDependencyModel:
         expect(model.forward_graph[node2]).to.have.length_of(1)
         expect(model.forward_graph[node2]).to.contain(node3)
 
-
-        expect(model.reverse_graph['sink']).to.have.length_of(1)
-        expect(model.reverse_graph['sink']).to.contain(node3)
+        expect(model.reverse_graph["sink"]).to.have.length_of(1)
+        expect(model.reverse_graph["sink"]).to.contain(node3)
         expect(model.reverse_graph[node3]).to.have.length_of(2)
         expect(model.reverse_graph[node3]).to.contain(node1)
         expect(model.reverse_graph[node3]).to.contain(node2)
         expect(model.reverse_graph[node2]).to.have.length_of(1)
         expect(model.reverse_graph[node2]).to.contain(source)
-
 
     def test_multiple_sources_multiple_sinks(self):
         model = DependencyModel()
@@ -130,7 +128,6 @@ class TestDependencyModel:
         expect(model.reverse_graph[node]).to.contain(source1)
         expect(model.reverse_graph[node]).to.contain(souce2)
 
-
     def test_apply(self):
         model = DependencyModel()
 
@@ -149,17 +146,16 @@ class TestDependencyModel:
         start_time = pendulum.datetime(2021, 9, 13, tz="UTC")
         end_time = start_time + datetime.timedelta(days=1)
 
-        dag = DAG('test_dag', start_date=start_time, schedule="@daily")
+        dag = DAG("test_dag", start_date=start_time, schedule="@daily")
         start_task = BashOperator(task_id="start", bash_command="echo start", dag=dag)
         end_task = BashOperator(task_id="end", bash_command="echo end", dag=dag)
 
         node_to_task = dict()
         for n in model.nodes:
             node_to_task[n] = BashOperator(task_id=n, bash_command=f"echo {n}", dag=dag)
-        
 
         model.apply(start_task, node_to_task, end_task)
-        
+
         expect(start_task.downstream_list).to.have.length_of(2)
         expect(start_task.downstream_list).to.contain(node_to_task[source1])
         expect(start_task.downstream_list).to.contain(node_to_task[souce2])
@@ -174,7 +170,7 @@ class TestDependencyModel:
         expect(node_to_task[node].downstream_list).to.contain(node_to_task[sink2])
 
         expect(end_task.upstream_list).to.have.length_of(2)
-        expect(end_task.upstream_list).to.contain(node_to_task[sink1])        
+        expect(end_task.upstream_list).to.contain(node_to_task[sink1])
         expect(end_task.upstream_list).to.contain(node_to_task[sink2])
 
     def test_search(self):
@@ -189,11 +185,11 @@ class TestDependencyModel:
         model.add_dependency(table2, table4)
         model.add_dependency(table3, table4)
 
-        expect(model.search('name', 'table1')).to.equal(table1)
-        expect(model.search('name', 'table3')).to.equal(table3)
-        expect(model.search('name', 'table4')).to.equal(table4)
-        expect(model.search('name', 'table5')).to.be(None)
-        
+        expect(model.search("name", "table1")).to.equal(table1)
+        expect(model.search("name", "table3")).to.equal(table3)
+        expect(model.search("name", "table4")).to.equal(table4)
+        expect(model.search("name", "table5")).to.be(None)
+
     def test_dependencies(self):
         model = DependencyModel()
 
@@ -283,6 +279,5 @@ class TestDependencyModel:
         model.add_dependency(table3, table4)
 
         model.__hash__.when.called_with().should.throw(
-            TypeError,
-            'Unhasable type: DepdendencyModel'
+            TypeError, "Unhasable type: DepdendencyModel"
         )

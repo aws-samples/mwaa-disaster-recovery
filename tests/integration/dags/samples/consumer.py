@@ -9,13 +9,13 @@ my_file_2 = Dataset("/tmp/my_file_2.txt")
 with DAG(
     dag_id="consumer",
     schedule=[my_file_1, my_file_2],
-    start_date=datetime(2022,1,1),
-    catchup=False
+    start_date=datetime(2022, 1, 1),
+    catchup=False,
 ):
 
     @task
     def read_dataset():
-        with open(my_file_1.uri, "r") as f:
+        with open(my_file_1.uri) as f:
             print(f.read())
-    
+
     read_dataset()

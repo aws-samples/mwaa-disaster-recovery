@@ -19,6 +19,7 @@ from mwaa_dr.framework.model.base_table import BaseTable
 from mwaa_dr.framework.model.dependency_model import DependencyModel
 from mwaa_dr.v_2_6.dr_factory import DRFactory_2_6
 
+
 class DRFactory_2_7(DRFactory_2_6):
     """
     Factory class for creating database models for Apache Airflow 2.7.2.
@@ -43,7 +44,7 @@ class DRFactory_2_7(DRFactory_2_6):
 
         Returns:
             BaseTable: The BaseTable model for the task_instance table.
-        """        
+        """
         return BaseTable(
             name="task_instance",
             model=model,
