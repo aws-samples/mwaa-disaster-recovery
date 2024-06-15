@@ -25,6 +25,25 @@ from mwaa_dr.framework.model.dependency_model import DependencyModel
 
 
 class ConnectionTable(BaseTable):
+    """
+    A class representing the connection table in Apache Airflow.
+
+    This class inherits from the BaseTable class and is responsible for backing up
+    and restoring the connection table in Apache Airflow. Only the connections that do
+    not exist in the restored environment will be restored by this class.
+    The connection table stores connection information for various data sources,
+    such as databases, APIs, and file systems.
+
+    Args:
+        model (DependencyModel): The dependency model object.
+        storage_type (str, optional): The type of storage to use for backup/restore. Defaults to S3.
+        path_prefix (str, optional): The path prefix for the backup/restore location.
+        batch_size (int, optional): The batch size for backup/restore operations. Defaults to 5000.
+
+    Attributes:
+        columns (list): A list of column names in the connection table.
+    """
+
     def __init__(
         self,
         model: DependencyModel,
@@ -53,37 +72,58 @@ class ConnectionTable(BaseTable):
         ]
 
     def backup(self, **context):
-        session = settings.Session()
-        query = session.query(Connection)
-        connections = query.all()
+        """
+        Backup the connection table to a specified location.
 
-        buffer = StringIO("")
-        if len(connections) > 0:
-            keys = self.columns
-            writer = csv.DictWriter(buffer, keys)
-            for connection in connections:
-                writer.writerow(
-                    {
-                        keys[0]: connection.conn_id,
-                        keys[1]: connection.conn_type,
-                        keys[2]: connection.description,
-                        keys[3]: connection.get_extra(),
-                        keys[4]: connection.host,
-                        keys[5]: connection.login,
-                        keys[6]: connection.get_password(),
-                        keys[7]: connection.port,
-                        keys[8]: connection.schema,
-                    }
-                )
+        This method retrieves all connections from the Apache Airflow database and
+        writes them to a CSV file in the specified backup location.
 
-        self.write(buffer.getvalue(), context)
-        session.close()
+        Args:
+            **context: Additional Airflow task context parameters.
+        """
+        with settings.Session() as session:
+            buffer = StringIO("")
+            query = session.query(Connection)
+            connections = query.all()
+
+            if connections:
+                keys = self.columns
+                writer = csv.DictWriter(buffer, keys)
+                for connection in connections:
+                    writer.writerow(
+                        {
+                            keys[0]: connection.conn_id,
+                            keys[1]: connection.conn_type,
+                            keys[2]: connection.description,
+                            keys[3]: connection.get_extra(),
+                            keys[4]: connection.host,
+                            keys[5]: connection.login,
+                            keys[6]: connection.get_password(),
+                            keys[7]: connection.port,
+                            keys[8]: connection.schema,
+                        }
+                    )
+            self.write(buffer.getvalue(), context)
 
     def restore(self, **context):
-        backup_file = self.read(context)
-        session = settings.Session()
+        """
+        Restore the connection table from a specified backup location.
 
-        with open(backup_file) as csv_file:
+        This method reads the connections from a CSV file in the specified backup
+        location and inserts or updates them in the Apache Airflow database.
+
+        Note that only connections that do not already exist in the database will be
+        restored by this method.
+
+        Args:
+            **context: Additional Airflow task context parameters.
+        """
+        backup_file = self.read(context)
+
+        with (
+            open(backup_file, encoding="utf-8") as csv_file,
+            settings.Session() as session,
+        ):
             reader = csv.reader(csv_file)
             new_connections = []
 
@@ -93,27 +133,25 @@ class ConnectionTable(BaseTable):
                     .filter(Connection.conn_id == connection[0])
                     .all()
                 )
-                if len(existing_connections) == 0:
+                if not existing_connections:
                     port = None
-                    if len(connection[7]) > 0:
+                    if connection[7]:
                         port = int(connection[7])
 
-                    new_connections.append(
-                        Connection(
-                            conn_id=connection[0],
-                            conn_type=connection[1],
-                            description=connection[2],
-                            extra=connection[3],
-                            host=connection[4],
-                            login=connection[5],
-                            password=connection[6],
-                            port=port,
-                            schema=connection[8],
-                        )
+                    connection = Connection(
+                        conn_id=connection[0],
+                        conn_type=connection[1],
+                        description=connection[2],
+                        extra=connection[3],
+                        host=connection[4],
+                        login=connection[5],
+                        password=connection[6],
+                        port=port,
+                        schema=connection[8],
                     )
+                    print(connection)
+                    new_connections.append(connection)
 
-            if len(new_connections) > 0:
+            if new_connections:
                 session.add_all(new_connections)
-
-        session.commit()
-        session.close()
+                session.commit()

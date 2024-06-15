@@ -42,14 +42,14 @@ automatically close the issue.
 
 ## Linting
 
-Have you done linting by issuing `pre-commit run --all-files` command?
+Have you done linting by issuing `./build.sh lint` command?
 - [ ] Yes
 - [ ] No, I need help with linting
 
 
 ## Testing
 
-Have you run testing by issuing `pytest` command?
+Have you run testing by issuing `./build.sh unit` command?
 - [ ] Yes
 - [ ] No, I need help with writing tests
 

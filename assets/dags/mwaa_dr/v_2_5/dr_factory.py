@@ -22,20 +22,39 @@ from mwaa_dr.framework.model.connection_table import ConnectionTable
 from mwaa_dr.framework.model.dependency_model import DependencyModel
 from mwaa_dr.framework.model.variable_table import VariableTable
 
-"""
-The schema and dependencies are based on ERD here:
-https://airflow.apache.org/docs/apache-airflow/2.5.1/database-erd-ref.html
-
-"""
-
 
 class DRFactory_2_5(BaseDRFactory):
-    def __init__(
-        self, dag_id: str, path_prefix: str, storage_type: str = None, batch_size=5000
-    ) -> None:
-        super().__init__(dag_id, path_prefix, storage_type, batch_size)
+    """
+    A factory class for creating and managing database tables and their dependencies
+    for the Airflow 2.5.1 version.
+
+    This class inherits from the `BaseDRFactory` class and is responsible for setting up
+    the necessary tables and their relationships based on the Airflow 2.5.1 database
+    schema: https://airflow.apache.org/docs/apache-airflow/2.5.1/database-erd-ref.html.
+
+    Args:
+        dag_id (str): The ID of the DAG.
+        path_prefix (str, optional): The prefix for the backup/restore path. Defaults to "data".
+        storage_type (str, optional): The type of storage used for backup/restore. Defaults to S3.
+        batch_size (int, optional): The batch size for backup/restore operations. Defaults to 5000.
+
+    Attributes:
+        dag_id (str): The ID of the DAG for which the tables are being set up.
+        path_prefix (str): The prefix for the storage path where the table data will be stored.
+        storage_type (str): The type of storage to use for the tables (e.g., 'local', 's3').
+        batch_size (int): The batch size for exporting table data.
+    """
 
     def setup_tables(self, model: DependencyModel[BaseTable]) -> list[BaseTable]:
+        """
+        Sets up the necessary tables and their dependencies based on the Airflow 2.5.1 database schema.
+
+        Args:
+            model (DependencyModel[BaseTable]): The dependency model for the tables.
+
+        Returns:
+            list[BaseTable]: A list of BaseTable instances representing the tables and their dependencies.
+        """
         active_dag = self.active_dag(model)
 
         variable = self.variable(model)
@@ -78,6 +97,15 @@ class DRFactory_2_5(BaseDRFactory):
         ]
 
     def active_dag(self, model: DependencyModel[BaseTable]) -> BaseTable:
+        """
+        Creates an instance of the ActiveDagTable.
+
+        Args:
+            model (DependencyModel[BaseTable]): The dependency model for the table.
+
+        Returns:
+            BaseTable: An instance of the ActiveDagTable.
+        """
         return ActiveDagTable(
             model=model,
             storage_type=self.storage_type,
@@ -86,6 +114,15 @@ class DRFactory_2_5(BaseDRFactory):
         )
 
     def variable(self, model: DependencyModel[BaseTable]) -> BaseTable:
+        """
+        Creates an instance of the VariableTable.
+
+        Args:
+            model (DependencyModel[BaseTable]): The dependency model for the table.
+
+        Returns:
+            BaseTable: An instance of the VariableTable.
+        """
         return VariableTable(
             model=model,
             storage_type=self.storage_type,
@@ -94,6 +131,15 @@ class DRFactory_2_5(BaseDRFactory):
         )
 
     def connection(self, model: DependencyModel[BaseTable]) -> BaseTable:
+        """
+        Creates an instance of the ConnectionTable.
+
+        Args:
+            model (DependencyModel[BaseTable]): The dependency model for the table.
+
+        Returns:
+            BaseTable: An instance of the ConnectionTable.
+        """
         return ConnectionTable(
             model=model,
             storage_type=self.storage_type,
@@ -102,6 +148,15 @@ class DRFactory_2_5(BaseDRFactory):
         )
 
     def dag_run(self, model: DependencyModel[BaseTable]) -> BaseTable:
+        """
+        Creates an instance of the BaseTable for the 'dag_run' table.
+
+        Args:
+            model (DependencyModel[BaseTable]): The dependency model for the table.
+
+        Returns:
+            BaseTable: An instance of the BaseTable representing the 'dag_run' table.
+        """
         return BaseTable(
             name="dag_run",
             model=model,
@@ -124,13 +179,22 @@ class DRFactory_2_5(BaseDRFactory):
                 "state",
                 "updated_at",
             ],
-            export_mappings=dict(conf="'\\x' || encode(conf,'hex') as conf"),
+            export_mappings={"conf": "'\\x' || encode(conf,'hex') as conf"},
             storage_type=self.storage_type,
             path_prefix=self.path_prefix,
             batch_size=self.batch_size,
         )
 
     def task_instance(self, model: DependencyModel[BaseTable]) -> BaseTable:
+        """
+        Creates an instance of the BaseTable for the 'task_instance' table.
+
+        Args:
+            model (DependencyModel[BaseTable]): The dependency model for the table.
+
+        Returns:
+            BaseTable: An instance of the BaseTable representing the 'task_instance' table.
+        """
         return BaseTable(
             name="task_instance",
             model=model,
@@ -164,9 +228,9 @@ class DRFactory_2_5(BaseDRFactory):
                 "unixname",
                 "updated_at",
             ],
-            export_mappings=dict(
-                executor_config="'\\x' || encode(executor_config,'hex') as executor_config"
-            ),
+            export_mappings={
+                "executor_config": "'\\x' || encode(executor_config,'hex') as executor_config"
+            },
             export_filter="state NOT IN ('running','restarting','queued','scheduled', 'up_for_retry','up_for_reschedule')",
             storage_type=self.storage_type,
             path_prefix=self.path_prefix,
@@ -174,6 +238,15 @@ class DRFactory_2_5(BaseDRFactory):
         )
 
     def slot_pool(self, model: DependencyModel[BaseTable]) -> BaseTable:
+        """
+        Creates an instance of the BaseTable for the 'slot_pool' table.
+
+        Args:
+            model (DependencyModel[BaseTable]): The dependency model for the table.
+
+        Returns:
+            BaseTable: An instance of the BaseTable representing the 'slot_pool' table.
+        """
         return BaseTable(
             name="slot_pool",
             model=model,
@@ -185,6 +258,15 @@ class DRFactory_2_5(BaseDRFactory):
         )
 
     def log(self, model: DependencyModel[BaseTable]) -> BaseTable:
+        """
+        Creates an instance of the BaseTable for the 'log' table.
+
+        Args:
+            model (DependencyModel[BaseTable]): The dependency model for the table.
+
+        Returns:
+            BaseTable: An instance of the BaseTable representing the 'log' table.
+        """
         return BaseTable(
             name="log",
             model=model,
@@ -204,6 +286,15 @@ class DRFactory_2_5(BaseDRFactory):
         )
 
     def task_fail(self, model: DependencyModel[BaseTable]) -> BaseTable:
+        """
+        Creates an instance of the BaseTable for the 'task_fail' table.
+
+        Args:
+            model (DependencyModel[BaseTable]): The dependency model for the table.
+
+        Returns:
+            BaseTable: An instance of the BaseTable representing the 'task_fail' table.
+        """
         return BaseTable(
             name="task_fail",
             model=model,
@@ -222,6 +313,15 @@ class DRFactory_2_5(BaseDRFactory):
         )
 
     def job(self, model: DependencyModel[BaseTable]) -> BaseTable:
+        """
+        Creates an instance of the BaseTable for the 'job' table.
+
+        Args:
+            model (DependencyModel[BaseTable]): The dependency model for the table.
+
+        Returns:
+            BaseTable: An instance of the BaseTable representing the 'job' table.
+        """
         return BaseTable(
             name="job",
             model=model,
@@ -242,6 +342,15 @@ class DRFactory_2_5(BaseDRFactory):
         )
 
     def trigger(self, model: DependencyModel[BaseTable]) -> BaseTable:
+        """
+        Creates an instance of the BaseTable for the 'trigger' table.
+
+        Args:
+            model (DependencyModel[BaseTable]): The dependency model for the table.
+
+        Returns:
+            BaseTable: An instance of the BaseTable representing the 'job' table.
+        """
         return BaseTable(
             name="trigger",
             model=model,

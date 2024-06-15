@@ -2,12 +2,11 @@
 <!-- TOC ignore:true -->
 # MWAA Disaster Recovery
 
-![python](https://img.shields.io/badge/cdk-python-orange)
-[![code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
-![2.5.x](https://img.shields.io/badge/mwaa-v2.5.x-green)
-![2.6.x](https://img.shields.io/badge/mwaa-v2.6.x-green)
-![2.7.x](https://img.shields.io/badge/mwaa-v2.7.x-green)
-![2.8.x](https://img.shields.io/badge/mwaa-v2.8.x-green)
+![mwaa](https://img.shields.io/badge/mwaa-2.8.1_|_2.7.2_|_2.6.3_|_2.5.1-green)
+![python](https://img.shields.io/badge/python-3.4+-blue)
+![cdk](https://img.shields.io/badge/cdk-python-orange)
+[![black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+
 
 <!-- TOC ignore:true -->
 # Contents
@@ -76,10 +75,10 @@ This solution is a part of an AWS blog series on MWAA Disaster Recovery. Please 
 
 > [!NOTE]
 > The project currently supports the following versions of MWAA:
-> - **2.5.x**
-> - **2.6.x**
-> - **2.7.x**
-> - **2.8.x**
+> - **2.8.1**
+> - **2.7.2**
+> - **2.6.3**
+> - **2.5.1**
 
 # Architecture
 
@@ -192,10 +191,11 @@ The [lib](lib) folder hosts the deployment code for the project. The project per
 ## Prerequisites
 
 ### Software Requirements
-[![Python 3.x](https://img.shields.io/badge/python-v3.x-orange)](https://www.python.org/downloads/)
-[![NodeJS >= v14](https://img.shields.io/badge/nodejs->=_v14-green)](https://nodejs.org/en/download)
+[![python](https://img.shields.io/badge/python-3.4+-blue)](https://www.python.org/downloads/)
+[![NodeJS >= v14](https://img.shields.io/badge/nodejs-_14+-green)](https://nodejs.org/en/download)
 [![AWS CDK v2](https://img.shields.io/badge/cdk-v2-yellow)](https://docs.aws.amazon.com/cdk/v2/guide/cli.html)
 [![Docker Latest](https://img.shields.io/badge/docker-latest-blue)](https://docs.docker.com/get-docker/)
+
 
 ### AWS Resources Needed Pre-Deployment
 - An AWS account with an MWAA environment deployed to the **primary** region. If you don't have an environment deployed, you can do so using the [quickstart guide](https://docs.aws.amazon.com/mwaa/latest/userguide/quick-start.html).
@@ -702,30 +702,15 @@ This is also a great way to manually test your disaster recovery setup!
 There might be a situation where you simply want to backup and restore metadata without the need to utilize the full DR solution. You can run the backup and restore independently in two modes:
 
 #### Local Runner
-You can run a [mwaa-local-runner](https://github.com/aws/aws-mwaa-local-runner) container locally by simply copying the [assets/dags/mwaa_dr](assets/dags/mwaa_dr/) folder into the `dags` folder of the local runner codebase. After copying the folder, update the [kwargs variable of backup_metadata DAG](assets/dags/mwaa_dr/backup_metadata.py#L20) to use `LOCAL_FS` storage type as follows:
+You can run a [mwaa-local-runner](https://github.com/aws/aws-mwaa-local-runner) container locally by simply copying the [assets/dags/mwaa_dr](assets/dags/mwaa_dr/) folder into the `dags` folder of the local runner codebase. After copying the folder, export an Airflow variable in the `startup_script/startup.sh` file of the local runner as follows:
+```bash
+export AIRFLOW_VAR_DR_STORAGE_TYPE=LOCAL_FS
+```
 
-Change `kwargs` variable from:
-```python
-kwargs = {"dag_id": "backup_metadata", "path_prefix": "data", "storage_type": "S3"}
-```
-to:
-```python
-kwargs = {"dag_id": "backup_metadata", "path_prefix": "data", "storage_type": "LOCAL_FS"}
-```
-Similarly, make the following change to the [kwargs variable of restore_metadata DAG](assets/dags/mwaa_dr/restore_metadata.py#L20) to use `LOCAL_FS` storage type as follows:
-
-Change `kwargs` variable from:
-```python
-kwargs = {"dag_id": "restore_metadata", "path_prefix": "data", "storage_type": "S3"}
-```
-to:
-```python
-kwargs = {"dag_id": "restore_metadata", "path_prefix": "data", "storage_type": "LOCAL_FS"}
-```
-The metadata will be stored and restored from the `dags/data/` folder of the `mwaa-lcoal-runner` codebase.
+After the setup you are all set to run the [backup_metadata](assets/dags/mwaa_dr/backup_metadata.py) and [restore_metadata](assets/dags/mwaa_dr/restore_metadata.py) dags. The metadata will be stored and restored from the `dags/data/` folder of the `mwaa-lcoal-runner` codebase.
 
 > [!IMPORTANT]
-> Note that this is a great way to test and contribute support for a new version of MWAA.
+> Note that this is a great way to test and contribute code for a new version of MWAA.
 
 #### Amazon MWAA
 
@@ -733,11 +718,7 @@ For running backup and restore DAGs on your Amazon MWAA environment on AWS, you 
 1. Ensure you have an S3 bucket created to store the backup
 2. Ensure that your MWAA execution role has read and write permissions on the bucket
 3. Create an Airflow Variable with the key named `DR_BACKUP_BUCKET` and the value containing the **name** (not ARN) of the S3 bucket.
-4. Ensure you have created a SNS topic for DAG failure notifications
-5. Ensure that your MWAA execution role has publish permission on the SNS topic
-6. Create an Airflow Variable with the key named `DR_SNS_TOPIC_ARN` and the value containing the **ARN** (not name) of the SNS topic.
-7. Create an Airflow Variable with the key name `DR_BACKUP_SCHEDULE` and the value containing a cron expression for running periodic backup, e.g., use `0 * * * *` for hourly backup.
-8. You can then manually trigger the backup and restore at any point. It may be worthwhile to first clean your metadata store by running the [cleanup_metadata](assets/dags/mwaa_dr/cleanup_metadata.py) DAG before performing restore operations to avoid database key constraint violations. Please make sure to use wider range for `MAX_AGE_IN_DAYS` and `MIN_AGE_IN_DAYS` (a value of `0` is suitable of min age for this use case) so that the metadata store is completely clean.
+4. Now you are all set to manually trigger the backup and restore at any point. It may be worthwhile to first clean your metadata store by running the [cleanup_metadata](assets/dags/mwaa_dr/cleanup_metadata.py) DAG before performing restore operations to avoid database key constraint violations. Please make sure to use wider range for `MAX_AGE_IN_DAYS` and `MIN_AGE_IN_DAYS` (a value of `0` is suitable of min age for this use case) so that the metadata store is completely clean.
 
 ### May Need to Restart Environment for Plugins to Work
 

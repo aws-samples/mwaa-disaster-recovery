@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 - Unit tests for functions, CDK stacks, and CDK constructs
+- Build script added for linting and running tests
 
 ### Changed
 - Updated the DAG factory for 2.8 to add new fields in the log and task instance tables
@@ -15,7 +16,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated the linting script to exclude `isort` as its changes conflicted with `black`
 - Updated the README to include FAQ section
 - Renamed `lib/function` folder to `lib/functions` to be consistent with other folder
-
 
 
 ## [0.1.1] - 2024-04-22

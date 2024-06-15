@@ -25,6 +25,19 @@ from mwaa_dr.framework.model.dependency_model import DependencyModel
 
 
 class VariableTable(BaseTable):
+    """
+    A class representing the Airflow Variable table. Inherits from the BaseTable class.
+
+    This class provides methods to backup and restore Airflow Variables to/from a storage location.
+    It is part of the mwaa-disaster-recovery framework for managing Airflow metadata backups.
+
+    Args:
+        model (DependencyModel): The DependencyModel instance representing table dependencies.
+        storage_type (str, optional): The storage type to use (e.g. 'S3', 'LOCAL_FS'). Defaults to S3.
+        path_prefix (str, optional): The path prefix for storage location. Defaults to None.
+        batch_size (int, optional): The batch size for writing to storage. Defaults to 5000.
+    """
+
     def __init__(
         self,
         model: DependencyModel,
@@ -41,29 +54,52 @@ class VariableTable(BaseTable):
         )
 
     def backup(self, **context):
-        session = settings.Session()
+        """
+        Backup the Airflow Variables to the configured storage location.
 
-        query = session.query(Variable)
-        rows = query.all()
+        Args:
+            **context: Additional context parameters passed from the Airflow task.
 
-        buffer = StringIO("")
-        keys = ["key", "val", "description"]
-        if len(rows) > 0:
-            writer = csv.DictWriter(buffer, keys)
-            for row in rows:
-                writer.writerow(
-                    {keys[0]: row.key, keys[1]: row.get_val(), keys[2]: row.description}
-                )
+        Returns:
+            None
+        """
+        with settings.Session() as session:
+            query = session.query(Variable)
+            rows = query.all()
 
-        self.write(buffer.getvalue(), context)
-        session.close()
+            buffer = StringIO("")
+            keys = ["key", "val", "description"]
+            if rows:
+                writer = csv.DictWriter(buffer, keys)
+                for row in rows:
+                    writer.writerow(
+                        {
+                            keys[0]: row.key,
+                            keys[1]: row.get_val(),
+                            keys[2]: row.description,
+                        }
+                    )
+
+            self.write(buffer.getvalue(), context)
 
     def restore(self, **context):
+        """
+        Restore the Airflow Variables from the configured storage location.
+        Only variables that do not already exist will be restored from backup.
+
+        Args:
+            **context: Additional context parameters passed from the Airflow task.
+
+        Returns:
+            None
+        """
         missing = "--missing--"
         backup_file = self.read(context)
-        session = settings.Session()
 
-        with open(backup_file) as csv_file:
+        with (
+            settings.Session() as session,
+            open(backup_file, encoding="utf-8") as csv_file,
+        ):
             reader = csv.reader(csv_file)
             for row in reader:
                 var = Variable.get(key=row[0], default_var=missing)
@@ -72,5 +108,4 @@ class VariableTable(BaseTable):
                         key=row[0], value=row[1], description=row[2], session=session
                     )
 
-        session.commit()
-        session.close()
+            session.commit()

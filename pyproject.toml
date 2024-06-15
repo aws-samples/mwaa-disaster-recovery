@@ -40,7 +40,8 @@ Changelog = "https://github.com/aws-samples/mwaa-disaster-recovery/blob/main/CHA
 [tool.pytest.ini_options]
 pythonpath = [
   ".",
-  "lib"
+  "lib",
+  "assets/dags"
 ]
 testpaths = [
   "tests"
@@ -59,6 +60,11 @@ branch = true
 
 [tool.coverage.report]
 ignore_errors = true
+exclude_also = [
+  "raise AssertionError",
+  "raise NotImplementedError",
+  "@(abc\\.)?abstractmethod",
+]
 
 [tool.coverage.html]
 directory = "coverage/html"
