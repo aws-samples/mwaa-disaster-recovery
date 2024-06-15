@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated the linting script to exclude `isort` as its changes conflicted with `black`
 - Updated the README to include FAQ section
 - Renamed `lib/function` folder to `lib/functions` to be consistent with other folder
-
+- Update to pyproject.toml file to set related_files to `true` for coverage reporting
 
 ## [0.1.1] - 2024-04-22
 ### Added
