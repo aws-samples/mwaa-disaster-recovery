@@ -38,7 +38,7 @@ jobs:
 
       - name: Check htmlcov .gitignore
         run: cat htmlcov/.gitignore
-        
+
       - name: Coverage Comment
         id: coverage_comment
         uses: py-cov-action/python-coverage-comment-action@v3
