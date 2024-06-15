@@ -34,7 +34,7 @@ jobs:
         run: ./build.sh unit
 
       - name: Check root .gitignore
-        run: cat .gitignore
+        run: cat .gitignore and ls -lah htmlcov
 
       - name: Check htmlcov .gitignore
         run: cat htmlcov/.gitignore
