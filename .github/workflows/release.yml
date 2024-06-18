@@ -21,6 +21,10 @@ jobs:
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
 
+      - name: Generate New Version
+        run: ./versioning
+        env:
+          GITHUB_REF: ${{ github.ref }} 
       - name: Build a binary wheel and a source tarball
         run: python3 -m build
 
@@ -115,6 +119,7 @@ jobs:
       with:
         name: python-package-distributions
         path: dist/
+
     - name: Publish distribution 📦 to TestPyPI
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
