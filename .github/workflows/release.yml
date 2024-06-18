@@ -108,7 +108,7 @@ jobs:
 
     environment:
       name: testpypi
-      url: https://test.pypi.org/p/mwaa-dr
+      url: https://test.pypi.org/p/mwaa-dr-test
 
     permissions:
       id-token: write
