@@ -673,7 +673,7 @@ The most recent backup of the primary environment will always override the metad
 The solution backs up `variable`, `connection`, `slot_pool`, `log`, `job`, `dag_run`, `trigger`, `task_instance`, and `task_fail` tables by default during the backup workflow in the primary region. If any of these tables are non-empty during a recovery workflow in the secondary region, then you will encounter database key constraint violations in the metadata store. To avoid this issue, particularly for the [Warm Standby](#warm-standby) approach, it is critical that you frequently cleanup the secondary region MWAA metadata using the [clean_metadata](assets/dags/mwaa_dr/cleanup_metadata.py) DAG.
 
 > [!IMPORTANT]
-> Please make sure to use wider range for `MAX_AGE_IN_DAYS` and `MIN_AGE_IN_DAYS` (a value of `0` is suitable of min age for this use case) so that the metadata store is completely clean when running the [cleanup_metadata](assets/dags/mwaa_dr/cleanup_metadata.py) DAG. By default, this DAG is scheduled to run weekly, and you may want to change the period or run it on demand after performing any tests in the secondary region.
+> Please make sure to use wider range for `MAX_AGE_IN_DAYS` and `MIN_AGE_IN_DAYS` (a value of `0` is suitable for min age for this use case) so that the metadata store is completely clean when running the [cleanup_metadata](assets/dags/mwaa_dr/cleanup_metadata.py) DAG. By default, this DAG is scheduled to run weekly, and you may want to change the period or run it on demand after performing any tests in the secondary region.
 
 
 ### Manually Triggering the Recovery Workflow

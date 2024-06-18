@@ -4,4 +4,5 @@ rm -rf .venv
 rm -rf .pytest_cache
 rm -rf build
 rm -rf cdk.out
+rm -rf dist
 find . | grep -E "(/__pycache__$|\.pyc$|\.pyo$|\.DS_Store$)" | xargs rm -rf

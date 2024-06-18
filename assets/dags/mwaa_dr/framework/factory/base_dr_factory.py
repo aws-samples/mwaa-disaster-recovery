@@ -319,25 +319,30 @@ class BaseDRFactory(ABC):
             "on_failure_callback": self.notify_failure_to_sns,
         }
 
-        with DAG(
+        dag = DAG(
             dag_id=self.dag_id,
             schedule=self.schedule(),
             catchup=False,
             default_args=default_args,
-        ) as dag:
-            setup_t = PythonOperator(task_id="setup", python_callable=self.setup_backup)
+        )
 
-            with TaskGroup(group_id="export_tables") as export_tables_t:
-                for table in self.tables():
-                    PythonOperator(
-                        task_id=f"export_{table.name}s", python_callable=table.backup
-                    )
+        setup_t = PythonOperator(
+            task_id="setup", python_callable=self.setup_backup, dag=dag
+        )
 
-            teardown_t = PythonOperator(
-                task_id="teardown", python_callable=self.teardown_backup
-            )
+        with TaskGroup(group_id="export_tables", dag=dag) as export_tables_t:
+            for table in self.tables():
+                PythonOperator(
+                    task_id=f"export_{table.name}s",
+                    python_callable=table.backup,
+                    dag=dag,
+                )
 
-            setup_t >> export_tables_t >> teardown_t
+        teardown_t = PythonOperator(
+            task_id="teardown", python_callable=self.teardown_backup, dag=dag
+        )
+
+        setup_t >> export_tables_t >> teardown_t
 
         return dag
 
@@ -356,36 +361,39 @@ class BaseDRFactory(ABC):
             "on_failure_callback": self.notify_failure_to_sfn,
         }
 
-        with DAG(
+        dag = DAG(
             dag_id=self.dag_id,
             schedule=None,
             catchup=False,
             default_args=default_args,
-        ) as dag:
-            setup_t = PythonOperator(
-                task_id="setup", python_callable=self.setup_restore
+        )
+
+        setup_t = PythonOperator(
+            task_id="setup", python_callable=self.setup_restore, dag=dag
+        )
+
+        restore_start_t = DummyOperator(task_id="restore_start", dag=dag)
+        setup_t >> restore_start_t
+
+        restore_tasks = {}
+        for table in tables:
+            restore_tasks[table] = PythonOperator(
+                task_id=f"restore_{table.name}", python_callable=table.restore, dag=dag
             )
 
-            restore_start_t = DummyOperator(task_id="restore_start")
-            setup_t >> restore_start_t
+        restore_end_t = DummyOperator(task_id="restore_end", dag=dag)
+        self.model.apply(restore_start_t, restore_tasks, restore_end_t)
 
-            restore_tasks = {}
-            for table in tables:
-                restore_tasks[table] = PythonOperator(
-                    task_id=f"restore_{table.name}", python_callable=table.restore
-                )
+        teardown_t = PythonOperator(
+            task_id="teardown", python_callable=self.teardown_restore, dag=dag
+        )
+        restore_end_t >> teardown_t
 
-            restore_end_t = DummyOperator(task_id="restore_end")
-            self.model.apply(restore_start_t, restore_tasks, restore_end_t)
-
-            teardown_t = PythonOperator(
-                task_id="teardown", python_callable=self.teardown_restore
-            )
-            restore_end_t >> teardown_t
-
-            notify_success_t = PythonOperator(
-                task_id="notify_success", python_callable=self.notify_success_to_sfn
-            )
-            teardown_t >> notify_success_t
+        notify_success_t = PythonOperator(
+            task_id="notify_success",
+            python_callable=self.notify_success_to_sfn,
+            dag=dag,
+        )
+        teardown_t >> notify_success_t
 
         return dag

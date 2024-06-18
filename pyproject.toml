@@ -3,17 +3,12 @@ requires = ["setuptools >= 61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "mwaa-disaster-recovery"
+name = "mwaa_dr"
 dynamic = ["version"]
 dependencies = [
-    "aws-cdk-lib==2.138.0",
-    "constructs==10.3.0",
-    "boto3==1.34.88",
-    "smart-open==7.0.4",
-    "dataclasses_json==0.6.4",
-    "python-dotenv==1.0.1",
+  "smart-open>=7.0.4"
 ]
-requires-python = ">=3"
+requires-python = ">=3.4"
 authors = [
   {name = "Chandan Rupakheti"},
   {name = "Parnab Basak"},
@@ -22,9 +17,9 @@ maintainers = [
   {name = "Chandan Rupakheti"}
 ]
 description = "DR Solution for Amazon Managed Workflows for Apache Airflow (MWAA)"
-readme = "README.md"
+readme = "PYPIDOC.md"
 license = {file = "LICENSE.md"}
-keywords = ["MWAA", "Apache Airflow", "Disaster Recovery", "DR"]
+keywords = ["MWAA", "airflow", "disaster", "recovery", "DR"]
 classifiers = [
   "Development Status :: 4 - Beta",
   "Programming Language :: Python"
@@ -32,7 +27,7 @@ classifiers = [
 
 [project.urls]
 Homepage = "https://github.com/aws-samples/mwaa-disaster-recovery"
-Documentation = "https://github.com/aws-samples/mwaa-disaster-recovery/blob/main/README.md"
+Documentation = "https://github.com/aws-samples/mwaa-disaster-recovery/blob/main/PYPIDOC.md"
 Repository = "https://github.com/aws-samples/mwaa-disaster-recovery.git"
 "Bug Tracker" = "https://github.com/aws-samples/mwaa-disaster-recovery/issues"
 Changelog = "https://github.com/aws-samples/mwaa-disaster-recovery/blob/main/CHANGELOG.md"
@@ -53,8 +48,7 @@ omit = [
 ]
 source = [
   "lib",
-  "assets",
-  "config.py",
+  "assets"
 ]
 branch = true
 relative_files = true
@@ -66,3 +60,6 @@ exclude_also = [
   "raise NotImplementedError",
   "@(abc\\.)?abstractmethod",
 ]
+
+[tool.setuptools.packages.find]
+where = ["assets/dags/"]
