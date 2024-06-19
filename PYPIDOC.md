@@ -27,7 +27,7 @@ from mwaa_dr.v_2_8.dr_factory import DRFactory_2_8
 factory = DRFactory_2_8(
     dag_id='backup',
     path_prefix='data',
-    storage_type='LOCAL_FS'
+    storage_type='S3'
 )
 
 factory.create_backup_dag(globals())
@@ -52,7 +52,7 @@ from mwaa_dr.v_2_8.dr_factory import DRFactory_2_8
 factory = DRFactory_2_8(
     dag_id='restore',
     path_prefix='data',
-    storage_type='LOCAL_FS'
+    storage_type='S3'
 )
 
 factory.create_restore_dag(globals())
