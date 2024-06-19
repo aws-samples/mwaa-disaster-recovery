@@ -673,7 +673,7 @@ The most recent backup of the primary environment will always override the metad
 The solution backs up `variable`, `connection`, `slot_pool`, `log`, `job`, `dag_run`, `trigger`, `task_instance`, and `task_fail` tables by default during the backup workflow in the primary region. If any of these tables are non-empty during a recovery workflow in the secondary region, then you will encounter database key constraint violations in the metadata store. To avoid this issue, particularly for the [Warm Standby](#warm-standby) approach, it is critical that you frequently cleanup the secondary region MWAA metadata using the [clean_metadata](assets/dags/mwaa_dr/cleanup_metadata.py) DAG.
 
 > [!IMPORTANT]
-> Please make sure to use wider range for `MAX_AGE_IN_DAYS` and `MIN_AGE_IN_DAYS` (a value of `0` is suitable of min age for this use case) so that the metadata store is completely clean when running the [cleanup_metadata](assets/dags/mwaa_dr/cleanup_metadata.py) DAG. By default, this DAG is scheduled to run weekly, and you may want to change the period or run it on demand after performing any tests in the secondary region.
+> Please make sure to use wider range for `MAX_AGE_IN_DAYS` and `MIN_AGE_IN_DAYS` (a value of `0` is suitable for min age for this use case) so that the metadata store is completely clean when running the [cleanup_metadata](assets/dags/mwaa_dr/cleanup_metadata.py) DAG. By default, this DAG is scheduled to run weekly, and you may want to change the period or run it on demand after performing any tests in the secondary region.
 
 
 ### Manually Triggering the Recovery Workflow
@@ -702,8 +702,9 @@ This is also a great way to manually test your disaster recovery setup!
 
 There might be a situation where you simply want to backup and restore metadata without the need to utilize the full DR solution. You can run the backup and restore independently in two modes:
 
-#### Local Runner
-You can run a [mwaa-local-runner](https://github.com/aws/aws-mwaa-local-runner) container locally by simply copying the [assets/dags/mwaa_dr](assets/dags/mwaa_dr/) folder into the `dags` folder of the local runner codebase. After copying the folder, export an Airflow variable in the `startup_script/startup.sh` file of the local runner as follows:
+For production use, we recommend using the published [mwaa_dr](https://pypi.org/project/mwaa-dr/) library to create the necessary DAG for backup and restore in your MWAA environment.
+
+For testing the `mwaa_dr` library itself, you can run [aws-mwaa-local-runner](https://github.com/aws/aws-mwaa-local-runner) container locally by simply copying the [assets/dags/mwaa_dr](assets/dags/mwaa_dr/) folder into the `dags` folder of the local runner codebase. After copying the folder, export an Airflow variable in the `startup_script/startup.sh` file of the local runner as follows:
 ```bash
 export AIRFLOW_VAR_DR_STORAGE_TYPE=LOCAL_FS
 ```
@@ -711,15 +712,8 @@ export AIRFLOW_VAR_DR_STORAGE_TYPE=LOCAL_FS
 After the setup you are all set to run the [backup_metadata](assets/dags/mwaa_dr/backup_metadata.py) and [restore_metadata](assets/dags/mwaa_dr/restore_metadata.py) dags. The metadata will be stored and restored from the `dags/data/` folder of the `mwaa-lcoal-runner` codebase.
 
 > [!IMPORTANT]
-> Note that this is a great way to test and contribute code for a new version of MWAA.
+> Note that this is a great way to test and contribute code to this project for a new version of MWAA.
 
-#### Amazon MWAA
-
-For running backup and restore DAGs on your Amazon MWAA environment on AWS, you need to do the following:
-1. Ensure you have an S3 bucket created to store the backup
-2. Ensure that your MWAA execution role has read and write permissions on the bucket
-3. Create an Airflow Variable with the key named `DR_BACKUP_BUCKET` and the value containing the **name** (not ARN) of the S3 bucket.
-4. Now you are all set to manually trigger the backup and restore at any point. It may be worthwhile to first clean your metadata store by running the [cleanup_metadata](assets/dags/mwaa_dr/cleanup_metadata.py) DAG before performing restore operations to avoid database key constraint violations. Please make sure to use wider range for `MAX_AGE_IN_DAYS` and `MIN_AGE_IN_DAYS` (a value of `0` is suitable of min age for this use case) so that the metadata store is completely clean.
 
 ### May Need to Restart Environment for Plugins to Work
 

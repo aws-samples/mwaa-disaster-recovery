@@ -6,17 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.2.0] - 2024-06-18
 ### Added
 - Unit tests for functions, CDK stacks, and CDK constructs
 - Build script added for linting and running tests
+- CICD pipeline and `mwaa_dr` package publishing in [PyPI](https://pypi.org/project/mwaa-dr/)
 
 ### Changed
 - Updated the DAG factory for 2.8 to add new fields in the log and task instance tables
 - Bugfix for the Airflow CLI client
 - Updated the linting script to exclude `isort` as its changes conflicted with `black`
-- Updated the README to include FAQ section
+- Updated the `README` to include FAQ section
 - Renamed `lib/function` folder to `lib/functions` to be consistent with other folder
-- Update to pyproject.toml file to set related_files to `true` for coverage reporting
+- Update to `pyproject.toml` file to set related_files to `true` for coverage reporting
 
 ## [0.1.1] - 2024-04-22
 ### Added
@@ -43,5 +46,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 [unreleased]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v0.1.1...HEAD
+[0.2.0]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v0.0.0...v0.1.1
 [0.0.0]: https://github.com/aws-samples/mwaa-disaster-recovery/releases/tag/v0.0.0

@@ -8,3 +8,6 @@ requests~=2.31.0
 moto~=5.0.6
 sure~=2.0.1
 httpretty~=1.1.4
+build~=1.2.1
+twine~=5.1.0
+semver~=3.0.2
