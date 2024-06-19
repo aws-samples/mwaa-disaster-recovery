@@ -306,7 +306,7 @@ class BaseDRFactory(ABC):
         """
         print("Executing the restore workflow teardown ...")
 
-    def create_backup_dag(self) -> DAG:
+    def create_backup_dag(self, client_globals: dict[str, any]) -> DAG:
         """
         Create the backup DAG for the DR workflow.
 
@@ -344,9 +344,10 @@ class BaseDRFactory(ABC):
 
         setup_t >> export_tables_t >> teardown_t
 
+        client_globals[self.dag_id] = dag
         return dag
 
-    def create_restore_dag(self) -> DAG:
+    def create_restore_dag(self, client_globals: dict[str, any]) -> DAG:
         """
         Create the restore DAG for the DR workflow.
 
@@ -396,4 +397,5 @@ class BaseDRFactory(ABC):
         )
         teardown_t >> notify_success_t
 
+        client_globals[self.dag_id] = dag
         return dag
