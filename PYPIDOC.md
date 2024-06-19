@@ -25,12 +25,12 @@ Let's assume your environment version is `2.8.1`. You can create a metadata back
 from mwaa_dr.v_2_8.dr_factory import DRFactory_2_8
 
 factory = DRFactory_2_8(
-    dag_id='backup_metadata',
+    dag_id='backup',
     path_prefix='data',
-    storage_type='S3'
+    storage_type='LOCAL_FS'
 )
 
-factory.create_backup_dag()
+factory.create_backup_dag(globals())
 ```
 
 For running backup and restore on your Amazon MWAA environment on AWS, you need to do the following:
@@ -50,16 +50,15 @@ You can create a metadata restore dag by creating a python file in your MWAA `da
 from mwaa_dr.v_2_8.dr_factory import DRFactory_2_8
 
 factory = DRFactory_2_8(
-    dag_id='restore_metadata',
+    dag_id='restore',
     path_prefix='data',
-    storage_type='S3'
+    storage_type='LOCAL_FS'
 )
 
-factory.create_restore_dag()
+factory.create_restore_dag(globals())
 ```
 
 Note that you will need an empty database for restore to work. To cleanup the database before restore, please use the [clean_metadata](https://github.com/aws-samples/mwaa-disaster-recovery/blob/main/assets/dags/mwaa_dr/cleanup_metadata.py) DAG. Please make sure to use wider range for `MAX_AGE_IN_DAYS` and `MIN_AGE_IN_DAYS` (a value of `0` is suitable for min age for this use case) so that the metadata store is completely clean.
-
 
 ## Advance Use Case
 
@@ -139,7 +138,7 @@ factory = CustomDRFactory_2_7(
     storage_type='S3'
 )
 
-factory.create_backup_dag()
+factory.create_backup_dag(globals())
 ```
 
 And finally, here is your metadata restore dag (also in the `dags` folder):
@@ -154,7 +153,7 @@ factory = CustomDRFactory_2_7(
     storage_type='S3'
 )
 
-factory.create_restore_dag()
+factory.create_restore_dag(globals())
 ```
 
 For additional details, please visit the project [homepage](https://github.com/aws-samples/mwaa-disaster-recovery).

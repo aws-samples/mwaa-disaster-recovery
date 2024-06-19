@@ -58,8 +58,6 @@
         - [Clean Metadata Tables Required for the Restore Workflow](#clean-metadata-tables-required-for-the-restore-workflow)
         - [Manually Triggering the Recovery Workflow](#manually-triggering-the-recovery-workflow)
         - [Using the Metadata Backup and Restore DAGs Independently](#using-the-metadata-backup-and-restore-dags-independently)
-            - [Local Runner](#local-runner)
-            - [Amazon MWAA](#amazon-mwaa)
         - [May Need to Restart Environment for Plugins to Work](#may-need-to-restart-environment-for-plugins-to-work)
 - [Frequently Asked Questions](#frequently-asked-questions)
     - [FAQ-1: Failure to Read Environment Backup](#faq-1-failure-to-read-environment-backup)
@@ -779,5 +777,7 @@ The [contributing guide](contributing.md) explains the process of forking the pr
 
 > [!IMPORTANT]
 > - You will need to have [Docker](https://www.docker.com/) running for the unit test to work.
-> - You may need to enable [Windows Subsystem for Linux](https://blogs.windows.com/windowsdeveloper/2016/03/30/run-bash-on-ubuntu-on-windows/) to run the build scripts.
+> - You may need to enable [Windows Subsystem for Linux](https://blogs.windows.com/windowsdeveloper/2016/03/30/run-bash-on-ubuntu-on-windows/) to run the build scripts in a Windows OS.
 > - Please ensure that the code coverage has not decreased after your changes before creating a pull request.
+
+Please also review the [Using the Metadata Backup and Restore DAGs Independently](#using-the-metadata-backup-and-restore-dags-independently) section on how to run the backup and restore locally for testing the `mwaa_dr` framework.

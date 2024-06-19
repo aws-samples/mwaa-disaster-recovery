@@ -51,4 +51,4 @@ else:
 
     factory = DefaultDagFactory(**kwargs)
 
-factory.create_backup_dag()
+factory.create_backup_dag(globals())
