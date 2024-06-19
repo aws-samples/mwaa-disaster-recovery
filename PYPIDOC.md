@@ -36,7 +36,7 @@ For running backup and restore on your Amazon MWAA environment on AWS, you need 
 1. Ensure you have an S3 bucket created to store the backup.
 2. Ensure that your MWAA execution role has read and write permissions on the bucket.
 3. Create an Airflow variable with the key named `DR_BACKUP_BUCKET` and the value containing the **name** (not ARN) of the S3 bucket.
-4. You are all set to manually trigger the backup and restore DAGs at any point.
+4. You are all set to manually trigger the backup and restore DAGs at any point. The metadata backup will be stored in `<backup S3 bucket>/<path_prefix>`.
 
 If you want to use the solution with [aws-mwaa-local-runner](https://github.com/aws/aws-mwaa-local-runner), change the `storage_type` argument from `S3` to `LOCAL_FS`. The backup will be located in the `dags/data` folder or more generally at the `dags/<path_prefix>` folder of the local runner project.
 
