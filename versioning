@@ -28,7 +28,7 @@ def get_current_version() -> str:
 
 def get_pypi_manifest():
     try:
-        resp = requests.get("https://test.pypi.org/pypi/mwaa-dr-test/json", timeout=10)
+        resp = requests.get("https://test.pypi.org/pypi/mwaa-dr/json", timeout=10)
         manifest = resp.json()
         return manifest
     except requests.exceptions.RequestException as e:
@@ -51,6 +51,7 @@ def bump_dev_release(manifest) -> str:
         new_base_version = Version(f'{major}.{minor}.{micro+1}dev1')
 
     for release in manifest.get('releases', []):
+        print(f'Checking release: {release} >= {new_base_version}')
         version = Version(release)
         if version.is_devrelease and version >= new_base_version:
             new_base_version = Version((f'{version.major}.{version.minor}.{version.micro}dev{version.dev+1}'))
