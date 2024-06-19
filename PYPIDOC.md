@@ -4,6 +4,7 @@
 ![Python](https://img.shields.io/badge/Python-3.4+-blue)
 [![Black](https://img.shields.io/badge/Code%20Style-Black-000000.svg)](https://github.com/psf/black)
 [![CodeCoverage](https://raw.githubusercontent.com/aws-samples/mwaa-disaster-recovery/python-coverage-comment-action-data/badge.svg)](https://htmlpreview.github.io/?https://github.com/aws-samples/mwaa-disaster-recovery/blob/python-coverage-comment-action-data/htmlcov/index.html)
+[![PyPI version](https://badge.fury.io/py/mwaa-dr.svg)](https://badge.fury.io/py/mwaa-dr)
 
 The `mwaa-dr` PyPi package is a part of the larger [MWAA DR solution](https://github.com/aws-samples/mwaa-disaster-recovery) for the use case where exporting and importing metadata store needs to be performed independent to the broader DR solution. As of the time of writing, access to the MWAA metadata store is only available through DAGs. This solution simplifies the process of creating backup and restore DAGs, respectively, by providing a reusable python library.
 
