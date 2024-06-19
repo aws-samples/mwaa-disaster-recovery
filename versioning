@@ -22,9 +22,11 @@ import os
 import requests
 from packaging.version import Version
 
+
 def get_current_version() -> str:
-    with open('VERSION', mode='r', encoding='utf-8') as file:
+    with open("VERSION", encoding="utf-8") as file:
         return file.read().strip()
+
 
 def get_pypi_manifest():
     try:
@@ -32,13 +34,13 @@ def get_pypi_manifest():
         manifest = resp.json()
         return manifest
     except requests.exceptions.RequestException as e:
-        print(f'Error fetching manifest: {e}')
+        print(f"Error fetching manifest: {e}")
         return {}
 
 
 def bump_dev_release(manifest) -> str:
     current_version = Version(get_current_version())
-    new_base_version = ''
+    new_base_version = ""
 
     major = current_version.major
     minor = current_version.minor
@@ -46,15 +48,17 @@ def bump_dev_release(manifest) -> str:
 
     if current_version.is_devrelease:
         dev = current_version.dev
-        new_base_version = Version(f'{major}.{minor}.{micro}dev{dev+1}')
+        new_base_version = Version(f"{major}.{minor}.{micro}dev{dev+1}")
     else:
-        new_base_version = Version(f'{major}.{minor}.{micro+1}dev1')
+        new_base_version = Version(f"{major}.{minor}.{micro+1}dev1")
 
-    for release in manifest.get('releases', []):
-        print(f'Checking release: {release} >= {new_base_version}')
+    for release in manifest.get("releases", []):
+        print(f"Checking release: {release} >= {new_base_version}")
         version = Version(release)
         if version.is_devrelease and version >= new_base_version:
-            new_base_version = Version((f'{version.major}.{version.minor}.{version.micro}dev{version.dev+1}'))
+            new_base_version = Version(
+                f"{version.major}.{version.minor}.{version.micro}dev{version.dev+1}"
+            )
 
     return str(new_base_version)
 
@@ -62,22 +66,24 @@ def bump_dev_release(manifest) -> str:
 def get_version():
     manifest = get_pypi_manifest()
     current_version = get_current_version()
-    print(f'Current version: {current_version}')
+    print(f"Current version: {current_version}")
 
-    github_ref = os.getenv('GITHUB_REF') or ''
+    github_ref = os.getenv("GITHUB_REF") or ""
 
-    if github_ref.startswith('refs/tags/'):
-        print('GitHub version tag found. Using GitHub version tag!')
-        return github_ref.split('/')[2]
+    if github_ref.startswith("refs/tags/"):
+        print("GitHub version tag found. Using GitHub version tag!")
+        return github_ref.split("/")[2]
 
-    print('No GitHub version tag found. Bumping version for development release!')
+    print("No GitHub version tag found. Bumping version for development release!")
     return bump_dev_release(manifest)
 
+
 def set_version(version):
-    with open('VERSION', mode='w', encoding='utf-8') as file:
+    with open("VERSION", mode="w", encoding="utf-8") as file:
         file.write(version)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     version = get_version()
-    print(f'Next version for build: {version}')
+    print(f"Next version for build: {version}")
     set_version(version)

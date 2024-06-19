@@ -1,6 +1,6 @@
 name: release
 
-on: 
+on:
   push:
   pull_request:
 
@@ -26,7 +26,7 @@ jobs:
       - name: Generate New Version
         run: ./versioning
         env:
-          GITHUB_REF: ${{ github.ref }} 
+          GITHUB_REF: ${{ github.ref }}
       - name: Build a binary wheel and a source tarball
         run: python3 -m build
 
