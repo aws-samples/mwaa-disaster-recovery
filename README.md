@@ -4,16 +4,24 @@
 
 | Name                                                            |    Stmts |     Miss |   Branch |   BrPart |    Cover |   Missing |
 |---------------------------------------------------------------- | -------: | -------: | -------: | -------: | -------: | --------: |
-| assets/dags/mwaa\_dr/framework/factory/base\_dr\_factory.py     |      139 |        0 |       34 |        0 |     100% |           |
+| assets/dags/mwaa\_dr/\_\_init\_\_.py                            |        0 |        0 |        0 |        0 |     100% |           |
+| assets/dags/mwaa\_dr/framework/\_\_init\_\_.py                  |        0 |        0 |        0 |        0 |     100% |           |
+| assets/dags/mwaa\_dr/framework/factory/\_\_init\_\_.py          |        0 |        0 |        0 |        0 |     100% |           |
+| assets/dags/mwaa\_dr/framework/factory/base\_dr\_factory.py     |      139 |        0 |       30 |        0 |     100% |           |
 | assets/dags/mwaa\_dr/framework/factory/default\_dag\_factory.py |       23 |        0 |        2 |        0 |     100% |           |
+| assets/dags/mwaa\_dr/framework/model/\_\_init\_\_.py            |        0 |        0 |        0 |        0 |     100% |           |
 | assets/dags/mwaa\_dr/framework/model/active\_dag\_table.py      |       30 |        0 |        8 |        0 |     100% |           |
 | assets/dags/mwaa\_dr/framework/model/base\_table.py             |      159 |        0 |       42 |        0 |     100% |           |
 | assets/dags/mwaa\_dr/framework/model/connection\_table.py       |       38 |        0 |       16 |        0 |     100% |           |
 | assets/dags/mwaa\_dr/framework/model/dependency\_model.py       |       61 |        0 |       28 |        0 |     100% |           |
 | assets/dags/mwaa\_dr/framework/model/variable\_table.py         |       30 |        0 |       12 |        0 |     100% |           |
+| assets/dags/mwaa\_dr/v\_2\_5/\_\_init\_\_.py                    |        0 |        0 |        0 |        0 |     100% |           |
 | assets/dags/mwaa\_dr/v\_2\_5/dr\_factory.py                     |       42 |        0 |        0 |        0 |     100% |           |
+| assets/dags/mwaa\_dr/v\_2\_6/\_\_init\_\_.py                    |        0 |        0 |        0 |        0 |     100% |           |
 | assets/dags/mwaa\_dr/v\_2\_6/dr\_factory.py                     |        2 |        0 |        0 |        0 |     100% |           |
+| assets/dags/mwaa\_dr/v\_2\_7/\_\_init\_\_.py                    |        0 |        0 |        0 |        0 |     100% |           |
 | assets/dags/mwaa\_dr/v\_2\_7/dr\_factory.py                     |        8 |        0 |        0 |        0 |     100% |           |
+| assets/dags/mwaa\_dr/v\_2\_8/\_\_init\_\_.py                    |        0 |        0 |        0 |        0 |     100% |           |
 | assets/dags/mwaa\_dr/v\_2\_8/dr\_factory.py                     |        8 |        0 |        0 |        0 |     100% |           |
 | lib/\_\_init\_\_.py                                             |        0 |        0 |        0 |        0 |     100% |           |
 | lib/constructs/airflow\_cli.py                                  |       35 |        0 |        5 |        0 |     100% |           |
@@ -29,7 +37,7 @@
 | lib/stacks/mwaa\_base\_stack.py                                 |       33 |        0 |       10 |        0 |     100% |           |
 | lib/stacks/mwaa\_primary\_stack.py                              |       99 |        0 |       12 |        0 |     100% |           |
 | lib/stacks/mwaa\_secondary\_stack.py                            |      166 |        0 |       14 |        0 |     100% |           |
-|                                                       **TOTAL** | **1132** |    **0** |  **236** |    **0** | **100%** |           |
+|                                                       **TOTAL** | **1132** |    **0** |  **232** |    **0** | **100%** |           |
 
 
 ## Setup coverage badge
