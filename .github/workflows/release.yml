@@ -1,6 +1,8 @@
 name: release
 
-on: push
+on: 
+  push:
+  pull_request:
 
 jobs:
   build:
@@ -108,7 +110,7 @@ jobs:
 
     environment:
       name: testpypi
-      url: https://test.pypi.org/p/mwaa-dr-test
+      url: https://test.pypi.org/p/mwaa-dr
 
     permissions:
       id-token: write
