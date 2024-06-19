@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2024-06-18
+### Changed
+- Fixed the bug in release pipeline to only deploy to TestPyPi package repo on non-tag push
+- Updated the `README` and `PYPIDOC` to include pypi package version badge.
+
+
 ## [0.2.0] - 2024-06-18
 ### Added
 - Unit tests for functions, CDK stacks, and CDK constructs
@@ -46,6 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 [unreleased]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v0.1.1...HEAD
+[0.2.1]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v0.0.0...v0.1.1
 [0.0.0]: https://github.com/aws-samples/mwaa-disaster-recovery/releases/tag/v0.0.0
