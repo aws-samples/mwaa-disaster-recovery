@@ -15,7 +15,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 
-from airflow import version
+from airflow import version, DAG
 from airflow.models import Variable
 
 kwargs = {
@@ -51,4 +51,4 @@ else:
 
     factory = DefaultDagFactory(**kwargs)
 
-factory.create_restore_dag(globals())
+dag: DAG = factory.create_restore_dag()

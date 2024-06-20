@@ -516,6 +516,7 @@ On AWS console, monitor the StepFunction deployed as a part of the secondary reg
 
 The Airflow UI should show past DAG runs as well as logs, variables, and connections restored from the primary MWAA environment. All the active DAGs in the primary region should also be active in the secondary region.
 
+
 ## Warm Standby Tutorial
 
 ### WS-1: Create Necessary AWS Resources
