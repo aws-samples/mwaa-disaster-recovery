@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.3] - 2024-06-19
+### Changed
+- Further fix for the DAG detection bug while using the `mwaa-dr` library in client DAGs
+- Updated the examples and documentation in `PYPIDOC` to reflect the new usage pattern
+
+
 ## [0.2.2] - 2024-06-19
 ### Changed
 - Fixed the DAG detection bug while using the `mwaa-dr` library in client DAGs
@@ -57,7 +63,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial commit with sample readme, code of conduct, and license
 
 
-[unreleased]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v0.2.2...HEAD
+[unreleased]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v0.2.3...HEAD
+[0.2.3]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v0.1.1...v0.2.0

@@ -290,7 +290,7 @@ class TestDRFactory_2_5:
         with patch(
             "airflow.models.Variable.get", return_value="@hourly"
         ) as variable_get:
-            dag: DAG = factory.create_backup_dag(globals())
+            dag: DAG = factory.create_backup_dag()
 
             expect(dag.dag_id).to.equal("metadata_backup")
             expect(dag.default_args["on_failure_callback"].__qualname__).to.equal(
@@ -369,13 +369,12 @@ class TestDRFactory_2_5:
             expect(teardown.upstream_task_ids).to.equal(
                 {t.task_id for t in table_tasks}
             )
-            expect(globals()["metadata_backup"]).to.be(dag)
 
     def test_base_dr_factory_create_restore_dag(self):
         factory = DRFactory_2_5("metadata_restore")
         factory.model
 
-        dag: DAG = factory.create_restore_dag(globals())
+        dag: DAG = factory.create_restore_dag()
 
         expect(dag.dag_id).to.equal("metadata_restore")
         expect(dag.default_args["on_failure_callback"].__qualname__).to.equal(
@@ -439,4 +438,3 @@ class TestDRFactory_2_5:
         expect(active_dag.downstream_task_ids).to.equal({restore_end.task_id})
         expect(restore_end.downstream_task_ids).to.equal({teardown.task_id})
         expect(teardown.downstream_task_ids).to.equal({notify_success.task_id})
-        expect(globals()["metadata_restore"]).to.be(dag)

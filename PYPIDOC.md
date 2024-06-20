@@ -22,6 +22,8 @@ Let's assume your environment version is `2.8.1`. You can create a metadata back
 
 **backup_metadata.py**:
 ```python
+# Importing DAG is necessary for DAG detection
+from airflow import DAG
 from mwaa_dr.v_2_8.dr_factory import DRFactory_2_8
 
 factory = DRFactory_2_8(
@@ -30,7 +32,8 @@ factory = DRFactory_2_8(
     storage_type='S3'
 )
 
-factory.create_backup_dag(globals())
+# Assigning the returned dag to a global variable is necessary for DAG detection
+dag: DAG = factory.create_backup_dag()
 ```
 
 For running backup and restore on your Amazon MWAA environment on AWS, you need to do the following:
@@ -47,6 +50,7 @@ You can create a metadata restore dag by creating a python file in your MWAA `da
 
 **restore_metadata.py**:
 ```python
+from airflow import DAG
 from mwaa_dr.v_2_8.dr_factory import DRFactory_2_8
 
 factory = DRFactory_2_8(
@@ -55,7 +59,7 @@ factory = DRFactory_2_8(
     storage_type='S3'
 )
 
-factory.create_restore_dag(globals())
+dag:DAG = factory.create_restore_dag()
 ```
 
 Note that you will need an empty database for restore to work. To cleanup the database before restore, please use the [clean_metadata](https://github.com/aws-samples/mwaa-disaster-recovery/blob/main/assets/dags/mwaa_dr/cleanup_metadata.py) DAG. Please make sure to use wider range for `MAX_AGE_IN_DAYS` and `MIN_AGE_IN_DAYS` (a value of `0` is suitable for min age for this use case) so that the metadata store is completely clean.
@@ -128,32 +132,34 @@ class CustomDRFactory_2_7(DRFactory_2_7):
 
 Here is your metadata backup dag that will use your custom factory (also in the `dags` folder):
 
-**metadata_backup.py**:
+**backup.py**:
 ```python
+from airflow import DAG
 from custom_dr_factory_2_7 import CustomDRFactory_2_7
 
 factory = CustomDRFactory_2_7(
-    dag_id='backup_metadata',
+    dag_id='backup',
     path_prefix='data',
     storage_type='S3'
 )
 
-factory.create_backup_dag(globals())
+dag:DAG = factory.create_backup_dag()
 ```
 
 And finally, here is your metadata restore dag (also in the `dags` folder):
 
-**restore_metadata.py**:
+**restore.py**:
 ```python
+from airflow import DAG
 from custom_dr_factory_2_7 import CustomDRFactory_2_7
 
 factory = CustomDRFactory_2_7(
-    dag_id='restore_metadata',
+    dag_id='restore',
     path_prefix='data',
     storage_type='S3'
 )
 
-factory.create_restore_dag(globals())
+dag: DAG = factory.create_restore_dag()
 ```
 
 For additional details, please visit the project [homepage](https://github.com/aws-samples/mwaa-disaster-recovery).
