@@ -7,7 +7,7 @@
 | assets/dags/mwaa\_dr/\_\_init\_\_.py                            |        0 |        0 |        0 |        0 |     100% |           |
 | assets/dags/mwaa\_dr/framework/\_\_init\_\_.py                  |        0 |        0 |        0 |        0 |     100% |           |
 | assets/dags/mwaa\_dr/framework/factory/\_\_init\_\_.py          |        0 |        0 |        0 |        0 |     100% |           |
-| assets/dags/mwaa\_dr/framework/factory/base\_dr\_factory.py     |      141 |        0 |       30 |        0 |     100% |           |
+| assets/dags/mwaa\_dr/framework/factory/base\_dr\_factory.py     |      139 |        0 |       30 |        0 |     100% |           |
 | assets/dags/mwaa\_dr/framework/factory/default\_dag\_factory.py |       23 |        0 |        2 |        0 |     100% |           |
 | assets/dags/mwaa\_dr/framework/model/\_\_init\_\_.py            |        0 |        0 |        0 |        0 |     100% |           |
 | assets/dags/mwaa\_dr/framework/model/active\_dag\_table.py      |       30 |        0 |        8 |        0 |     100% |           |
@@ -37,7 +37,7 @@
 | lib/stacks/mwaa\_base\_stack.py                                 |       33 |        0 |       10 |        0 |     100% |           |
 | lib/stacks/mwaa\_primary\_stack.py                              |       99 |        0 |       12 |        0 |     100% |           |
 | lib/stacks/mwaa\_secondary\_stack.py                            |      166 |        0 |       14 |        0 |     100% |           |
-|                                                       **TOTAL** | **1134** |    **0** |  **232** |    **0** | **100%** |           |
+|                                                       **TOTAL** | **1132** |    **0** |  **232** |    **0** | **100%** |           |
 
 
 ## Setup coverage badge
