@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.4] - 2024-06-19
+### Changed
+- Updating `backup_matadata` and `restore_metadata` script to use the new framework access pattern
+- Updated `PYPIDOC` to include the backup and restore workflow sample runs
+
+
 ## [0.2.3] - 2024-06-19
 ### Changed
 - Further fix for the DAG detection bug while using the `mwaa-dr` library in client DAGs
@@ -63,7 +69,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial commit with sample readme, code of conduct, and license
 
 
-[unreleased]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v0.2.3...HEAD
+[unreleased]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v0.2.4...HEAD
+[0.2.4]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v0.2.0...v0.2.1

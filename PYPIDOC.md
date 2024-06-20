@@ -44,6 +44,11 @@ For running backup and restore on your Amazon MWAA environment on AWS, you need 
 
 If you want to use the solution with [aws-mwaa-local-runner](https://github.com/aws/aws-mwaa-local-runner), change the `storage_type` argument from `S3` to `LOCAL_FS`. The backup will be located in the `dags/data` folder or more generally at the `dags/<path_prefix>` folder of the local runner project.
 
+Here is the sample run of the backup workflow:
+
+![Backup Workflow](https://github.com/aws-samples/mwaa-disaster-recovery/blob/main/design/BackupRun.png?raw=true)
+
+
 ### Metadata Restore DAG
 
 You can create a metadata restore dag by creating a python file in your MWAA `dags` folder as follows:
@@ -63,6 +68,10 @@ dag:DAG = factory.create_restore_dag()
 ```
 
 Note that you will need an empty database for restore to work. To cleanup the database before restore, please use the [clean_metadata](https://github.com/aws-samples/mwaa-disaster-recovery/blob/main/assets/dags/mwaa_dr/cleanup_metadata.py) DAG. Please make sure to use wider range for `MAX_AGE_IN_DAYS` and `MIN_AGE_IN_DAYS` (a value of `0` is suitable for min age for this use case) so that the metadata store is completely clean.
+
+Here is the sample of the restore workflow:
+
+![Restore Workflow](https://github.com/aws-samples/mwaa-disaster-recovery/blob/main/design/RestoreRun.png?raw=true)
 
 ## Advance Use Case
 
