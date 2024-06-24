@@ -15,8 +15,9 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 
-## Copied from https://docs.aws.amazon.com/mwaa/latest/userguide/samples-database-cleanup.html
+# Modified from https://docs.aws.amazon.com/mwaa/latest/userguide/samples-database-cleanup.html
 
+from datetime import datetime
 from time import sleep
 
 from airflow import settings
@@ -43,66 +44,34 @@ else:
     # The BaseJob class was renamed as of Apache Airflow v2.6
     from airflow.jobs.base_job import BaseJob as Job
 
-# Delete entries for the past 35 days to 42 days. Adjust MAX_AGE_IN_DAYS and MIN_AGE_IN_DAYS
-# to set how far back this DAG cleans the database.
-# Note that this dag runs weekly.
-MAX_AGE_IN_DAYS = 42
-MIN_AGE_IN_DAYS = 35
-DECREMENT = -7
-
-# This is a list of (table, time) tuples.
-# table = the table to clean in the metadata database
-# time  = the column in the table associated to the timestamp of an entry
-#         or None if not applicable.
-TABLES_TO_CLEAN = [
-    [Job, Job.latest_heartbeat],
-    [TaskInstance, TaskInstance.execution_date],
-    [TaskReschedule, TaskReschedule.execution_date],
-    [DagTag, None],
-    [DagModel, DagModel.last_parsed_time],
-    [DagRun, DagRun.execution_date],
-    [ImportError, ImportError.timestamp],
-    [Log, Log.dttm],
-    [SlaMiss, SlaMiss.execution_date],
-    [RenderedTaskInstanceFields, RenderedTaskInstanceFields.execution_date],
-    [XCom, XCom.execution_date],
-]
-
+TABLES_TO_CLEAN = {
+    'job': Job,
+    'task_instance': TaskInstance,
+    'task_reschedule': TaskReschedule,
+    'dag_tag', DagTag,
+    'dag_model', DagModel,
+    'dag_run': DagRun,
+    'import_error': ImportError,
+    'log': Log,
+    'sla_miss': SlaMiss,
+    'rendered_task_instance_fields': RenderedTaskInstanceFields,
+    'xcom': XCom
+}
 
 @task()
-def cleanup_db_fn(x):
-    session = settings.Session()
-
-    if x[1]:
-        for oldest_days_ago in range(MAX_AGE_IN_DAYS, MIN_AGE_IN_DAYS, DECREMENT):
-            earliest_days_ago = max(oldest_days_ago + DECREMENT, MIN_AGE_IN_DAYS)
-            print(
-                f"deleting {str(x[0])} entries between {earliest_days_ago} and {oldest_days_ago} days old..."
-            )
-            earliest_date = days_ago(earliest_days_ago)
-            oldest_date = days_ago(oldest_days_ago)
-            query = (
-                session.query(x[0])
-                .filter(x[1] >= oldest_date)
-                .filter(x[1] <= earliest_date)
-            )
-            query.delete(synchronize_session=False)
-            session.commit()
-            sleep(5)
-    else:
-        # No time column specified for the table. Delete all entries
-        print("deleting", str(x[0]), "...")
-        query = session.query(x[0])
+def cleanup_db_fn(table):
+    with settings.Session() as session:
+        print(f"Deleting {table} ...")
+        query = session.query(TABLES_TO_CLEAN[table])
         query.delete(synchronize_session=False)
         session.commit()
-
-    session.close()
+        print(f"Successfully deleted {table}!")
 
 
 @dag(
     dag_id="cleanup_db",
-    schedule_interval="@weekly",
-    start_date=days_ago(7),
+    schedule=None,
+    start_date=datetime(2022, 1, 1),
     catchup=False,
     is_paused_upon_creation=True,
 )
