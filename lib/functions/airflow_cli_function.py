@@ -18,7 +18,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 import json
 import os
 
-from .airflow_cli_client import AirflowCliClient, AirflowCliInput, AirflowCliException
+from airflow_cli_client import AirflowCliClient, AirflowCliInput, AirflowCliException
 
 
 def on_event(event, context):

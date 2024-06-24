@@ -15,13 +15,10 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 
-# Modified from https://docs.aws.amazon.com/mwaa/latest/userguide/samples-database-cleanup.html
-
 from datetime import datetime
-from time import sleep
 
-from airflow import settings
-from airflow.decorators import dag, task
+from airflow import DAG, settings 
+from airflow.operators.python import PythonOperator
 from airflow.models import (
     DagModel,
     DagRun,
@@ -34,7 +31,6 @@ from airflow.models import (
     TaskReschedule,
     XCom,
 )
-from airflow.utils.dates import days_ago
 from airflow.version import version
 
 major_version, minor_version = int(version.split(".")[0]), int(version.split(".")[1])
@@ -44,44 +40,51 @@ else:
     # The BaseJob class was renamed as of Apache Airflow v2.6
     from airflow.jobs.base_job import BaseJob as Job
 
-TABLES_TO_CLEAN = {
-    'job': Job,
-    'task_instance': TaskInstance,
-    'task_reschedule': TaskReschedule,
-    'dag_tag', DagTag,
-    'dag_model', DagModel,
-    'dag_run': DagRun,
-    'import_error': ImportError,
-    'log': Log,
-    'sla_miss': SlaMiss,
-    'rendered_task_instance_fields': RenderedTaskInstanceFields,
-    'xcom': XCom
+TABLES_TO_CLEAN = [
+    Job,
+    TaskInstance,
+    TaskReschedule,
+    DagTag,
+    DagModel,
+    DagRun,
+    ImportError,
+    Log,
+    SlaMiss,
+    RenderedTaskInstanceFields,
+    XCom
+]
+
+
+def cleanup_tables():
+    """
+    Deletes all records from tables included in TABLES_TO_CLEAN
+    """
+    print("Running metadata tables cleanup ...")
+
+    with settings.Session() as session:
+        for table in TABLES_TO_CLEAN:
+            print(f"Deleting records from {table.__tablename__} ...")
+            query = session.query(table)
+            if table.__tablename__ == 'job':
+                query = query.filter(Job.job_type != 'SchedulerJob')
+            query.delete(synchronize_session=False)
+        session.commit()
+
+    print("Metadata cleanup complete!")
+
+
+default_args = {
+    'owner': 'airflow',
+    'start_date': datetime(2022, 1, 1)
 }
 
-@task()
-def cleanup_db_fn(table):
-    with settings.Session() as session:
-        print(f"Deleting {table} ...")
-        query = session.query(TABLES_TO_CLEAN[table])
-        query.delete(synchronize_session=False)
-        session.commit()
-        print(f"Successfully deleted {table}!")
-
-
-@dag(
-    dag_id="cleanup_db",
-    schedule=None,
-    start_date=datetime(2022, 1, 1),
+with DAG(
+    dag_id='cleanup_metadata',
+    schedule_interval=None,
     catchup=False,
-    is_paused_upon_creation=True,
-)
-def clean_db_dag_fn():
-    t_last = None
-    for x in TABLES_TO_CLEAN:
-        t = cleanup_db_fn(x)
-        if t_last:
-            t_last >> t
-        t_last = t
-
-
-clean_db_dag = clean_db_dag_fn()
+    default_args=default_args
+) as dag:
+    task = PythonOperator(
+        task_id="cleanup_tables",
+        python_callable=cleanup_tables
+    )

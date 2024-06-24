@@ -23,14 +23,11 @@ from unittest.mock import patch
 from sure import expect
 from moto import mock_aws
 from tests.unit.mocks.mock_setup import aws_credentials, aws_mwaa
-from lib.functions.airflow_cli_client import (
-    AirflowCliClient,
-    AirflowCliCommand,
-    AirflowCliInput,
+from airflow_cli_client import (
+    AirflowCliClient,    
     AirflowCliResult,
-    AirflowCliException,
 )
-from lib.functions.airflow_dag_trigger_function import handler
+from airflow_dag_trigger_function import handler
 
 
 @mock_aws

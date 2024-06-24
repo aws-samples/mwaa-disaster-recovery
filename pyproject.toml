@@ -36,7 +36,8 @@ Changelog = "https://github.com/aws-samples/mwaa-disaster-recovery/blob/main/CHA
 pythonpath = [
   ".",
   "lib",
-  "assets/dags"
+  "assets/dags",
+  "lib/functions"
 ]
 testpaths = [
   "tests"

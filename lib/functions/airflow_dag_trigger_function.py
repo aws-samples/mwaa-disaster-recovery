@@ -16,7 +16,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 
 import json
-from .airflow_cli_client import AirflowCliClient
+from airflow_cli_client import AirflowCliClient
 
 
 def handler(event, context):

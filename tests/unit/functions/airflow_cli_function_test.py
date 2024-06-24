@@ -22,31 +22,31 @@ from unittest.mock import patch
 from sure import expect
 from moto import mock_aws
 from tests.unit.mocks.mock_setup import aws_credentials, aws_mwaa, warm_standby_env_vars
-from lib.functions.airflow_cli_client import (
+from airflow_cli_client import (
     AirflowCliCommand,
     AirflowCliInput,
     AirflowCliResult,
     AirflowCliException,
 )
-from lib.functions.airflow_cli_function import on_event, on_create, on_update, on_delete
+from airflow_cli_function import on_event, on_create, on_update, on_delete
 
 
 def test_on_event_create():
-    with patch("lib.functions.airflow_cli_function.on_create") as on_create_mock:
+    with patch("airflow_cli_function.on_create") as on_create_mock:
         event = {"RequestType": "Create"}
         on_event(event, None)
     on_create_mock.assert_called_once_with(event)
 
 
 def test_on_event_update():
-    with patch("lib.functions.airflow_cli_function.on_update") as on_update_mock:
+    with patch("airflow_cli_function.on_update") as on_update_mock:
         event = {"RequestType": "Update"}
         on_event(event, None)
     on_update_mock.assert_called_once_with(event)
 
 
 def test_on_event_delete():
-    with patch("lib.functions.airflow_cli_function.on_delete") as on_delete_mock:
+    with patch("airflow_cli_function.on_delete") as on_delete_mock:
         event = {"RequestType": "Delete"}
         on_event(event, None)
     on_delete_mock.assert_called_once_with(event)
@@ -104,7 +104,7 @@ def test_on_create(aws_mwaa, warm_standby_env_vars):
         )
 
     with patch(
-        "lib.functions.airflow_cli_client.AirflowCliClient.execute",
+        "airflow_cli_client.AirflowCliClient.execute",
         new=mock_execute_command,
     ):
         expect(on_create(event)).to.equal(expected_result)
@@ -140,7 +140,7 @@ def test_on_update(aws_mwaa, warm_standby_env_vars):
         )
 
     with patch(
-        "lib.functions.airflow_cli_client.AirflowCliClient.execute",
+        "airflow_cli_client.AirflowCliClient.execute",
         new=mock_execute_command,
     ):
         expect(on_update(event)).to.equal(expected_result)
@@ -176,7 +176,7 @@ def test_on_delete(aws_mwaa, warm_standby_env_vars):
         )
 
     with patch(
-        "lib.functions.airflow_cli_client.AirflowCliClient.execute",
+        "airflow_cli_client.AirflowCliClient.execute",
         new=mock_execute_command,
     ):
         expect(on_delete(event)).to.equal(expected_result)

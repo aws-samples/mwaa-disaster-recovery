@@ -1,5 +1,6 @@
 {
     "python.analysis.extraPaths": [
-        "./assets/dags"
+        "./assets/dags",
+        "./lib/functions"
     ]
 }
