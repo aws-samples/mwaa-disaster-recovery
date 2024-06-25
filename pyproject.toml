@@ -8,7 +8,7 @@ dynamic = ["version"]
 dependencies = [
   "smart-open>=7.0.4"
 ]
-requires-python = ">=3.4"
+requires-python = ">=3.7"
 authors = [
   {name = "Chandan Rupakheti"},
   {name = "Parnab Basak"},

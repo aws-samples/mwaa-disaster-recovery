@@ -94,18 +94,18 @@ class VariableTable(BaseTable):
             None
         """
         missing = "--missing--"
-        backup_file = self.read(context)
+        csv_file = self.read(context)
 
-        with (
-            settings.Session() as session,
-            open(backup_file, encoding="utf-8") as csv_file,
-        ):
-            reader = csv.reader(csv_file)
-            for row in reader:
-                var = Variable.get(key=row[0], default_var=missing)
-                if var == missing:
-                    Variable.set(
-                        key=row[0], value=row[1], description=row[2], session=session
-                    )
+        try:
+            with settings.Session() as session:
+                reader = csv.reader(csv_file)
+                for row in reader:
+                    var = Variable.get(key=row[0], default_var=missing)
+                    if var == missing:
+                        Variable.set(
+                            key=row[0], value=row[1], description=row[2], session=session
+                        )
 
-            session.commit()
+                session.commit()
+        finally:
+            csv_file.close()

@@ -96,24 +96,24 @@ class ActiveDagTable(BaseTable):
         """
         backup_file = self.read(context)
 
-        with (
-            settings.Session() as session,
-            open(backup_file, encoding="utf-8") as backup,
-        ):
-            session.execute(
-                "CREATE TABLE IF NOT EXISTS active_dags(dag_id VARCHAR(250))"
-            )
-            session.commit()
+        try:
+            with settings.Session() as session:
+                session.execute(
+                    "CREATE TABLE IF NOT EXISTS active_dags(dag_id VARCHAR(250))"
+                )
+                session.commit()
 
-            conn = settings.engine.raw_connection()
-            cursor = conn.cursor()
-            cursor.copy_expert(
-                "COPY active_dags FROM STDIN WITH (FORMAT CSV, HEADER FALSE)", backup
-            )
-            conn.commit()
-            conn.close()
+                conn = settings.engine.raw_connection()
+                cursor = conn.cursor()
+                cursor.copy_expert(
+                    "COPY active_dags FROM STDIN WITH (FORMAT CSV, HEADER FALSE)", backup_file
+                )
+                conn.commit()
+                conn.close()
 
-            session.execute(
-                "UPDATE dag d SET is_paused=false FROM active_dags ad WHERE d.dag_id = ad.dag_id"
-            )
-            session.commit()
+                session.execute(
+                    "UPDATE dag d SET is_paused=false FROM active_dags ad WHERE d.dag_id = ad.dag_id"
+                )
+                session.commit()
+        finally:
+            backup_file.close()

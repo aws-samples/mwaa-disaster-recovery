@@ -4,7 +4,7 @@
 
 ![MWAA](https://img.shields.io/badge/MWAA-2.8.1_|_2.7.2_|_2.6.3_|_2.5.1-blue)
 ![CDK](https://img.shields.io/badge/CDK-Python-orange)
-![Python](https://img.shields.io/badge/Python-3.4+-blue)
+![Python](https://img.shields.io/badge/Python-3.7+-blue)
 [![Black](https://img.shields.io/badge/Code%20Style-Black-000000.svg)](https://github.com/psf/black)
 [![CodeCoverage](https://raw.githubusercontent.com/aws-samples/mwaa-disaster-recovery/python-coverage-comment-action-data/badge.svg)](https://htmlpreview.github.io/?https://github.com/aws-samples/mwaa-disaster-recovery/blob/python-coverage-comment-action-data/htmlcov/index.html)
 [![PyPI version](https://badge.fury.io/py/mwaa-dr.svg)](https://badge.fury.io/py/mwaa-dr)
@@ -191,7 +191,7 @@ The [lib](lib) folder hosts the deployment code for the project. The project per
 ## Prerequisites
 
 ### Software Requirements
-[![python](https://img.shields.io/badge/python-3.4+-blue)](https://www.python.org/downloads/)
+[![python](https://img.shields.io/badge/python-3.7+-blue)](https://www.python.org/downloads/)
 [![NodeJS >= v14](https://img.shields.io/badge/nodejs-_14+-green)](https://nodejs.org/en/download)
 [![AWS CDK v2](https://img.shields.io/badge/cdk-v2-yellow)](https://docs.aws.amazon.com/cdk/v2/guide/cli.html)
 [![Docker Latest](https://img.shields.io/badge/docker-latest-blue)](https://docs.docker.com/get-docker/)
