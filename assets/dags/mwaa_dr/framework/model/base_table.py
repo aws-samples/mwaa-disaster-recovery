@@ -270,11 +270,10 @@ class BaseTable:
 
         The backup process streams the table data in batches of `batch_size` rows to the backup file.
         """
-        import smart_open
-
         store = None
 
         if self.storage_type == S3:
+            import smart_open
 
             s3_file_uri = (
                 f"s3://{self.bucket(context)}/{self.path_prefix}/{self.name}.csv"
@@ -326,12 +325,12 @@ class BaseTable:
 
         conn = settings.engine.raw_connection()
         try:
-            with open(backup_file, encoding="utf-8") as backup:
-                cursor = conn.cursor()
-                cursor.copy_expert(restore_sql, backup)
-                conn.commit()
+            cursor = conn.cursor()
+            cursor.copy_expert(restore_sql, backup_file)
+            conn.commit()
         finally:
             conn.close()
+            backup_file.close()
 
     def write(self, body: str, context=None):
         """
@@ -362,64 +361,47 @@ class BaseTable:
         local_file_uri = f"{AIRFLOW_HOME}/dags/{self.path_prefix}/{file_name}.csv"
 
         print(f"Writing to local file: {local_file_uri} ...")
-        with open(local_file_uri, "w") as local_file:
+        with open(local_file_uri, "w", encoding="utf-8") as local_file:
             local_file.write(body)
-            local_file.close()
 
-    def read(self, context=None) -> str:
+    def read(self, context=None):
         """
-        Reads the content of the backup CSV file and returns its local file path.
+        Reads the content of the backup CSV file from the specified storage location.
 
         Args:
             context (dict, optional): The context dictionary containing the 'dag_run' information.
 
         Returns:
-            str: The local file path of the backup CSV file.
-
-        If the backup file is stored in S3, it is first downloaded to a temporary local file before returning the path.
-        If the backup file does not exist, it returns None.
+            file object: The file object of the backup CSV file.
         """
         if self.storage_type == S3:
             return self.read_from_s3(context)
-        else:
-            return self.read_from_local()
+        return self.read_from_local()
 
-    def read_from_s3(self, context) -> str:
+    def read_from_s3(self, context):
         """
-        Reads the content of the backup CSV file from S3 and returns its local file path.
+        Returns a file object to read the content of the backup CSV file from S3.
 
         Args:
-            context (dict, optional): The context dictionary containing the 'dag_run' information.
+            context (dict): The context dictionary containing the 'dag_run' information.
 
         Returns:
-            str: The local file path of the backup CSV file.
+            file object: The file object of the backup CSV file.
         """
-        import boto3
-        import botocore
+        import smart_open
 
-        resource = boto3.resource("s3")
-        bucket = resource.Bucket(self.bucket(context))
-        backup_file = f"/tmp/{self.name}.csv"
-        s3_file_key = f"{self.path_prefix}/{self.name}.csv"
+        bucket = self.bucket(context)
+        s3_file_url = f"s3://{bucket}/{self.path_prefix}/{self.name}.csv"
+        return smart_open.open(s3_file_url, encoding="utf-8")
 
-        try:
-            print(f"Downloading file {s3_file_key} ...")
-            bucket.download_file(s3_file_key, backup_file)
-        except botocore.exceptions.ClientError as e:
-            if e.response["Error"]["Code"] == "404":
-                return None
-            else:
-                raise
-        else:
-            return backup_file
-
-    def read_from_local(self) -> str:
+    def read_from_local(self):
         """
-        Reads the content of the backup CSV file from local storage and returns its local file path.
+        Returns a file object to read the content of the backup CSV file from the local file system.
 
         Returns:
-            str: The local file path of the backup CSV file.
+            file object: The file object of the backup CSV file.
         """
+
         AIRFLOW_HOME = os.getenv("AIRFLOW_HOME")
         local_file_uri = f"{AIRFLOW_HOME}/dags/{self.path_prefix}/{self.name}.csv"
-        return local_file_uri
+        return open(local_file_uri, encoding="utf-8")

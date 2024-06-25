@@ -63,7 +63,7 @@ class MwaaPrimaryStack(MwaaBaseStack):
         secondary_backup_bucket: s3.Bucket,
         secondary_source_bucket: s3.Bucket,
         conf: config.Config = None,
-        **kwargs
+        **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, conf, **kwargs)
         conf = self.conf

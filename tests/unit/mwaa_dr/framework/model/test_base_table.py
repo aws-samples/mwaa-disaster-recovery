@@ -94,7 +94,7 @@ class TestBaseTable:
         expect(BaseTable.bucket()).to.equal("a_bucket")
 
     @patch("airflow.models.Variable.get", return_value="--dummy-bucket--")
-    def test_bucket_with_context_withou_bucket(self, mock):
+    def test_bucket_with_context_without_bucket(self, mock):
         conf = dict()
 
         dag_run = types.SimpleNamespace()
@@ -422,43 +422,37 @@ class TestBaseTable:
     def test_read_from_s3(self, mock_table_for_s3, mock_s3_bucket, mock_context):
         mock_table_for_s3.read_from_s3(mock_context)
 
-        # Read /tml/task_instance.csv from local file system and expect it contnet to equal "data"
+        # Read /tml/task_instance.csv from local file system and expect it content to equal "data"
         with open("/tmp/task_instance.csv") as file:
             expect(file.read()).to.equal("data")
 
-    def test_read_from_s3_not_found(self, mock_table_for_s3, mock_context):
-        with mock_aws():
-            conn = boto3.resource("s3")
-            conn.create_bucket(Bucket="backup-bucket")
-
-            expect(mock_table_for_s3.read_from_s3(mock_context)).to.equal(None)
-
-    def test_read_from_s3_client_error(self, mock_table_for_s3, mock_context):
+    def test_read_from_s3_error(self, mock_table_for_s3, mock_context):
         with mock_aws():
             mock_table_for_s3.read_from_s3.when.called_with(
                 mock_context
-            ).should.have.raised(ClientError)
+            ).should.have.raised(OSError)
 
     def test_read_from_local(self, mock_table_for_local_fs):
         os.environ["AIRFLOW_HOME"] = "/tmp"
-        expect(mock_table_for_local_fs.read_from_local()).to.equal(
-            "/tmp/dags/data/task_instance.csv"
-        )
+        buffer = io.StringIO("test, running\r\n")
+        with patch("builtins.open", return_value=buffer):
+            expect(mock_table_for_local_fs.read_from_local()).to.be(buffer)
         del os.environ["AIRFLOW_HOME"]
 
     def test_read(mock_context):
         table_for_s3 = BaseTable(
             name="task_instance", model=DependencyModel(), storage_type=S3
         )
+        buffer = io.StringIO("test, running\r\n")
 
-        with patch.object(table_for_s3, "read_from_s3", return_value="s3"):
-            expect(table_for_s3.read(mock_context)).to.equal("s3")
+        with patch.object(table_for_s3, "read_from_s3", return_value=buffer):
+            expect(table_for_s3.read(mock_context)).to.be(buffer)
 
         table_for_local_fs = BaseTable(
             name="task_instance", model=DependencyModel(), storage_type="LOCAL_FS"
         )
-        with patch.object(table_for_local_fs, "read_from_local", return_value="local"):
-            expect(table_for_local_fs.read(dict())).to.equal("local")
+        with patch.object(table_for_local_fs, "read_from_local", return_value=buffer):
+            expect(table_for_local_fs.read(dict())).to.be(buffer)
 
     def test_restore_multi_columns(self, mock_context, mock_sql_raw_connection):
         task_instance = BaseTable(
@@ -467,8 +461,7 @@ class TestBaseTable:
 
         with (
             io.BytesIO(b"test,running\r\n") as store,
-            patch("builtins.open", return_value=store) as file,
-            patch.object(task_instance, "read", return_value="task_instance.csv"),
+            patch.object(task_instance, "read", return_value=store),
         ):
             task_instance.restore(**mock_context)
             expect(task_instance.read.call_count).to.equal(1)
@@ -485,8 +478,7 @@ class TestBaseTable:
 
         with (
             io.BytesIO(b"test,running\r\n") as store,
-            patch("builtins.open", return_value=store) as file,
-            patch.object(task_instance, "read", return_value="task_instance.csv"),
+            patch.object(task_instance, "read", return_value=store),
         ):
             task_instance.restore(**mock_context)
             expect(task_instance.read.call_count).to.equal(1)

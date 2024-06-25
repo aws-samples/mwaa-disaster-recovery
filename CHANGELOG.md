@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2024-06-25
+### Changed
+- Bugfixes to the [cleanup_metadata](assets/dags/mwaa_dr/cleanup_metadata.py) DAG
+- Bugfixes to the [functions](lib/functions/) module
+- Performance optimization of the restore operation -- Moved away from the two-step process of first downloading the file locally and then loading the file into metadata store to directly streaming the file from S3. Introduces API spec changes to `BaseTable`
+- Updates to `build.sh` script to include publishing commands
+- Updates to `README` and `PYPIDOC`
+
 ## [0.2.4] - 2024-06-19
 ### Changed
 - Updating `backup_matadata` and `restore_metadata` script to use the new framework access pattern
@@ -69,7 +77,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial commit with sample readme, code of conduct, and license
 
 
-[unreleased]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v0.2.4...HEAD
+[unreleased]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v0.2.4...v0.3.0
 [0.2.4]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v0.2.1...v0.2.2

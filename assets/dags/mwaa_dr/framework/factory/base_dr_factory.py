@@ -122,18 +122,22 @@ class BaseDRFactory(ABC):
         """
         return Variable.get("DR_BACKUP_SCHEDULE", default_var=None)
 
-    def task_token(self, context):
+    def task_token(self, context, default_value=None):
         """
         Get the AWS StepFunctions task token from the Airflow dag_run context.
 
         Args:
             context (dict): The Airflow task context.
+            default_value (str): The default value to return if the task token is not found.
 
         Returns:
             str: The task token.
         """
-        dag_run = context.get("dag_run")
-        return dag_run.conf["task_token"]
+        try:
+            dag_run = context.get("dag_run")
+            return dag_run.conf["task_token"]
+        except:
+            return default_value
 
     def dag_run_result(self, context):
         """
@@ -163,14 +167,14 @@ class BaseDRFactory(ABC):
         result["status"] = "Success"
 
         if self.storage_type == S3:
-            import json
-
-            import boto3
-
             result["location"] = f"s3://{self.bucket(context)}/{self.path_prefix}"
-            token = self.task_token(context)
-            sfn = boto3.client("stepfunctions")
-            sfn.send_task_success(taskToken=token, output=json.dumps(result))
+            token = self.task_token(context, "--missing--")
+            if token != "--missing--":
+                import json
+                import boto3
+
+                sfn = boto3.client("stepfunctions")
+                sfn.send_task_success(taskToken=token, output=json.dumps(result))
         else:
             AIRFLOW_HOME = os.getenv("AIRFLOW_HOME")
             result["location"] = f"{AIRFLOW_HOME}/dags/{self.path_prefix}"
@@ -192,11 +196,12 @@ class BaseDRFactory(ABC):
 
             import boto3
 
-            token = self.task_token(context)
-            sfn = boto3.client("stepfunctions")
-            sfn.send_task_failure(
-                taskToken=token, error="Restore Failure", cause=json.dumps(result)
-            )
+            token = self.task_token(context, "--missing--")
+            if token != "--missing--":
+                sfn = boto3.client("stepfunctions")
+                sfn.send_task_failure(
+                    taskToken=token, error="Restore Failure", cause=json.dumps(result)
+                )
 
         print(result)
 

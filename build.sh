@@ -46,6 +46,8 @@ prompt() {
     echo "      e.g. $./build.sh setup 2_8"
     echo "  teardown: Teardowns integration test environment by stopping mwaa local runner container. Takes mwaa version as an argument -- one of [2_5, 2_6, 2_7, 2_8]."
     echo "      e.g. $./build.sh teardown 2_8"
+    echo "  publish: Publishes the package to a pypi repo. Assumes the ~/.pypirc file has publishing credentials"
+    echo "      e.g. $./build.sh publish"
     echo "  help: Presents the build options"
     echo "      e.g. $./build.sh help"
     echo "====================================="
@@ -71,6 +73,7 @@ unit_test() {
     rm -rf coverage
     mkdir -p coverage
     coverage run -m pytest $path && coverage report -m
+    find . | grep -E "(/__pycache__$|\.pyc$|\.pyo$|\.DS_Store$)" | xargs rm -rf
 }
 
 
@@ -197,6 +200,13 @@ trigger_dag() {
     dag_name=$1
 }
 
+publish() {
+    rm -rf dist
+    ./versioning
+    python -m build
+    twine upload --repository testpypi dist/*
+}
+
 # Driver
 case "$1" in
     clean)
@@ -216,6 +226,9 @@ case "$1" in
     ;;
     teardown)
         integration_test_teardown $2
+    ;;
+    publish)
+        publish
     ;;
     *)
         prompt

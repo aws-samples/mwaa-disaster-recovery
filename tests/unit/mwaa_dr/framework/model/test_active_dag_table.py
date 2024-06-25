@@ -119,11 +119,11 @@ class TestActiveDagTable:
         table = ActiveDagTable(
             model=model, storage_type="LOCAL_FS", path_prefix="data", batch_size=1000
         )
-        context = dict()
+        context = {}
 
         with (
             io.BytesIO() as store,
-            patch.object(table, "read", return_value="active_dag.csv") as read,
+            patch.object(table, "read", return_value=store) as read,
             patch("sqlalchemy.orm.Session.execute") as execute,
             patch("sqlalchemy.orm.Session.commit") as commit,
             patch("sqlalchemy.orm.Session.close") as close,

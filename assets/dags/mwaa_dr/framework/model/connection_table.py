@@ -118,40 +118,40 @@ class ConnectionTable(BaseTable):
         Args:
             **context: Additional Airflow task context parameters.
         """
-        backup_file = self.read(context)
+        csv_file = self.read(context)
 
-        with (
-            open(backup_file, encoding="utf-8") as csv_file,
-            settings.Session() as session,
-        ):
-            reader = csv.reader(csv_file)
-            new_connections = []
+        try:
+            with settings.Session() as session:
+                reader = csv.reader(csv_file)
+                new_connections = []
 
-            for connection in reader:
-                existing_connections = (
-                    session.query(Connection)
-                    .filter(Connection.conn_id == connection[0])
-                    .all()
-                )
-                if not existing_connections:
-                    port = None
-                    if connection[7]:
-                        port = int(connection[7])
-
-                    connection = Connection(
-                        conn_id=connection[0],
-                        conn_type=connection[1],
-                        description=connection[2],
-                        extra=connection[3],
-                        host=connection[4],
-                        login=connection[5],
-                        password=connection[6],
-                        port=port,
-                        schema=connection[8],
+                for connection in reader:
+                    existing_connections = (
+                        session.query(Connection)
+                        .filter(Connection.conn_id == connection[0])
+                        .all()
                     )
-                    print(connection)
-                    new_connections.append(connection)
+                    if not existing_connections:
+                        port = None
+                        if connection[7]:
+                            port = int(connection[7])
 
-            if new_connections:
-                session.add_all(new_connections)
-                session.commit()
+                        connection = Connection(
+                            conn_id=connection[0],
+                            conn_type=connection[1],
+                            description=connection[2],
+                            extra=connection[3],
+                            host=connection[4],
+                            login=connection[5],
+                            password=connection[6],
+                            port=port,
+                            schema=connection[8],
+                        )
+                        print(connection)
+                        new_connections.append(connection)
+
+                if new_connections:
+                    session.add_all(new_connections)
+                    session.commit()
+        finally:
+            csv_file.close()

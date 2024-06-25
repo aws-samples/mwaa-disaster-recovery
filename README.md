@@ -4,7 +4,7 @@
 
 ![MWAA](https://img.shields.io/badge/MWAA-2.8.1_|_2.7.2_|_2.6.3_|_2.5.1-blue)
 ![CDK](https://img.shields.io/badge/CDK-Python-orange)
-![Python](https://img.shields.io/badge/Python-3.4+-blue)
+![Python](https://img.shields.io/badge/Python-3.7+-blue)
 [![Black](https://img.shields.io/badge/Code%20Style-Black-000000.svg)](https://github.com/psf/black)
 [![CodeCoverage](https://raw.githubusercontent.com/aws-samples/mwaa-disaster-recovery/python-coverage-comment-action-data/badge.svg)](https://htmlpreview.github.io/?https://github.com/aws-samples/mwaa-disaster-recovery/blob/python-coverage-comment-action-data/htmlcov/index.html)
 [![PyPI version](https://badge.fury.io/py/mwaa-dr.svg)](https://badge.fury.io/py/mwaa-dr)
@@ -191,7 +191,7 @@ The [lib](lib) folder hosts the deployment code for the project. The project per
 ## Prerequisites
 
 ### Software Requirements
-[![python](https://img.shields.io/badge/python-3.4+-blue)](https://www.python.org/downloads/)
+[![python](https://img.shields.io/badge/python-3.7+-blue)](https://www.python.org/downloads/)
 [![NodeJS >= v14](https://img.shields.io/badge/nodejs-_14+-green)](https://nodejs.org/en/download)
 [![AWS CDK v2](https://img.shields.io/badge/cdk-v2-yellow)](https://docs.aws.amazon.com/cdk/v2/guide/cli.html)
 [![Docker Latest](https://img.shields.io/badge/docker-latest-blue)](https://docs.docker.com/get-docker/)
@@ -671,10 +671,6 @@ The most recent backup of the primary environment will always override the metad
 ### Clean Metadata Tables Required for the Restore Workflow
 
 The solution backs up `variable`, `connection`, `slot_pool`, `log`, `job`, `dag_run`, `trigger`, `task_instance`, and `task_fail` tables by default during the backup workflow in the primary region. If any of these tables are non-empty during a recovery workflow in the secondary region, then you will encounter database key constraint violations in the metadata store. To avoid this issue, particularly for the [Warm Standby](#warm-standby) approach, it is critical that you frequently cleanup the secondary region MWAA metadata using the [clean_metadata](assets/dags/mwaa_dr/cleanup_metadata.py) DAG.
-
-> [!IMPORTANT]
-> Please make sure to use wider range for `MAX_AGE_IN_DAYS` and `MIN_AGE_IN_DAYS` (a value of `0` is suitable for min age for this use case) so that the metadata store is completely clean when running the [cleanup_metadata](assets/dags/mwaa_dr/cleanup_metadata.py) DAG. By default, this DAG is scheduled to run weekly, and you may want to change the period or run it on demand after performing any tests in the secondary region.
-
 
 ### Manually Triggering the Recovery Workflow
 

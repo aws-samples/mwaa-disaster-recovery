@@ -18,7 +18,8 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 
-from unittest.mock import patch, mock_open
+from unittest.mock import patch
+from io import StringIO
 
 from airflow.models import Variable
 from sure import expect
@@ -47,7 +48,7 @@ class TestVariableTable:
             storage_type="LOCAL_FS",
             path_prefix="data",
         )
-        context = dict()
+        context = {}
 
         with (
             patch("sqlalchemy.orm.Session.query") as query,
@@ -68,7 +69,7 @@ class TestVariableTable:
             storage_type="LOCAL_FS",
             path_prefix="data",
         )
-        context = dict()
+        context = {}
 
         with (
             patch("sqlalchemy.orm.Session.query") as query,
@@ -87,13 +88,12 @@ class TestVariableTable:
             storage_type="LOCAL_FS",
             path_prefix="data",
         )
-        context = dict()
+        context = {}
+
+        buffer = StringIO("key1,val1,description1\r\n")
 
         with (
-            patch.object(table, "read", return_value="variable.csv") as read,
-            patch(
-                "builtins.open", mock_open(read_data="key1,val1,description1\r\n")
-            ) as mock_file,
+            patch.object(table, "read", return_value=buffer),
             patch("sqlalchemy.orm.Session.__enter__") as session,
             patch("airflow.models.Variable.get", return_value="--missing--") as var_get,
             patch("airflow.models.Variable.set") as var_set,
@@ -116,13 +116,11 @@ class TestVariableTable:
             storage_type="LOCAL_FS",
             path_prefix="data",
         )
-        context = dict()
+        context = {}
+        buffer = StringIO("key1,val1,description1\r\n")
 
         with (
-            patch.object(table, "read", return_value="variable.csv") as read,
-            patch(
-                "builtins.open", mock_open(read_data="key1,val1,description1\r\n")
-            ) as mock_file,
+            patch.object(table, "read", return_value=buffer),
             patch("sqlalchemy.orm.Session.__enter__") as session,
             patch("airflow.models.Variable.get", return_value="val1") as var_get,
             patch("airflow.models.Variable.set") as var_set,

@@ -8,7 +8,7 @@ dynamic = ["version"]
 dependencies = [
   "smart-open>=7.0.4"
 ]
-requires-python = ">=3.4"
+requires-python = ">=3.7"
 authors = [
   {name = "Chandan Rupakheti"},
   {name = "Parnab Basak"},
@@ -36,7 +36,8 @@ Changelog = "https://github.com/aws-samples/mwaa-disaster-recovery/blob/main/CHA
 pythonpath = [
   ".",
   "lib",
-  "assets/dags"
+  "assets/dags",
+  "lib/functions"
 ]
 testpaths = [
   "tests"
