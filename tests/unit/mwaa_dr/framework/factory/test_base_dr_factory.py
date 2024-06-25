@@ -103,6 +103,10 @@ class TestBaseDRFactory:
     def test_token(self, mock_context):
         factory = BaseDRFactory(dag_id="dag")
         expect(factory.task_token(mock_context)).to.equal("token")
+    
+    def test_token_none(self):
+        factory = BaseDRFactory(dag_id="dag")
+        expect(factory.task_token({}, 'default')).to.equal('default')
 
     def test_dag_run_result(self, mock_context, mock_result):
         factory = BaseDRFactory(dag_id="dag")
@@ -131,6 +135,18 @@ class TestBaseDRFactory:
 
             boto3_client().send_task_success.assert_not_called()
 
+    def test_notify_success_to_sfn_for_mwaa_no_token(self, mock_context, mock_result):
+        factory = BaseDRFactory(dag_id="dag", storage_type="S3")
+        mock_context["dag_run"].conf.pop("task_token")
+
+        mock_result["status"] = "Success"
+        mock_result["location"] = "s3://backup-bucket/data"
+
+        with patch("boto3.client") as boto3_client:
+            factory.notify_success_to_sfn(**mock_context)
+
+            boto3_client().send_task_success.assert_not_called()
+
     def test_notify_failure_to_sfn_for_mwaa(self, mock_context, mock_result):
         factory = BaseDRFactory(dag_id="dag", storage_type="S3")
 
@@ -147,6 +163,17 @@ class TestBaseDRFactory:
 
     def test_notify_failure_to_sfn_for_local(self, mock_context, mock_result):
         factory = BaseDRFactory(dag_id="dag", storage_type="LOCAL_FS")
+
+        mock_result["status"] = "Fail"
+
+        with patch("boto3.client") as boto3_client:
+            factory.notify_failure_to_sfn(mock_context)
+
+            boto3_client().send_task_failure.assert_not_called()
+
+    def test_notify_failure_to_sfn_for_mwaa_no_token(self, mock_context, mock_result):
+        factory = BaseDRFactory(dag_id="dag", storage_type="S3")
+        mock_context["dag_run"].conf.pop("task_token")
 
         mock_result["status"] = "Fail"
 

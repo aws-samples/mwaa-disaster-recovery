@@ -136,7 +136,7 @@ class BaseDRFactory(ABC):
         try:
             dag_run = context.get("dag_run")
             return dag_run.conf["task_token"]
-        except KeyError:
+        except:
             return default_value
 
     def dag_run_result(self, context):

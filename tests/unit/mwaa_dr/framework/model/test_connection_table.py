@@ -18,7 +18,8 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 
-from unittest.mock import patch, mock_open
+from io import StringIO
+from unittest.mock import patch
 
 from airflow.models import Connection
 from sure import expect
@@ -105,12 +106,11 @@ class TestConnectionTable:
         table = ConnectionTable(
             model=model, storage_type="LOCAL_FS", path_prefix="data", batch_size=1000
         )
-        context = dict()
+        context = {}
         data = 'id,type,description,"{""extra"": ""value""}",host,login,password,1234,schema\r\n'
-
+        buffer = StringIO(data)
         with (
-            patch("builtins.open", mock_open(read_data=data)) as mock_file,
-            patch.object(table, "read", return_value="connection.csv") as read,
+            patch.object(table, "read", return_value=buffer),
             patch("sqlalchemy.orm.Session.__enter__") as session,
         ):
             session.return_value.query.return_value.filter.return_value.all.return_value = (
@@ -130,10 +130,10 @@ class TestConnectionTable:
         )
         context = dict()
         data = 'id,type,description,"{""extra"": ""value""}",host,login,password,1234,schema\r\n'
+        buffer = StringIO(data)
 
         with (
-            patch("builtins.open", mock_open(read_data=data)) as mock_file,
-            patch.object(table, "read", return_value="connection.csv") as read,
+            patch.object(table, "read", return_value=buffer),
             patch("sqlalchemy.orm.Session.__enter__") as session,
         ):
             session.return_value.query.return_value.filter.return_value.all.return_value = [
@@ -162,10 +162,10 @@ class TestConnectionTable:
         )
         context = dict()
         data = 'id,type,description,"{""extra"": ""value""}",host,login,password,,schema\r\n'
+        buffer = StringIO(data)
 
         with (
-            patch("builtins.open", mock_open(read_data=data)) as mock_file,
-            patch.object(table, "read", return_value="connection.csv") as read,
+            patch.object(table, "read", return_value=buffer),
             patch("sqlalchemy.orm.Session.__enter__") as session,
         ):
             session.return_value.query.return_value.filter.return_value.all.return_value = (
