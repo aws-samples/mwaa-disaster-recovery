@@ -17,7 +17,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 from datetime import datetime
 
-from airflow import DAG, settings 
+from airflow import DAG, settings
 from airflow.operators.python import PythonOperator
 from airflow.models import (
     DagModel,
@@ -51,7 +51,7 @@ TABLES_TO_CLEAN = [
     Log,
     SlaMiss,
     RenderedTaskInstanceFields,
-    XCom
+    XCom,
 ]
 
 
@@ -65,26 +65,20 @@ def cleanup_tables():
         for table in TABLES_TO_CLEAN:
             print(f"Deleting records from {table.__tablename__} ...")
             query = session.query(table)
-            if table.__tablename__ == 'job':
-                query = query.filter(Job.job_type != 'SchedulerJob')
+            if table.__tablename__ == "job":
+                query = query.filter(Job.job_type != "SchedulerJob")
             query.delete(synchronize_session=False)
         session.commit()
 
     print("Metadata cleanup complete!")
 
 
-default_args = {
-    'owner': 'airflow',
-    'start_date': datetime(2022, 1, 1)
-}
+default_args = {"owner": "airflow", "start_date": datetime(2022, 1, 1)}
 
 with DAG(
-    dag_id='cleanup_metadata',
+    dag_id="cleanup_metadata",
     schedule_interval=None,
     catchup=False,
-    default_args=default_args
+    default_args=default_args,
 ) as dag:
-    task = PythonOperator(
-        task_id="cleanup_tables",
-        python_callable=cleanup_tables
-    )
+    task = PythonOperator(task_id="cleanup_tables", python_callable=cleanup_tables)

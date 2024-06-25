@@ -103,7 +103,10 @@ class VariableTable(BaseTable):
                     var = Variable.get(key=row[0], default_var=missing)
                     if var == missing:
                         Variable.set(
-                            key=row[0], value=row[1], description=row[2], session=session
+                            key=row[0],
+                            value=row[1],
+                            description=row[2],
+                            session=session,
                         )
 
                 session.commit()

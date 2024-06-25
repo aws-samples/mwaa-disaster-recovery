@@ -106,7 +106,8 @@ class ActiveDagTable(BaseTable):
                 conn = settings.engine.raw_connection()
                 cursor = conn.cursor()
                 cursor.copy_expert(
-                    "COPY active_dags FROM STDIN WITH (FORMAT CSV, HEADER FALSE)", backup_file
+                    "COPY active_dags FROM STDIN WITH (FORMAT CSV, HEADER FALSE)",
+                    backup_file,
                 )
                 conn.commit()
                 conn.close()

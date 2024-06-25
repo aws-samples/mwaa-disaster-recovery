@@ -45,7 +45,7 @@ class AirflowCli(Construct):
         env_version: str,
         vpc_info: VpcInfo,
         cli_input: AirflowCliInput,
-        **kwargs
+        **kwargs,
     ):
         super().__init__(scope, id, **kwargs)
 

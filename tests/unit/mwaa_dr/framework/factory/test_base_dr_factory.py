@@ -103,10 +103,10 @@ class TestBaseDRFactory:
     def test_token(self, mock_context):
         factory = BaseDRFactory(dag_id="dag")
         expect(factory.task_token(mock_context)).to.equal("token")
-    
+
     def test_token_none(self):
         factory = BaseDRFactory(dag_id="dag")
-        expect(factory.task_token({}, 'default')).to.equal('default')
+        expect(factory.task_token({}, "default")).to.equal("default")
 
     def test_dag_run_result(self, mock_context, mock_result):
         factory = BaseDRFactory(dag_id="dag")

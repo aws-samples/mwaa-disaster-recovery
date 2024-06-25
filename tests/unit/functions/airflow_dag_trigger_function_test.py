@@ -24,7 +24,7 @@ from sure import expect
 from moto import mock_aws
 from tests.unit.mocks.mock_setup import aws_credentials, aws_mwaa
 from airflow_cli_client import (
-    AirflowCliClient,    
+    AirflowCliClient,
     AirflowCliResult,
 )
 from airflow_dag_trigger_function import handler

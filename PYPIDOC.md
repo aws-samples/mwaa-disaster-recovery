@@ -67,7 +67,7 @@ factory = DRFactory_2_8(
 dag:DAG = factory.create_restore_dag()
 ```
 
-Note that you will need an empty database for restore to work. To cleanup the database before restore, please use the [clean_metadata](https://github.com/aws-samples/mwaa-disaster-recovery/blob/main/assets/dags/mwaa_dr/cleanup_metadata.py) DAG. Please make sure to use wider range for `MAX_AGE_IN_DAYS` and `MIN_AGE_IN_DAYS` (a value of `0` is suitable for min age for this use case) so that the metadata store is completely clean.
+Note that you will need an empty database for restore to work. To cleanup the database before restore, please use the [clean_metadata](https://github.com/aws-samples/mwaa-disaster-recovery/blob/main/assets/dags/mwaa_dr/cleanup_metadata.py) DAG.
 
 Here is the sample of the restore workflow:
 

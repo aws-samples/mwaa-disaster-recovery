@@ -389,6 +389,7 @@ class BaseTable:
             file object: The file object of the backup CSV file.
         """
         import smart_open
+
         bucket = self.bucket(context)
         s3_file_url = f"s3://{bucket}/{self.path_prefix}/{self.name}.csv"
         return smart_open.open(s3_file_url, encoding="utf-8")
@@ -400,7 +401,7 @@ class BaseTable:
         Returns:
             file object: The file object of the backup CSV file.
         """
-        
+
         AIRFLOW_HOME = os.getenv("AIRFLOW_HOME")
         local_file_uri = f"{AIRFLOW_HOME}/dags/{self.path_prefix}/{self.name}.csv"
         return open(local_file_uri, encoding="utf-8")

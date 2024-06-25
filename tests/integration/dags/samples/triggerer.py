@@ -45,7 +45,7 @@ class WaitFiveSecondsSensor(BaseSensorOperator):
         deferrable: bool = conf.getboolean(
             "operators", "default_deferrable", fallback=False
         ),
-        **kwargs
+        **kwargs,
     ) -> None:
         super().__init__(**kwargs)
         self.deferrable = deferrable
