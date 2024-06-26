@@ -17,21 +17,19 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import os
 from abc import ABC, abstractmethod
-from datetime import timedelta
+from datetime import datetime
 
 from airflow import DAG, settings
 from airflow.exceptions import AirflowFailException
 from airflow.models import Variable
 from airflow.operators.dummy import DummyOperator
 from airflow.operators.python_operator import PythonOperator
-from datetime import datetime
 from airflow.utils.task_group import TaskGroup
 from mwaa_dr.framework.model.base_table import S3, BaseTable
 from mwaa_dr.framework.model.dependency_model import DependencyModel
 
 BACKUP_RESTORE = "BACKUP_RESTORE"
 WARM_STANDBY = "WARM_STANDBY"
-EXECUTION_TIMEOUT = timedelta(minutes=5)
 
 
 class BaseDRFactory(ABC):
@@ -401,4 +399,84 @@ class BaseDRFactory(ABC):
         )
         teardown_t >> notify_success_t
 
+        return dag
+
+    def cleanup_tables(self, **context):
+        """
+        Cleans up the metadata store before a restore operation.
+
+        Args:
+            **context: The Airflow context dictionary.
+        """
+        try:
+            from airflow.version import version
+            from airflow.models import (
+                DagModel,
+                DagRun,
+                DagTag,
+                ImportError,
+                Log,
+                RenderedTaskInstanceFields,
+                SlaMiss,
+                TaskInstance,
+                TaskReschedule,
+                XCom,
+            )
+
+            major_version, minor_version = int(version.split(".")[0]), int(version.split(".")[1])
+            if major_version >= 2 and minor_version >= 6:
+                from airflow.jobs.job import Job
+            else:
+                from airflow.jobs.base_job import BaseJob as Job
+
+            tables = [
+                Job,
+                TaskInstance,
+                TaskReschedule,
+                DagTag,
+                DagModel,
+                DagRun,
+                ImportError,
+                Log,
+                SlaMiss,
+                RenderedTaskInstanceFields,
+                XCom,
+            ]
+
+            print("Running metadata tables cleanup ...")
+
+            with settings.Session() as session:
+                for table in tables:
+                    print(f"Deleting records from {table.__tablename__} ...")
+                    query = session.query(table)
+                    if table.__tablename__ == "job":
+                        query = query.filter(Job.job_type != "SchedulerJob")
+                    query.delete(synchronize_session=False)
+                session.commit()
+
+            print("Metadata cleanup complete!")
+            self.notify_success_to_sfn(**context)
+        except Exception as err:
+            print(err)
+            self.notify_failure_to_sfn(**context)
+            raise err
+
+    def create_cleanup_dag(self) -> DAG:
+        """
+        Creates the cleanup DAG to clean up metadata store before a restore operation.
+
+        Returns:
+            DAG: The cleanup DAG.
+        """
+        default_args = {
+            "owner": "airflow", 
+            "start_date": datetime(2022, 1, 1),
+        }
+        dag=  DAG(
+            dag_id=self.dag_id,
+            schedule=None,
+            catchup=False,
+            default_args=default_args,
+        )
+        PythonOperator(task_id="cleanup_tables", python_callable=self.cleanup_tables, dag=dag)
         return dag

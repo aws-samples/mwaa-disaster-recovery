@@ -165,6 +165,12 @@ class TestConfig:
 
         expect(config.metadata_import_dag_name).to.equal("import")
 
+    def test_metadata_cleanup_dag_name(backup_restore_env_vars):
+        os.environ["METADATA_CLEANUP_DAG_NAME"] = "cleanup"
+        config = Config()
+
+        expect(config.metadata_cleanup_dag_name).to.equal("cleanup")
+
     def test_state_machine_timeout_mins(backup_restore_env_vars):
         os.environ["STATE_MACHINE_TIMEOUT_MINS"] = "30"
         config = Config()
@@ -360,3 +366,9 @@ class TestConfig:
         config = Config()
 
         expect(config.secondary_create_step_functions_vpce).to.be.falsy
+
+    def test_secondary_cleanup_cool_off_secs(warm_standby_env_vars):
+        os.environ["SECONDARY_CLEANUP_COOL_OFF_SECS"] = "30"
+        config = Config()
+
+        expect(config.secondary_cleanup_cool_off_secs).to.equal(30)
