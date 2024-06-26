@@ -48,6 +48,9 @@ omit = [
   "tests/*",
   "temp.py",
   "app.py",
+  "backup_metadata.py",
+  "cleanup_metadata.py",
+  "restore_metadata.py",
 ]
 source = [
   "assets/dags",

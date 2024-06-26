@@ -423,7 +423,9 @@ class BaseDRFactory(ABC):
                 XCom,
             )
 
-            major_version, minor_version = int(version.split(".")[0]), int(version.split(".")[1])
+            major_version, minor_version = int(version.split(".")[0]), int(
+                version.split(".")[1]
+            )
             if major_version >= 2 and minor_version >= 6:
                 from airflow.jobs.job import Job
             else:
@@ -469,14 +471,16 @@ class BaseDRFactory(ABC):
             DAG: The cleanup DAG.
         """
         default_args = {
-            "owner": "airflow", 
+            "owner": "airflow",
             "start_date": datetime(2022, 1, 1),
         }
-        dag=  DAG(
+        dag = DAG(
             dag_id=self.dag_id,
             schedule=None,
             catchup=False,
             default_args=default_args,
         )
-        PythonOperator(task_id="cleanup_tables", python_callable=self.cleanup_tables, dag=dag)
+        PythonOperator(
+            task_id="cleanup_tables", python_callable=self.cleanup_tables, dag=dag
+        )
         return dag

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2024-06-26
+### Added
+- Added support for cleaning up the metadata store before running restore operations as a part of the automated restore StepFunctions workflow
+- Introduced a new stack parameters, `METADATA_CLEANUP_DAG_NAME`, to represent the name of metadata clean up dag for restore operations
+- Introduced a new stack parameters, `SECONDARY_CLEANUP_COOL_OFF_SECS`, to represent the cool of time in secs between the metadata store cleanup operation and the restore operation in the recovery workflow
+
+## Changed
+- Updates the `README` and `PYPIDOC` reflecting addition of metadata cleanup DAG
+- Updates to `pyproject.toml` to properly report uncovered files during unit testing
+
 ## [0.3.0] - 2024-06-25
 ### Changed
 - Bugfixes to the [cleanup_metadata](assets/dags/mwaa_dr/cleanup_metadata.py) DAG
@@ -77,7 +87,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial commit with sample readme, code of conduct, and license
 
 
-[unreleased]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v0.3.0...HEAD
+[unreleased]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v0.2.4...v0.3.0
 [0.2.4]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v0.2.2...v0.2.3

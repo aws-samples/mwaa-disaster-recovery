@@ -185,12 +185,13 @@ class MwaaSecondaryStack(MwaaBaseStack):
         )
 
         disable_schedule_state = self.create_disable_scheduler_state(schedule_name)
-        
-        unhealthy_flow = disable_schedule_state\
-            .next(cleanup_metadata_state)\
-            .next(cool_off_state)\
-            .next(restore_metadata_state)\
+
+        unhealthy_flow = (
+            disable_schedule_state.next(cleanup_metadata_state)
+            .next(cool_off_state)
+            .next(restore_metadata_state)
             .next(success)
+        )
 
         check_heartbeat_flow = (
             sfn.Choice(self, "Check Heartbeat")

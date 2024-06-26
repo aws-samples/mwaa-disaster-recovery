@@ -349,6 +349,7 @@ Here are the optional parameters that applies to both primary and secondary regi
 | `HEALTH_CHECK_MAX_RETRY` | `2` | number | The maximum number of retries after the health check of the primary region MWAA fails before moving on to the disaster recovery flow. |
 | `HEALTH_CHECK_RETRY_BACKOFF_RATE` | `2` | number | Health check retry exponential backoff rate (exponential backoff common ratio). |
 | `HEALTH_CHECK_RETRY_INTERVAL_SECS` | `5` | time interval in seconds | Health check retry interval (exponential backoff coefficient) on failure. |
+| `METADATA_CLEANUP_DAG_NAME` | [cleanup_metadata](assets/dags/mwaa_dr/cleanup_metadata.py) | a dag name | Name of the DAG that cleans up metadata store. |
 | `METADATA_EXPORT_DAG_NAME` | [backup_metadata](assets/dags/mwaa_dr/backup_metadata.py) | a dag name | Name of the DAG that exports metadata. |
 | `METADATA_IMPORT_DAG_NAME` | [restore_metadata](assets/dags/mwaa_dr/restore_metadata.py) | a dag name | Name of the DAG that imports metadata. |
 | `MWAA_BACKUP_FILE_NAME` | `environment.json` | a json file name | Name of the file (json) to used for storing environment details in the backup S3 bucket. |
@@ -357,6 +358,7 @@ Here are the optional parameters that applies to both primary and secondary regi
 | `MWAA_NOTIFICATION_EMAILS` | `[]` | `'["ad@eg.com"]'`, `'["ad@eg.com", "ops@eg.com"]'` | Comma separated list of emails. Note that the brackets, `[]`, are necessary to denote a list even for a single element list. |
 | `MWAA_SIMULATE_DR` | `NO` | `YES` or `NO` | Whether to simulate a DR by artificially forcing health check failure for the MWAA environment in the primary region. Only use for testing. |
 | `PRIMARY_BACKUP_SCHEDULE` | `'0 * * * *'` | `@hourly`, `@daily`, or any cron expressions | Cron schedule for taking backup of the metadata store. |
+| `SECONDARY_CLEANUP_COOL_OFF_SECS` | `30` | wait time in seconds | The cool of time in secs between the metadata store cleanup operation and the restore operation in the recovery workflow. |
 | `STATE_MACHINE_TIMEOUT_MINS` | `60` | timeout in minutes | The restore Step Fuctions workflow timeout in minutes. |
 
 ### Automated Updates to the Execution Role
@@ -665,7 +667,7 @@ The project **only** takes metadata backup of the tasks that are not actively ru
 The most recent backup of the primary environment will always override the metadata of the secondary environment except for the `variable` and `connection` tables. In many cases, the secondary Amazon MWAA environment will likely need to interact with different data sources and web services running in the secondary region. Hence, the restore workflow will not override existing entries of the variable and connection tables in the secondary MWAA environment.
 
 > [!IMPORTANT]
-> Users are encouraged to either create the needed variables and connections entries in the secondary environment manually or modify the logic in the codebase for [Variable](assets/dags/mwaa_dr/framework/model/variable_table.py#L70) and [Connection](assets/dags/mwaa_dr/framework/model/connection_table.py#L96) tables appropriately to force updates in all cases.
+> Users are encouraged to either create the needed variables and connections entries in the secondary environment manually or modify the logic in the codebase for [Variable](assets/dags/mwaa_dr/framework/model/variable_table.py#L104) and [Connection](assets/dags/mwaa_dr/framework/model/connection_table.py#L134) tables appropriately to force updates in all cases.
 
 
 ### Clean Metadata Tables Required for the Restore Workflow
