@@ -89,7 +89,7 @@ class MwaaSecondaryStack(MwaaBaseStack):
         self.create_scheduler(
             conf=conf, schedule_name=schedule_name, state_machine=self._state_machine
         )
-        self.setup_failure_notification(conf, self._state_machine)
+        self.setup_notification(conf, self._state_machine)
 
         if conf.secondary_create_step_functions_vpce:
             self.setup_sfn_vpce(conf, self._vpc)
@@ -155,6 +155,25 @@ class MwaaSecondaryStack(MwaaBaseStack):
             env_name=conf.secondary_mwaa_environment_name,
             vpc_info=vpc_info,
         )
+
+        cleanup_metadata_state = self.create_dag_trigger_state(
+            state_name="Cleanup Metadata",
+            mwaa_env_name=conf.secondary_mwaa_environment_name,
+            mwaa_env_version=conf.mwaa_version,
+            dag_name=conf.metadata_cleanup_dag_name,
+            bucket=self.backup_bucket.bucket_name,
+            dr_type=conf.dr_type,
+            function=dag_trigger_function,
+        )
+
+        cool_off_state = sfn.Wait(
+            self,
+            f"Cool Off {conf.secondary_cleanup_cool_off_secs}s",
+            time=sfn.WaitTime.duration(
+                cdk.Duration.seconds(conf.secondary_cleanup_cool_off_secs)
+            ),
+        )
+
         restore_metadata_state = self.create_dag_trigger_state(
             state_name="Restore Metadata",
             mwaa_env_name=conf.secondary_mwaa_environment_name,
@@ -166,8 +185,12 @@ class MwaaSecondaryStack(MwaaBaseStack):
         )
 
         disable_schedule_state = self.create_disable_scheduler_state(schedule_name)
-        unhealthy_flow = disable_schedule_state.next(restore_metadata_state).next(
-            success
+
+        unhealthy_flow = (
+            disable_schedule_state.next(cleanup_metadata_state)
+            .next(cool_off_state)
+            .next(restore_metadata_state)
+            .next(success)
         )
 
         check_heartbeat_flow = (
@@ -713,7 +736,7 @@ class MwaaSecondaryStack(MwaaBaseStack):
 
         return cloudwatch_health_check_fn
 
-    def setup_failure_notification(
+    def setup_notification(
         self, conf: config.Config, state_machine: sfn.StateMachine
     ) -> events.Rule:
         sns_topic = self.create_sns_topic_with_email_subscriptions(conf)
@@ -724,7 +747,7 @@ class MwaaSecondaryStack(MwaaBaseStack):
                 source=["aws.states"],
                 detail_type=["Step Functions Execution Status Change"],
                 detail={
-                    "status": ["FAILED", "TIMED_OUT", "ABORTED"],
+                    "status": ["FAILED", "TIMED_OUT", "ABORTED", "SUCCEEDED"],
                     "stateMachineArn": [state_machine.state_machine_arn],
                 },
             ),

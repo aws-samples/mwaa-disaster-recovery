@@ -1,3 +1,23 @@
+# pylint: disable=missing-class-docstring
+# pylint: disable=missing-function-docstring
+
+"""
+Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software is furnished to do so.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+"""
+
 import json
 import os
 
@@ -21,6 +41,7 @@ MWAA_UPDATE_EXECUTION_ROLE = "MWAA_UPDATE_EXECUTION_ROLE"
 MWAA_CREATE_ENV_POLLING_INTERVAL_SECS = "MWAA_CREATE_ENV_POLLING_INTERVAL_SECS"
 METADATA_EXPORT_DAG_NAME = "METADATA_EXPORT_DAG_NAME"
 METADATA_IMPORT_DAG_NAME = "METADATA_IMPORT_DAG_NAME"
+METADATA_CLEANUP_DAG_NAME = "METADATA_CLEANUP_DAG_NAME"
 STATE_MACHINE_TIMEOUT_MINS = "STATE_MACHINE_TIMEOUT_MINS"
 MWAA_SIMULATE_DR = "MWAA_SIMULATE_DR"
 
@@ -51,6 +72,7 @@ SECONDARY_VPC_ID = "SECONDARY_VPC_ID"
 SECONDARY_SUBNET_IDS = "SECONDARY_SUBNET_IDS"
 SECONDARY_SECURITY_GROUP_IDS = "SECONDARY_SECURITY_GROUP_IDS"
 SECONDARY_CREATE_SFN_VPCE = "SECONDARY_CREATE_SFN_VPCE"
+SECONDARY_CLEANUP_COOL_OFF_SECS = "SECONDARY_CLEANUP_COOL_OFF_SECS"
 
 REQUIRED_CONFIGS = [
     STACK_NAME_PREFIX,
@@ -83,6 +105,7 @@ DEFAULT_CONFIGS = {
     MWAA_CREATE_ENV_POLLING_INTERVAL_SECS: "60",
     METADATA_EXPORT_DAG_NAME: "backup_metadata",
     METADATA_IMPORT_DAG_NAME: "restore_metadata",
+    METADATA_CLEANUP_DAG_NAME: "cleanup_metadata",
     STATE_MACHINE_TIMEOUT_MINS: "60",
     MWAA_SIMULATE_DR: "NO",
     HEALTH_CHECK_ENABLED: "YES",
@@ -91,6 +114,7 @@ DEFAULT_CONFIGS = {
     HEALTH_CHECK_RETRY_INTERVAL_SECS: "10",
     HEALTH_CHECK_RETRY_BACKOFF_RATE: "2",
     PRIMARY_SCHEDULE_INTERVAL: "0 * * * *",
+    SECONDARY_CLEANUP_COOL_OFF_SECS: "30",
 }
 
 
@@ -166,6 +190,10 @@ class Config:
     @property
     def metadata_import_dag_name(self) -> str:
         return self.get(METADATA_IMPORT_DAG_NAME)
+
+    @property
+    def metadata_cleanup_dag_name(self) -> str:
+        return self.get(METADATA_CLEANUP_DAG_NAME)
 
     @property
     def state_machine_timeout_mins(self) -> int:
@@ -262,3 +290,7 @@ class Config:
     @property
     def secondary_create_step_functions_vpce(self) -> bool:
         return self.get("SECONDARY_CREATE_SFN_VPCE") == "YES"
+
+    @property
+    def secondary_cleanup_cool_off_secs(self) -> int:
+        return int(self.get("SECONDARY_CLEANUP_COOL_OFF_SECS"))

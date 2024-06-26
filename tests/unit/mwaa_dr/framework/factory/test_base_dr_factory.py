@@ -319,4 +319,61 @@ class TestBaseDRFactory:
                 "Executing the restore workflow teardown ..."
             )
 
+    def test_cleanup_tables_v_2_6_and_above(self, mock_context):
+        factory = BaseDRFactory(dag_id="dag", storage_type="S3")
+
+        with (
+            patch("sqlalchemy.orm.Session.query") as query,
+            patch.object(factory, "notify_success_to_sfn") as notify_success_to_sfn,
+        ):
+            factory.cleanup_tables(**mock_context)
+
+            expect(query.call_count).to.equal(11)
+            expect(query().filter.call_count).to.equal(1)
+            expect(query().filter().delete.call_count).to.equal(1)
+            expect(query().delete.call_count).to.equal(10)
+            expect(notify_success_to_sfn.called).to.be.true
+
+    def test_cleanup_tables_v_2_6_and_above_error(self, mock_context):
+        factory = BaseDRFactory(dag_id="dag", storage_type="S3")
+
+        with (
+            patch("sqlalchemy.orm.Session.query", side_effect=Exception()) as query,
+            patch.object(factory, "notify_failure_to_sfn") as notify_failure_to_sfn,
+        ):
+            factory.cleanup_tables.when.called_with(**mock_context).should.throw(
+                Exception
+            )
+            notify_failure_to_sfn.assert_called_once()
+
+    def test_cleanup_tables_v_2_5_and_below_error(self, mock_context):
+        from airflow.jobs.job import Job
+
+        with (
+            patch("sqlalchemy.orm.Session.query", side_effect=Exception()) as query,
+            patch(
+                "mwaa_dr.framework.factory.base_dr_factory.BaseDRFactory.notify_failure_to_sfn"
+            ) as notify_failure_to_sfn,
+            patch("airflow.version.version", "2.5.1"),
+            patch("airflow.jobs") as jobs,
+        ):
+            jobs().base_job().BaseJob.return_value = Job
+            factory = BaseDRFactory(dag_id="dag", storage_type="S3")
+
+            factory.cleanup_tables.when.called_with(**mock_context).should.throw(
+                Exception
+            )
+            notify_failure_to_sfn.assert_called_once()
+
+    def test_create_cleanup_dag(self):
+        factory = BaseDRFactory(dag_id="dag", storage_type="S3")
+        dag = factory.create_cleanup_dag()
+
+        expect(dag.dag_id).to.equal("dag")
+        expect(dag.task_count).to.equal(1)
+        expect(dag.has_task("cleanup_tables")).to.be.true
+        expect(dag.get_task("cleanup_tables").python_callable).to.equal(
+            factory.cleanup_tables
+        )
+
     # NOTE: create_backup_dag and create_restore_dag are tested in v_2_5.dr_factory

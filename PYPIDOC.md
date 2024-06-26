@@ -67,11 +67,30 @@ factory = DRFactory_2_8(
 dag:DAG = factory.create_restore_dag()
 ```
 
-Note that you will need an empty database for restore to work. To cleanup the database before restore, please use the [clean_metadata](https://github.com/aws-samples/mwaa-disaster-recovery/blob/main/assets/dags/mwaa_dr/cleanup_metadata.py) DAG.
-
 Here is the sample of the restore workflow:
 
 ![Restore Workflow](https://github.com/aws-samples/mwaa-disaster-recovery/blob/main/design/RestoreRun.png?raw=true)
+
+Note that you will need an empty database for restore to work. To cleanup the database before restore, please use the [cleanup_metadata](#metadata-cleanup-dag) DAG discussed next.
+
+### Metadata Cleanup DAG
+
+You can create a metadata cleanup dag by creating a python file in your MWAA `dags` folder as follows:
+
+**cleanup_metadata.py**:
+```python
+from airflow import DAG
+from mwaa_dr.v_2_8.dr_factory import DRFactory_2_8
+
+factory = DRFactory_2_8(
+    dag_id='cleanup',
+    path_prefix='data',
+    storage_type='S3'
+)
+
+dag:DAG = factory.create_cleanup_dag()
+```
+
 
 ## Advance Use Case
 

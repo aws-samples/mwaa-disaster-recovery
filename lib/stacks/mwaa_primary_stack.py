@@ -26,7 +26,7 @@ from aws_cdk import custom_resources as cr
 from constructs import Construct
 
 import config
-from lib.constructs.airflow_cli import AirflowCli, VpcInfo
+from lib.dr_constructs.airflow_cli import AirflowCli, VpcInfo
 from lib.functions.airflow_cli_client import AirflowCliCommand, AirflowCliInput
 from lib.stacks.mwaa_base_stack import MwaaBaseStack
 

@@ -45,11 +45,16 @@ testpaths = [
 
 [tool.coverage.run]
 omit = [
-  "tests/*"
+  "tests/*",
+  "temp.py",
+  "app.py",
+  "backup_metadata.py",
+  "cleanup_metadata.py",
+  "restore_metadata.py",
 ]
 source = [
-  "lib",
-  "assets"
+  "assets/dags",
+  ".",
 ]
 branch = true
 relative_files = true
