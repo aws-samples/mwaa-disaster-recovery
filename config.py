@@ -62,6 +62,7 @@ PRIMARY_VPC_ID = "PRIMARY_VPC_ID"
 PRIMARY_SUBNET_IDS = "PRIMARY_SUBNET_IDS"
 PRIMARY_SECURITY_GROUP_IDS = "PRIMARY_SECURITY_GROUP_IDS"
 PRIMARY_BACKUP_SCHEDULE = "PRIMARY_BACKUP_SCHEDULE"
+PRIMARY_REPLICATION_POLLING_INTERVAL_SECS = "PRIMARY_REPLICATION_POLLING_INTERVAL_SECS"
 
 # Environment variables for secondary stack configuration
 SECONDARY_REGION = "SECONDARY_REGION"
@@ -114,6 +115,7 @@ DEFAULT_CONFIGS = {
     HEALTH_CHECK_RETRY_INTERVAL_SECS: "10",
     HEALTH_CHECK_RETRY_BACKOFF_RATE: "2",
     PRIMARY_SCHEDULE_INTERVAL: "0 * * * *",
+    PRIMARY_REPLICATION_POLLING_INTERVAL_SECS: "30",
     SECONDARY_CLEANUP_COOL_OFF_SECS: "30",
 }
 
@@ -256,6 +258,10 @@ class Config:
     @property
     def primary_backup_schedule(self) -> str:
         return self.get(PRIMARY_BACKUP_SCHEDULE)
+
+    @property
+    def primary_replication_polling_interval_secs(self) -> int:
+        return int(self.get(PRIMARY_REPLICATION_POLLING_INTERVAL_SECS))
 
     @property
     def secondary_region(self) -> str:

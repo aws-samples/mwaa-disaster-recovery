@@ -93,7 +93,8 @@ jobs:
           gh release create
           '${{ github.ref_name }}'
           --repo '${{ github.repository }}'
-          --notes ""
+          --title '${{ github.ref_name }}'
+          --notes 'See [CHANGELOG](CHANGELOG.md) for details.'
 
       - name: Upload Signatures to GitHub Release
         env:
