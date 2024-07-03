@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Customizable recovery strategy for `variable` and `connection`
 
 ### Changed
+- Updates to the `cleanup_metadata` dag to include additional tables: `task_fail`, `trigger`, and `slot_pool`
 - Documentation and test cases updates to reflect the changes
 
 ## [0.4.0] - 2024-06-26

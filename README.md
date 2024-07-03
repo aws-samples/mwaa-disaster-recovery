@@ -793,6 +793,11 @@ To resolve this issue, please follow these steps:
 4. Redeploy your stack with `MWAA_SIMULATE_DR=YES`, which should now pick up the right version of the requirements file from the secondary DAGs bucket.
 5. Revert the change you made to the [mwaa_primary_stack](lib/stacks/mwaa_primary_stack.py#L619) by replacing `on_update` with `on_create` in the `create_replication_job_custom_resource` function.
 
+The stack deployment triggers a StepFunctions workflow that replicates existing object from primary S3 DAGs bucket to the secondary bucket:
+
+![ReplicationWorkflow](design/replication-job-sfn.png)
+
+
 # Development Notes
 
 The [contributing guide](contributing.md) explains the process of forking the project before creating a pull request. After you have cloned your forked repository locally and made some code changes, please ensure that you have run the following commands supplied in [build.sh](build.sh) script as follows:
