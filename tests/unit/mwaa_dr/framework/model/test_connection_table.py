@@ -124,7 +124,7 @@ class TestConnectionTable:
             # Cannot do object comparison for the session.add_all() call because Connection does on implement __eq__
             session.return_value.delete.assert_not_called()
             session.return_value.add_all.assert_called_once()
-            session.return_value.commit.assert_called_once()
+            expect(session.return_value.commit.call_count).to.equal(2)
 
     def test_restore_existing_connection_append(self):
         model = DependencyModel()
@@ -192,7 +192,7 @@ class TestConnectionTable:
 
             session.return_value.delete.assert_called_once()
             session.return_value.add_all.assert_called_once()
-            session.return_value.commit.assert_called_once()
+            expect(session.return_value.commit.call_count).to.equal(2)
 
     def test_restore_missing_port_append(self):
         model = DependencyModel()
@@ -218,3 +218,27 @@ class TestConnectionTable:
             session.return_value.delete.assert_not_called()
             session.return_value.add_all.assert_called_once()
             session.return_value.add_all.assert_called_once()
+
+    def test_restore_connection_do_nothing(self):
+        model = DependencyModel()
+        table = ConnectionTable(
+            model=model, storage_type="LOCAL_FS", path_prefix="data", batch_size=1000
+        )
+        context = dict()
+        data = 'id,type,description,"{""extra"": ""value""}",host,login,password,,schema\r\n'
+        buffer = StringIO(data)
+
+        with (
+            patch.object(table, "read", return_value=buffer),
+            patch("sqlalchemy.orm.Session.__enter__") as session,
+            patch("airflow.models.Variable.get", return_value='DO_NOTHING')
+        ):
+            session.return_value.query.return_value.filter.return_value.all.return_value = (
+                []
+            )
+
+            table.restore(**context)
+
+            session.return_value.delete.assert_not_called()
+            session.return_value.add_all.assert_not_called()
+            session.return_value.add_all.assert_not_called()

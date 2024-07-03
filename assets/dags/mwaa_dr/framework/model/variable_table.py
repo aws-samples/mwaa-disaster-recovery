@@ -94,8 +94,7 @@ class VariableTable(BaseTable):
 
         Returns:
             None
-        """
-        csv_file = self.read(context)
+        """        
         strategy = VariableTable.config(
             conf_key="variable_restore_strategy",
             var_key="DR_VARIABLE_RESTORE_STRATEGY",
@@ -103,10 +102,20 @@ class VariableTable(BaseTable):
             context=context,
         )
 
+        print(f"Variable restore strategy: {strategy}")
+        if strategy == "DO_NOTHING":
+            return
+
+        skips = ["DR_VARIABLE_RESTORE_STRATEGY", "DR_CONNECTION_RESTORE_STRATEGY"]
+        csv_file = self.read(context)
         try:
             with settings.Session() as session:
                 reader = csv.reader(csv_file)
                 for row in reader:
+                    if row[0] in skips:
+                        print(f"Skipping restoring {row[0]}")
+                        continue
+
                     var = Variable.get(key=row[0], default_var=MISSING)
 
                     if var != MISSING:

@@ -170,3 +170,67 @@ class TestVariableTable:
                 session=session.return_value,
             )
             session.return_value.commit.assert_called_once()
+
+    def test_restore_existing_variables_replace_special_vars(self):
+        model = DependencyModel()
+        table = VariableTable(
+            model=model,
+            storage_type="LOCAL_FS",
+            path_prefix="data",
+        )
+        context = {}
+        buffer = StringIO(
+            "key1,val1,description1\r\n" +
+            "DR_VARIABLE_RESTORE_STRATEGY,APPEND,description2\r\n"
+            "DR_CONNECTION_RESTORE_STRATEGY,APPEND,description2\r\n"
+        )
+
+        def mock_variable_get_call(key, default_var):
+            if key == "DR_VARIABLE_RESTORE_STRATEGY":
+                return "REPLACE"
+            if key == "key1":
+                return "val1"
+            return default_var
+        with (
+            patch.object(table, "read", return_value=buffer),
+            patch("sqlalchemy.orm.Session.__enter__") as session,
+            patch("airflow.models.Variable.get", new=mock_variable_get_call),
+            patch("airflow.models.Variable.set") as var_set,
+        ):
+            table.restore(**context)
+
+            var_set.assert_called_once_with(
+                key="key1",
+                value="val1",
+                description="description1",
+                session=session.return_value,
+            )
+            session.return_value.commit.assert_called_once()
+
+    def test_restore_variables_do_nothing(self):
+        model = DependencyModel()
+        table = VariableTable(
+            model=model,
+            storage_type="LOCAL_FS",
+            path_prefix="data",
+        )
+        context = {}
+        buffer = StringIO("key1,val1,description1\r\n")
+
+        def mock_variable_get_call(key, default_var):
+            if key == "DR_VARIABLE_RESTORE_STRATEGY":
+                return "DO_NOTHING"
+            if key == "key1":
+                return "val1"
+            return default_var
+        with (
+            patch.object(table, "read", return_value=buffer),
+            patch("sqlalchemy.orm.Session.__enter__") as session,
+            patch("airflow.models.Variable.get", new=mock_variable_get_call),
+            patch("airflow.models.Variable.set") as var_set,
+        ):
+            table.restore(**context)
+
+            var_set.assert_not_called()
+            session.return_value.commit.assert_not_called()
+            

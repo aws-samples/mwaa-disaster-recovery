@@ -119,7 +119,6 @@ class ConnectionTable(BaseTable):
         Args:
             **context: Additional Airflow task context parameters.
         """
-        csv_file = self.read(context)
         strategy = ConnectionTable.config(
             conf_key="connection_restore_strategy",
             var_key="DR_CONNECTION_RESTORE_STRATEGY",
@@ -127,6 +126,11 @@ class ConnectionTable(BaseTable):
             context=context,
         )
 
+        print(f"Connection restore strategy: {strategy}")
+        if strategy == "DO_NOTHING":
+            return
+
+        csv_file = self.read(context)
         try:
             with settings.Session() as session:
                 reader = csv.reader(csv_file)
@@ -141,7 +145,7 @@ class ConnectionTable(BaseTable):
                     if existing_connections:
                         if strategy == APPEND:
                             continue
-                        for existing_connection in existing_connections:
+                        for existing_connection in existing_connections:                            
                             session.delete(existing_connection)
                     
                     port = None
@@ -163,6 +167,7 @@ class ConnectionTable(BaseTable):
                     new_connections.append(connection)
 
                 if new_connections:
+                    session.commit()
                     session.add_all(new_connections)
                     session.commit()
         finally:

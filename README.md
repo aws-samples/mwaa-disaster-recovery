@@ -712,7 +712,7 @@ There might be a need where you only want to perform backup and restore operatio
 
 For production use in a public web server mode, we recommend using the published [mwaa_dr](https://pypi.org/project/mwaa-dr/) library to create the necessary DAG for backup and restore in your MWAA environment.
 
-For a private webserver mode, you can copy the [assets/dags/mwaa_dr](assets/dags/mwaa_dr/) folder to your S3's `dags` folder.
+For a private webserver mode, you can copy the [assets/dags/mwaa_dr](assets/dags/mwaa_dr/) folder to your S3's `dags` folder. Also, copy the contents of [requirements.txt](assets/requirements.txt) to the MWAA requirements file.
 
 For both modes, please make sure of the following:
 1. Ensure you have an S3 bucket created to store the backup.
@@ -720,7 +720,7 @@ For both modes, please make sure of the following:
 3. Create an Airflow variable with the key named `DR_BACKUP_BUCKET` and the value containing the **name** (not ARN) of the S3 bucket.
 4. You are all set to manually trigger the backup and restore DAGs at any point. The metadata backup will be stored in `<backup S3 bucket>/<path_prefix>`.
 
-For testing the `mwaa_dr` library itself, you can run [aws-mwaa-local-runner](https://github.com/aws/aws-mwaa-local-runner) container locally by simply copying the [assets/dags/mwaa_dr](assets/dags/mwaa_dr/) folder into the `dags` folder of the local runner codebase. After copying the folder, export an Airflow variable in the `startup_script/startup.sh` file of the local runner as follows:
+For testing the `mwaa_dr` library itself, you can run [aws-mwaa-local-runner](https://github.com/aws/aws-mwaa-local-runner) container locally by simply copying the [assets/dags/mwaa_dr](assets/dags/mwaa_dr/) folder into the `dags` folder of the local runner codebase. Also, copy the contents of [requirements.txt](assets/requirements.txt) to the local runner's requirements file. Finally, export an Airflow variable in the `startup_script/startup.sh` file of the local runner as follows:
 ```bash
 export AIRFLOW_VAR_DR_STORAGE_TYPE=LOCAL_FS
 ```
