@@ -28,7 +28,15 @@ def handler(event, context):
     bucket = event["bucket"]
     task_token = event["task_token"]
     dr_type = event["dr_type"]
-    config = {"bucket": bucket, "task_token": task_token, "dr_type": dr_type}
+    connection_restore_strategy = event["connection_restore_strategy"]
+    variable_restore_strategy = event["variable_restore_strategy"]
+    config = {
+        "bucket": bucket,
+        "dr_type": dr_type,
+        "connection_restore_strategy": connection_restore_strategy,
+        "variable_restore_strategy": variable_restore_strategy,
+        "task_token": task_token,
+    }
 
     airflow_cli = AirflowCliClient(mwaa_env_name, mwaa_env_version)
 

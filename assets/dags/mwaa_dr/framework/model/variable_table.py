@@ -94,7 +94,7 @@ class VariableTable(BaseTable):
 
         Returns:
             None
-        """        
+        """
         strategy = VariableTable.config(
             conf_key="variable_restore_strategy",
             var_key="DR_VARIABLE_RESTORE_STRATEGY",

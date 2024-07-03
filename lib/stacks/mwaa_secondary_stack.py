@@ -167,6 +167,8 @@ class MwaaSecondaryStack(MwaaBaseStack):
             dag_name=conf.metadata_cleanup_dag_name,
             bucket=self.backup_bucket.bucket_name,
             dr_type=conf.dr_type,
+            connection_restore_strategy=conf.dr_connection_restore_strategy,
+            variable_restore_strategy=conf.dr_variable_restore_strategy,
             function=dag_trigger_function,
         )
 
@@ -185,6 +187,8 @@ class MwaaSecondaryStack(MwaaBaseStack):
             dag_name=conf.metadata_import_dag_name,
             bucket=self.backup_bucket.bucket_name,
             dr_type=conf.dr_type,
+            connection_restore_strategy=conf.dr_connection_restore_strategy,
+            variable_restore_strategy=conf.dr_variable_restore_strategy,
             function=dag_trigger_function,
         )
 
@@ -273,6 +277,8 @@ class MwaaSecondaryStack(MwaaBaseStack):
             dag_name=conf.metadata_import_dag_name,
             bucket=self.backup_bucket.bucket_name,
             dr_type=conf.dr_type,
+            connection_restore_strategy=conf.dr_connection_restore_strategy,
+            variable_restore_strategy=conf.dr_variable_restore_strategy,
             function=dag_trigger_function,
         )
 
@@ -466,6 +472,8 @@ class MwaaSecondaryStack(MwaaBaseStack):
         dag_name: str,
         bucket: str,
         dr_type: str,
+        variable_restore_strategy: str,
+        connection_restore_strategy: str,
         function: _lambda.Function,
     ) -> tasks.LambdaInvoke:
         state = tasks.LambdaInvoke(
@@ -481,6 +489,8 @@ class MwaaSecondaryStack(MwaaBaseStack):
                     "dag": dag_name,
                     "bucket": bucket,
                     "dr_type": dr_type,
+                    "variable_restore_strategy": variable_restore_strategy,
+                    "connection_restore_strategy": connection_restore_strategy,
                 }
             ),
             retry_on_service_exceptions=True,

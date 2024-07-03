@@ -347,6 +347,8 @@ Here are the optional parameters that applies to both primary and secondary regi
 
 | Variable Name | Default Value | Example Values | Description |
 | ------------- | ------------- | -------------- | ----------- |
+| `DR_CONNECTION_RESTORE_STRATEGY` | `APPEND` | `DO_NOTHING`, `APPEND`, or `REPLACE` | The strategy to use to restore the connection table during recovery workflow. Review [Special Handling of Variable and Connection Tables](#special-handling-of-variable-and-connection-tables) for details. |
+| `DR_VARIABLE_RESTORE_STRATEGY` | `APPEND` | `DO_NOTHING`, `APPEND`, or `REPLACE` | The strategy to use to restore the variable table during recovery workflow. Review [Special Handling of Variable and Connection Tables](#special-handling-of-variable-and-connection-tables) for details. |
 | `HEALTH_CHECK_ENABLED` | `YES` | `YES` or `NO` | Whether to enable periodic health check of the primary MWAA environment from the secondary region. If set to `NO` the, primary region failure will go undetected and the onus is on admins to manually trigger the recovery workflow. |
 | `HEALTH_CHECK_INTERVAL_MINS` | `5` | time interval in minutes | Health check frequency of the primary mwaa environment in mins. |
 | `HEALTH_CHECK_MAX_RETRY` | `2` | number | The maximum number of retries after the health check of the primary region MWAA fails before moving on to the disaster recovery flow. |
@@ -674,11 +676,30 @@ The project **only** takes metadata backup of the tasks that are not actively ru
 
 ### Special Handling of Variable and Connection Tables
 
-The most recent backup of the primary environment will always override the metadata of the secondary environment except for the `variable` and `connection` tables. In many cases, the secondary Amazon MWAA environment will likely need to interact with different data sources and web services running in the secondary region. Hence, the restore workflow will not override existing entries of the variable and connection tables in the secondary MWAA environment.
+The most recent backup of the primary environment will always override the metadata of the secondary environment except for the `variable` and `connection` tables. These tables may need to be handled specially and the solution supports three different restore strategies for them as follows:
+
+1. **DO_NOTHING**: As the name suggests, this strategy will not restore the variable and connection tables from the backup. This strategy is particularly useful if your MWAA environments have been configured to use [AWS Secrets Manager](https://docs.aws.amazon.com/mwaa/latest/userguide/connections-secrets-manager.html) for storing variables and connections, particularly, applicable for the [warm standby](#warm-standby) deployment. 
+
+2. **APPEND**: In many cases, the secondary Amazon MWAA environment will likely need to interact with different data sources and web services running in the secondary region. Hence, with this strategy, the restore workflow will not overwrite existing entries of the variable and connection tables in the secondary MWAA environment from the backup. This is the default strategy for the [warm standby](#warm-standby) deployment.
+
+3. **REPLACE**: This strategy can be used to overwrite existing variable and connections from backup. This is the default strategy for the [backup and restore](#backup-and-restore) deployment.
+
+The solution automatically reads these configuration from your `.env` file or environment variables during deployment. To change the default restore behavior for `variable` and `connection` tables, you will need to supply an appropriate value for `DR_VARIABLE_RESTORE_STRATEGY` and `DR_CONNECTION_RESTORE_STRATEGY`, respectively. Here is an example `.env` file for a warm standby deployment:
+
+```sh
+DR_VARIABLE_RESTORE_STRATEGY=DO_NOTHING
+DR_CONNECTION_RESTORE_STRATEGY=DO_NOTHING
+
+STACK_NAME_PREFIX=mwaa-2-5-1
+AWS_ACCOUNT_ID=123456789101
+...
+```
+
+> [!NOTE]
+> Please note that the [back restore](#backup-and-restore) deployment only supports `DO_NOTHING` and `REPLACE` strategies, where as the [warm standby](#warm-standby) deployment supports all three.
 
 > [!IMPORTANT]
-> Users are encouraged to either create the needed variables and connections entries in the secondary environment manually or modify the logic in the codebase for [Variable](assets/dags/mwaa_dr/framework/model/variable_table.py#L104) and [Connection](assets/dags/mwaa_dr/framework/model/connection_table.py#L134) tables appropriately to force updates in all cases.
-
+> For using the [mwaa-dr](https://pypi.org/project/mwaa-dr/) framework independent to the DR solution, you will need to similarly set `DR_VARIABLE_RESTORE_STRATEGY` and `DR_CONNECTION_RESTORE_STRATEGY` Airflow variables. Note that these two Airflow variables are treated specially and are unaffected by the restore process. In their absence, the default value of `APPEND` is used during the restore workflow in the independent use.
 
 ### Clean Metadata Tables Required for the Restore Workflow
 

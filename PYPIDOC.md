@@ -44,7 +44,7 @@ For running backup and restore on your Amazon MWAA environment on AWS, you need 
 
 If you want to use the solution with [aws-mwaa-local-runner](https://github.com/aws/aws-mwaa-local-runner), change the `storage_type` argument from `S3` to `LOCAL_FS`. The backup will be located in the `dags/data` folder or more generally at the `dags/<path_prefix>` folder of the local runner project.
 
-Here is the sample run of the backup workflow:
+Here is a sample run of the backup workflow:
 
 ![Backup Workflow](https://github.com/aws-samples/mwaa-disaster-recovery/blob/main/design/BackupRun.png?raw=true)
 
@@ -67,11 +67,21 @@ factory = DRFactory_2_8(
 dag:DAG = factory.create_restore_dag()
 ```
 
-Here is the sample of the restore workflow:
+Here is a sample run of the restore workflow:
 
 ![Restore Workflow](https://github.com/aws-samples/mwaa-disaster-recovery/blob/main/design/RestoreRun.png?raw=true)
 
-Note that you will need an empty database for restore to work. To cleanup the database before restore, please use the [cleanup_metadata](#metadata-cleanup-dag) DAG discussed next.
+Please note that `variable` and `connection` tables are handled specially during the restore process. You can specify a restore strategy to be applied for these two tables by setting `DR_VARIABLE_RESTORE_STRATEGY` and `DR_CONNECTION_RESTORE_STRATEGY` Airflow variables. These variables can take on of the following values:
+
+1. **DO_NOTHING**: As the name suggests, this strategy will not restore the variable and connection tables from the backup. This strategy is particularly useful if your MWAA environments have been configured to use [AWS Secrets Manager](https://docs.aws.amazon.com/mwaa/latest/userguide/connections-secrets-manager.html) for storing variables and connections. 
+
+2. **APPEND**: With this strategy, the restore workflow will not overwrite existing entries of the variable and connection tables and only add missing entries from the backup.
+
+3. **REPLACE**: This strategy will overwrite existing variable and connections from backup.
+
+Note that these two Airflow variables are treated specially and are unaffected by the restore process of the `variable` table. In the absence of these variables, the default value of `APPEND` is used for both `variable` and `connection` restores.
+
+Note that you will need an empty database for restore to work. To cleanup the database before restore, please use the `cleanup_metadata` DAG discussed next.
 
 ### Metadata Cleanup DAG
 

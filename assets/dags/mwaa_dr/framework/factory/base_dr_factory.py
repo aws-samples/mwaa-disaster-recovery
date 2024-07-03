@@ -419,8 +419,11 @@ class BaseDRFactory(ABC):
                 RenderedTaskInstanceFields,
                 SlaMiss,
                 TaskInstance,
+                TaskFail,
                 TaskReschedule,
+                Trigger,
                 XCom,
+                Pool,
             )
 
             major_version, minor_version = int(version.split(".")[0]), int(
@@ -434,7 +437,9 @@ class BaseDRFactory(ABC):
             tables = [
                 Job,
                 TaskInstance,
+                TaskFail,
                 TaskReschedule,
+                Trigger,
                 DagTag,
                 DagModel,
                 DagRun,
@@ -443,6 +448,7 @@ class BaseDRFactory(ABC):
                 SlaMiss,
                 RenderedTaskInstanceFields,
                 XCom,
+                Pool
             ]
 
             print("Running metadata tables cleanup ...")
@@ -453,6 +459,8 @@ class BaseDRFactory(ABC):
                     query = session.query(table)
                     if table.__tablename__ == "job":
                         query = query.filter(Job.job_type != "SchedulerJob")
+                    elif table.__tablename__ == "slot_pool":
+                        query = query.filter(Pool.pool != 'default_pool')
                     query.delete(synchronize_session=False)
                 session.commit()
 
