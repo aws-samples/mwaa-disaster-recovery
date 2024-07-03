@@ -23,6 +23,7 @@ from airflow.models import Connection
 from mwaa_dr.framework.model.base_table import BaseTable
 from mwaa_dr.framework.model.dependency_model import DependencyModel
 
+APPEND = "APPEND"
 
 class ConnectionTable(BaseTable):
     """
@@ -119,6 +120,12 @@ class ConnectionTable(BaseTable):
             **context: Additional Airflow task context parameters.
         """
         csv_file = self.read(context)
+        strategy = ConnectionTable.config(
+            conf_key="connection_restore_strategy",
+            var_key="DR_CONNECTION_RESTORE_STRATEGY",
+            default_val=APPEND,
+            context=context,
+        )
 
         try:
             with settings.Session() as session:
@@ -131,24 +138,29 @@ class ConnectionTable(BaseTable):
                         .filter(Connection.conn_id == connection[0])
                         .all()
                     )
-                    if not existing_connections:
-                        port = None
-                        if connection[7]:
-                            port = int(connection[7])
+                    if existing_connections:
+                        if strategy == APPEND:
+                            continue
+                        for existing_connection in existing_connections:
+                            session.delete(existing_connection)
+                    
+                    port = None
+                    if connection[7]:
+                        port = int(connection[7])
 
-                        connection = Connection(
-                            conn_id=connection[0],
-                            conn_type=connection[1],
-                            description=connection[2],
-                            extra=connection[3],
-                            host=connection[4],
-                            login=connection[5],
-                            password=connection[6],
-                            port=port,
-                            schema=connection[8],
-                        )
-                        print(connection)
-                        new_connections.append(connection)
+                    connection = Connection(
+                        conn_id=connection[0],
+                        conn_type=connection[1],
+                        description=connection[2],
+                        extra=connection[3],
+                        host=connection[4],
+                        login=connection[5],
+                        password=connection[6],
+                        port=port,
+                        schema=connection[8],
+                    )
+                    print(connection)
+                    new_connections.append(connection)
 
                 if new_connections:
                     session.add_all(new_connections)

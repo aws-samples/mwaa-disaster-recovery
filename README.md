@@ -31,6 +31,8 @@
         - [Automated Updates to the Execution Role](#automated-updates-to-the-execution-role)
         - [Automated Update to the VPC Security Group](#automated-update-to-the-vpc-security-group)
 - [Step-By-Step Deployment Guide](#step-by-step-deployment-guide)
+    - [Bootstrap Your AWS Account](#bootstrap-your-aws-account)
+    - [Clone the Project](#clone-the-project)
     - [Backup and Restore Tutorial](#backup-and-restore-tutorial)
         - [BR-1: Create Necessary AWS Resources](#br-1-create-necessary-aws-resources)
         - [BR-2: Setup Local Virtual Environment](#br-2-setup-local-virtual-environment)
@@ -97,7 +99,7 @@ In order to recreate a new environment in secondary region when the primary envi
 
 - \[**1.a**] Assuming you host your DAGs code in a source code repository, your CICD pipeline deploys the code changes to the S3 bucket configured to host DAGs, plugins, and the requirements file.
 
-- \[**1.b**] For this architecture, we also assume that you have another S3 bucket deployed to the secondary region to host DAGs, plugins, and the requirements file with bucket versioning enabled. As a part of the CDK deployment of this project, we enable [cross-region replication](https://docs.aws.amazon.com/AmazonS3/latest/userguide/replication.html) from primary to the secondary region buckets. Any new changes to the primary DAGs bucket are replicated in the secondary region. However, for existing objects, a one-time replication will need to be performed using [S3 Batch replication](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-batch-replication-batch.html) to the secondary region bucket.
+- \[**1.b**] For this architecture, we also assume that you have another S3 bucket deployed to the secondary region to host DAGs, plugins, and the requirements file with bucket versioning enabled. As a part of the CDK deployment of this project, we enable [cross-region replication](https://docs.aws.amazon.com/AmazonS3/latest/userguide/replication.html) from primary to the secondary region buckets. Additionally, a StepFunctions workflow is triggered during the primary stack deployment to perform a one time replication of existing objects from primary DAGs bucket to the secondary DAGs bucket. Any new changes to the primary DAGs bucket are automatically replicated in the secondary region.
 
 - \[**1.c**] The CDK deployment of the [primary stack](lib/stacks/mwaa_primary_stack.py) deploys the [mwaa_dr](assets/dags/mwaa_dr/) framework package to the primary DAGs S3 bucket. This framework includes the ([backup_metadata](assets/dags/mwaa_dr/backup_metadata.py)) DAG, which periodically takes backup of the metadata store. The backup interval is configurable and should be based on the recovery point objective (RPO) -- the data loss time during a failure that can be sustained by the business.
 
@@ -148,7 +150,7 @@ In order to restore the primary MWAA environment in the secondary region, you ha
 
 - \[**1.a**] Assuming you host your DAGs code in a source code repository, your CICD pipeline deploys the code changes to the S3 bucket configured to host DAGs, plugins, and the requirements file.
 
-- \[**1.b**] For this architecture, we also assume that you have another S3 bucket deployed to the secondary region to host DAGs, plugins, and the requirements file with bucket versioning enabled. As a part of the CDK deployment of this project, we enable [cross-region replication](https://docs.aws.amazon.com/AmazonS3/latest/userguide/replication.html) from primary to the secondary region buckets. Any new changes to the primary DAGs bucket are replicated in the secondary region. However, for existing objects, a one-time replication will need to be performed using [S3 Batch replication](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-batch-replication-batch.html) to the secondary region bucket.
+- \[**1.b**] For this architecture, we also assume that you have another S3 bucket deployed to the secondary region to host DAGs, plugins, and the requirements file with bucket versioning enabled. As a part of the CDK deployment of this project, we enable [cross-region replication](https://docs.aws.amazon.com/AmazonS3/latest/userguide/replication.html) from primary to the secondary region buckets. Additionally, a StepFunctions workflow is triggered during the primary stack deployment to perform a one time replication of existing objects from primary DAGs bucket to the secondary DAGs bucket. Any new changes to the primary DAGs bucket are automatically replicated in the secondary region.
 
 - \[**1.c**] The CDK deployment of the [primary stack](lib/stacks/mwaa_primary_stack.py) deploys the [mwaa_dr](assets/dags/mwaa_dr/) framework package to the primary DAGs S3 bucket. This framework includes the ([backup_metadata](assets/dags/mwaa_dr/backup_metadata.py)) DAG, which periodically takes backup of the metadata store. The backup interval is configurable and should be based on the recovery point objective (RPO) -- the data loss time during a failure that can be sustained by the business.
 
@@ -168,9 +170,11 @@ As discussed in the previous sections, [WS Flow 1](#ws-flow-1-periodic-backup) h
 
     - \[**2.d**] As a first step of the recovery subflow, the EventBridge schedule is disabled to prevent subsequent duplicate recovery flow.
 
-    - \[**2.e**] The workflow then restores the metadata from the S3 backup bucket into the standby secondary environment by triggering the [restore_metadata](assets/dags/mwaa_dr/restore_metadata.py) DAG. It uses the [task token integration](https://docs.aws.amazon.com/step-functions/latest/dg/connect-to-resource.html#connect-wait-token), in which, it waits for the restore DAG to respond back with success or failure notification before completing the workflow.
+    - \[**2.e**] The workflow then cleans up the metadata database by triggering the [cleanup_metadata](assets/dags/mwaa_dr/cleanup_metadata.py) DAG. It uses the [task token integration](https://docs.aws.amazon.com/step-functions/latest/dg/connect-to-resource.html#connect-wait-token), in which, it waits for the cleanup DAG to respond back with success or failure notification before completing the workflow. The cleanup before restore is needed to avoid primary key constraint violations in the database.
 
-    - \[**2.f**] The DAG for restoring metadata hydrates the standby MWAA environment with the metadata stored in the backup bucket and finally, returns a success token back to the StepFunctions workflow, which ends the flow successfully.
+    - \[**2.f**] The workflow then restores the metadata from the S3 backup bucket into the standby secondary environment by triggering the [restore_metadata](assets/dags/mwaa_dr/restore_metadata.py) DAG. It uses the [task token integration](https://docs.aws.amazon.com/step-functions/latest/dg/connect-to-resource.html#connect-wait-token), in which, it waits for the restore DAG to respond back with success or failure notification before completing the workflow.
+
+    - \[**2.g**] The DAG for restoring metadata hydrates the standby MWAA environment with the metadata stored in the backup bucket and finally, returns a success token back to the StepFunctions workflow, which ends the flow successfully.
 
 
 # Solution
@@ -179,9 +183,10 @@ The [lib](lib) folder hosts the deployment code for the project. The project per
 - [The Primary Region Stack](lib/stacks/mwaa_primary_stack.py)
     - Deploys a backup S3 bucket to the primary region
     - Sets up cross region replications for both MWAA DAGs and backup S3 buckets
+    - Performs one time replication of the existing objects (such as DAGs, plugins, requirements file, and startup script) from primary DAGs bucket to the secondary one. Creates a S3 bucket to store the replication job manifest file and the replication CSV report.
     - Deploys the [mwaa_dr](assets/dags/mwaa_dr/) framework to the DAGs S3 bucket, which include DAGs for [backup](assets/dags/mwaa_dr/backup_metadata.py), [restore](assets/dags/mwaa_dr/restore_metadata.py), and [cleanup](assets/dags/mwaa_dr/cleanup_metadata.py) of metadata store
     - Deploys the [Airflow CLI](lib/constructs/airflow_cli.py) custom resource and associated lambda functions to setup necessary Airflow variables on the primary MWAA environment
-    - Deploys an SNS topic for DAG failure notification
+    - Deploys an SNS topic for failure notifications
 
 - [The Secondary Region Stack](lib/stacks/mwaa_secondary_stack.py)
     - Deploys a backup S3 bucket to the secondary region
@@ -202,9 +207,7 @@ The [lib](lib) folder hosts the deployment code for the project. The project per
 
 - For [Warm Standby](#warm-standby), another identical MWAA environment deployed to the **secondary** region. Note that [Backup and Restore](#backup-and-restore) does not require a running MWAA environment in the secondary region.
 
-- DAGs S3 buckets with versioning enabled in both primary and secondary region. Copy the packages in [assets/requirements.txt](assets/requirements.txt) to requirements files in the DAGs S3 buckets if already available or upload the provided requirements file to the buckets and [configure the MWAA environments](https://docs.aws.amazon.com/mwaa/latest/userguide/working-dags-dependencies.html) to use the requirements files.
-
-- The solution enables cross region replication for the DAGs buckets, so any new files/changes are replicated from the primary to the secondary bucket. However, the solution does not copy any pre-existing objects. You can manually upload your existing DAGs and plugin files to the secondary region DAGs bucket as an initial setup.
+- DAGs S3 buckets with versioning enabled in both primary and secondary region. Copy the packages in [assets/requirements.txt](assets/requirements.txt) to requirements files in the DAGs S3 buckets if already available or upload the provided requirements file to the  buckets and [configure the MWAA environments](https://docs.aws.amazon.com/mwaa/latest/userguide/working-dags-dependencies.html) to use the requirements files.
 
 - The security groups used by MWAA environment. In the secondary region, this can be the default security group of the VPC if not already defined, i.e., in the case of [backup and restore](#backup-and-restore). You can find the VPC, security groups, and subnet information of an existing MWAA environment on your AWS console.
 
@@ -358,12 +361,13 @@ Here are the optional parameters that applies to both primary and secondary regi
 | `MWAA_NOTIFICATION_EMAILS` | `[]` | `'["ad@eg.com"]'`, `'["ad@eg.com", "ops@eg.com"]'` | Comma separated list of emails. Note that the brackets, `[]`, are necessary to denote a list even for a single element list. |
 | `MWAA_SIMULATE_DR` | `NO` | `YES` or `NO` | Whether to simulate a DR by artificially forcing health check failure for the MWAA environment in the primary region. Only use for testing. |
 | `PRIMARY_BACKUP_SCHEDULE` | `'0 * * * *'` | `@hourly`, `@daily`, or any cron expressions | Cron schedule for taking backup of the metadata store. |
+| `PRIMARY_REPLICATION_POLLING_INTERVAL_SECS` | `30` | wait time in seconds | The polling internal in secs for checking the status of the one time replication job during primary stack deployment. |
 | `SECONDARY_CLEANUP_COOL_OFF_SECS` | `30` | wait time in seconds | The cool of time in secs between the metadata store cleanup operation and the restore operation in the recovery workflow. |
 | `STATE_MACHINE_TIMEOUT_MINS` | `60` | timeout in minutes | The restore Step Fuctions workflow timeout in minutes. |
 
 ### Automated Updates to the Execution Role
 
-Note that the [secondary region stack](lib/stacks/mwaa_secondary_stack.py) will add an additional policy statement to the MWAA execution role for the secondary region if the configuration parameter `MWAA_UPDATE_EXECUTION_ROLE` is set to `YES`. If you intend to set this parameter to `NO`, then please add the following policy entry to secondary MWAA execution role:
+Note that the [secondary region stack](lib/stacks/mwaa_secondary_stack.py) will add an additional policy statement to the MWAA execution role for the secondary region if the configuration parameter `MWAA_UPDATE_EXECUTION_ROLE` is set to `YES`. If you intend to set this parameter to `NO`, then please add the following policy entry to the secondary MWAA execution role:
 
 ```json
 {
@@ -386,7 +390,15 @@ Note that if you supplied a VPC security group for your MWAA environment and if 
 
 The project uses Cloud Development Kit (CDK) and is set up like a standard Python project. Assuming that you have AWS credentials for deploying the project setup for your command shell, follow these steps to build and deploy the solution to your AWS account.
 
-First, let's clone the project in your local machine:
+## Bootstrap Your AWS Account
+If you account has not been setup to use CDK yet, you will need to perform a one time cdk bootstrapping for both primary and secondary regions using the following command: `cdk bootstrap cdk bootstrap aws://<account>/<primary-region> aws://<account>/<secondary-region>`. Here's an example:
+```sh
+cdk bootstrap aws://123456789999/us-east-1 aws://123456789999/us-east-2
+```
+
+## Clone the Project
+
+Let's clone the project in your local machine as follows:
 ```sh
 git clone https://github.com/aws-samples/mwaa-disaster-recovery.git
 cd mwaa-disaster-recovery
@@ -403,7 +415,7 @@ If you already don't have an MWAA environment, use the [quickstart guide](https:
 1. Create a S3 bucket with versioning enabled on AWS console in your primary region, let's call it `mwaa-2-5-1-primary-source` (you will probably need to specify a different name as S3 bucket name must be globally unique).
 2. Assuming you will name your primary mwaa environment `mwaa-2-5-1-primary`, create an IAM role as documented in the [AWS Resources](#aws-resources) pre-requisites section.
 3. Create an MWAA environment on AWS console and using S3 bucket and execution role that you created in steps 1 and 2. Choose default VPC, subnets, and security group.
-4. Similarly create another S3 bucket and IAM role in your secondary region.
+4. Similarly create another S3 bucket (with versioning enabled) and IAM role in your secondary region.
 
 
 ### BR-2: Setup Local Virtual Environment
@@ -426,7 +438,7 @@ Windows:
 .venv\Scripts\activate.bat
 ```
 
-Once the virtualenv is activated, you can install the required dependencies:
+Once the virtualenv is activated, you will need to install the required dependencies:
 ```sh
 pip install -r requirements.txt
 pip install -r requirements-dev.txt
@@ -484,9 +496,9 @@ cdk deploy --all
 ### BR-6: Explore the Airflow UI
 
 From MWAA console, explore the Airflow UI, it should have the following DAGs available:
-- [backup_metadata](assets/dags/mwaa_dr/backup_metadata.py) - this backs up metadata based on the provided schedule and should be **enabled**
-- [cleanup_metadata](assets/dags/mwaa_dr/cleanup_metadata.py) - this DAG provided as a part of the [mwaa_dr](assets/dags/mwaa_dr/) framework will cleanup the metadata store for restore to work without database constraint violations. This is a utility DAG and can used as needed during restore process and should be in **disabled** state
-- [restore_metadata](assets/dags/mwaa_dr/restore_metadata.py) - this DAG will restore metadata from S3 backup and should be in **disabled** state
+- [backup_metadata](assets/dags/mwaa_dr/backup_metadata.py) - this backs up metadata based on the provided schedule and should be **enabled**. There is a small chance that the MWAA scheduler had not finished parsing/detecting this DAG before the stack deployment enabled it, in which case, it will appear paused. Ensure that you unpause it in the Airflow UI.
+- [cleanup_metadata](assets/dags/mwaa_dr/cleanup_metadata.py) - this DAG provided as a part of the [mwaa_dr](assets/dags/mwaa_dr/) framework will cleanup the metadata store for restore to work without database constraint violations. This is a utility DAG and can used as needed just before the restore process and should be in the **disabled** state.
+- [restore_metadata](assets/dags/mwaa_dr/restore_metadata.py) - this DAG will restore metadata from S3 backup and should be in the **disabled** state.
 
 Feel free to upload additional dags and play around to generate some metadata for the backup restore process. Here is a [sample dag](https://airflow.apache.org/docs/apache-airflow/2.5.1/tutorial/fundamentals.html) that you can upload in the `dags` folder of your DAGs S3 bucket.
 
@@ -496,9 +508,7 @@ While the backups are taken automatically based on the supplied schedule, you ca
 
 ### BR-8: Simulate DR for Testing
 
-To be able to perform DR testing, you will need to have the **existing** `requirements.txt` file, plugins, and DAGs replicated from the primary to the secondary DAGs S3 bucket (note that any new changes are replicated automatically, existing objects are not).  If the version of `requirements.txt` used by your primary MWAA environment from the primary DAGs S3 bucket is not available in the secondary DAGs S3 bucket, then you will encounter an error detailed in the [FAQ-2 Failure to Create New Environment](#faq-2-failure-to-create-new-environment) section.
-
-To avoid this issue, use a S3 Batch Replication job to perform a one time replication of the existing objects including `requirements.txt` from the primary DAGs S3 bucket to the secondary. Please follow [step 4 (only) of this tutorial](https://aws.amazon.com/getting-started/hands-on/replicate-existing-objects-with-amazon-s3-batch-replication/?ref=docs_gateway/amazons3/s3-batch-replication-batch.html). After the replication is complete, you can simulate a DR situation by setting the `MWAA_SIMULATE_DR` parameter in your `.env` file as follows:
+You can simulate a DR situation by enabling the `MWAA_SIMULATE_DR` parameter in your `.env` file as follows:
 ```sh
 MWAA_SIMULATE_DR=YES
 
@@ -608,9 +618,9 @@ cdk deploy --all
 ### WS-6: Explore the Airflow UI
 
 From MWAA console, explore the Airflow UI, it should have the following DAGs available:
-- [backup_metadata](assets/dags/mwaa_dr/backup_metadata.py) - this backs up metadata based on the provided schedule and should be **enabled**
-- [cleanup_metadata](assets/dags/mwaa_dr/cleanup_metadata.py) - this DAG provided as a part of the [mwaa_dr](assets/dags/mwaa_dr/) framework will cleanup the metadata store for restore to work without database constraint violations. This is a utility DAG and can used as needed during DR testing on the existing secondary MWAA environment. The DAG should be in **disabled** state. **NOTE**: it is highly recommended to run this DAG before the warm standby DR testing to avoid restore failure due to database key constraints violations.
-- [restore_metadata](assets/dags/mwaa_dr/restore_metadata.py) - this DAG will restore metadata from S3 backup and should be in **disabled** state
+- [backup_metadata](assets/dags/mwaa_dr/backup_metadata.py) - this backs up metadata based on the provided schedule and should be **enabled**. There is a small chance that the MWAA scheduler had not finished parsing/detecting this DAG before the stack deployment enabled it, in which case, it will appear paused. Ensure that you unpause it in the Airflow UI.
+- [cleanup_metadata](assets/dags/mwaa_dr/cleanup_metadata.py) - this DAG provided as a part of the [mwaa_dr](assets/dags/mwaa_dr/) framework will cleanup the metadata store for restore to work without database constraint violations. This is a utility DAG and can used as needed during DR testing on the existing secondary MWAA environment. The DAG should be in the **disabled** state.
+- [restore_metadata](assets/dags/mwaa_dr/restore_metadata.py) - this DAG will restore metadata from S3 backup and should be in the **disabled** state.
 
 Feel free to upload additional dags and play around to generate some metadata for the backup restore process. Here is a [sample dag](https://airflow.apache.org/docs/apache-airflow/2.5.1/tutorial/fundamentals.html) that you can upload in the `dags` folder of your DAGs S3 bucket.
 
@@ -672,7 +682,7 @@ The most recent backup of the primary environment will always override the metad
 
 ### Clean Metadata Tables Required for the Restore Workflow
 
-The solution backs up `variable`, `connection`, `slot_pool`, `log`, `job`, `dag_run`, `trigger`, `task_instance`, and `task_fail` tables by default during the backup workflow in the primary region. If any of these tables are non-empty during a recovery workflow in the secondary region, then you will encounter database key constraint violations in the metadata store. To avoid this issue, particularly for the [Warm Standby](#warm-standby) approach, it is critical that you frequently cleanup the secondary region MWAA metadata using the [clean_metadata](assets/dags/mwaa_dr/cleanup_metadata.py) DAG.
+The solution backs up `variable`, `connection`, `slot_pool`, `log`, `job`, `dag_run`, `trigger`, `task_instance`, and `task_fail` tables by default during the backup workflow in the primary region. If any of these tables are non-empty during a recovery workflow in the secondary region, then you will encounter database key constraint violations in the metadata store. To avoid this issue, the [Warm Standby](#warm-standby) worfklow automatically cleans up the secondary region MWAA metadata using the [clean_metadata](assets/dags/mwaa_dr/cleanup_metadata.py) DAG during execution.
 
 ### Manually Triggering the Recovery Workflow
 
@@ -698,11 +708,11 @@ This is also a great way to manually test your disaster recovery setup!
 
 ### Using the Metadata Backup and Restore DAGs Independently
 
-There might be a situation where you simply want to backup and restore metadata without the need to utilize the full DR solution. You can run the backup and restore independently in two modes:
+There might be a need where you only want to perform backup and restore operations without the full DR solution. You can run the backup and restore independently in two modes:
 
 For production use in a public web server mode, we recommend using the published [mwaa_dr](https://pypi.org/project/mwaa-dr/) library to create the necessary DAG for backup and restore in your MWAA environment.
 
-For a private webserver mode, you can copy the [assets/dags/mwass_dr](assets/dags/mwaa_dr/) folder to your S3's `dags` folder.
+For a private webserver mode, you can copy the [assets/dags/mwaa_dr](assets/dags/mwaa_dr/) folder to your S3's `dags` folder.
 
 For both modes, please make sure of the following:
 1. Ensure you have an S3 bucket created to store the backup.
@@ -715,10 +725,10 @@ For testing the `mwaa_dr` library itself, you can run [aws-mwaa-local-runner](ht
 export AIRFLOW_VAR_DR_STORAGE_TYPE=LOCAL_FS
 ```
 
-After the setup you are all set to run the [backup_metadata](assets/dags/mwaa_dr/backup_metadata.py) and [restore_metadata](assets/dags/mwaa_dr/restore_metadata.py) dags. The metadata will be stored and restored from the `dags/data/` folder of the `mwaa-lcoal-runner` codebase.
+After the setup you are all set to run the [backup_metadata](assets/dags/mwaa_dr/backup_metadata.py) and [restore_metadata](assets/dags/mwaa_dr/restore_metadata.py) dags. The metadata will be stored and restored from/to the `dags/data/` folder of the `mwaa-lcoal-runner` codebase.
 
 > [!IMPORTANT]
-> Note that this is a great way to test and contribute code to this project for a new version of MWAA.
+> Note that this is a great way to test support for a new version of MWAA.
 
 
 ### May Need to Restart Environment for Plugins to Work
@@ -754,16 +764,13 @@ An error occurred (ValidationException) when calling the CreateEnvironment opera
 
 This issue occurs when the version of `requirements.txt` file in the secondary region DAGs bucket does not match that of the primary region DAGs bucket.
 
-To resolve this issue, you can try one of the following two approaches:
+To resolve this issue, please follow these steps:
 
-**S3 Batch Replication Job**:  Use a S3 Batch Replication job to perform a one time replication of the existing objects including `requirements.txt` from the primary DAGs S3 bucket to the secondary. Please follow [step 4 (only) of this tutorial](https://aws.amazon.com/getting-started/hands-on/replicate-existing-objects-with-amazon-s3-batch-replication/?ref=docs_gateway/amazons3/s3-batch-replication-batch.html). After the replication is complete find the Event Bridge scheduler in the secondary region and re-enable it. You can find the name of the scheduler under the resources section of the secondary region CloudFormation stack.
-
-**Updates to the MWAA Requirements**: You can upload a new `requirements.txt` file to the primary DAGs S3 bucket, which will automatically get replicated to the secondary region DAGs S3 bucket with version number preserved. You will then need to point the pirmary MWAA environment to use the newly uploaded version of the requirements file so that the configuration change gets stored in the secondary region and gets picked up during the restore operations. Please carry out the following steps:
-
-1. Introduce a cosmetic change to your `requirements.txt` file, such as, a new line or space and upload the file to the primary region DAGs S3 bucket. The cross-region replication setup for the two DAGs buckets will ensure the change is replicated in the secondary region DAGs bucket. Double check the current version of `requirement.txt` in the two S3 buckets are the same before moving on.
-2. Edit the MWAA environment in the primary region to use the newly uploaded version of `requirements.txt`. After you save the configuration change, the MWAA environment will undergo updates. Wait for the environment to be available.
-3. Redeploy your stack with `MWAA_SIMULATE_DR=NO` and wait for the StepFunctions workflow in the secondary region stack to finish successfully at least once. This will ensure that the latest primary environment configuration (including the current version of `requirements.txt`) is stored in the secondary region backup bucket for future use.
+1. Modify the `create_replication_job_custom_resource` function in [mwaa_primary_stack](lib/stacks/mwaa_primary_stack.py#L619) to replace `on_create` with `on_update`.
+2. Redeploy your stack with `MWAA_SIMULATE_DR=NO` and wait for the StepFunctions workflow in the secondary region stack to finish successfully at least once. This will ensure that the latest primary environment configuration is stored in the secondary region backup bucket for future use.
+3. Enable the Event Bridge schedule if it's in disabled state from your AWS console in the secondary region so the restore workflow can start again. 
 4. Redeploy your stack with `MWAA_SIMULATE_DR=YES`, which should now pick up the right version of the requirements file from the secondary DAGs bucket.
+5. Revert the change you made to the [mwaa_primary_stack](lib/stacks/mwaa_primary_stack.py#L619) by replacing `on_update` with `on_create` in the `create_replication_job_custom_resource` function.
 
 # Development Notes
 

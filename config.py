@@ -28,11 +28,16 @@ load_dotenv()
 # DR Option
 DR_BACKUP_RESTORE = "BACKUP_RESTORE"
 DR_WARM_STANDBY = "WARM_STANDBY"
+APPEND = "APPEND"
+REPLACE = "REPLACE"
+DO_NOTHING = "DO_NOTHING"
 
-# Environment variables for stack configuration
+# Environment variables for stack and the mwaa_dr framework configuration
 STACK_NAME_PREFIX = "STACK_NAME_PREFIX"
 AWS_ACCOUNT_ID = "AWS_ACCOUNT_ID"
 DR_TYPE = "DR_TYPE"
+DR_VARIABLE_RESTORE_STRATEGY = "DR_VARIABLE_RESTORE_STRATEGY"
+DR_CONNECTION_RESTORE_STRATEGY = "DR_CONNECTION_RESTORE_STRATEGY"
 MWAA_VERSION = "MWAA_VERSION"
 MWAA_DAGS_S3_PATH = "MWAA_DAGS_S3_PATH"
 MWAA_NOTIFICATION_EMAILS = "MWAA_NOTIFICATION_EMAILS"
@@ -100,6 +105,8 @@ REQUIRED_CONFIGS = [
 ]
 
 DEFAULT_CONFIGS = {
+    DR_VARIABLE_RESTORE_STRATEGY: "APPEND",
+    DR_CONNECTION_RESTORE_STRATEGY: "APPEND", 
     MWAA_DAGS_S3_PATH: "dags",
     MWAA_NOTIFICATION_EMAILS: "[]",
     MWAA_BACKUP_FILE_NAME: "environment.json",
@@ -152,6 +159,27 @@ class Config:
         if type not in [DR_BACKUP_RESTORE, DR_WARM_STANDBY]:
             raise ValueError(f"The DR type, {type}, is not supported!")
         return type
+
+    @property
+    def dr_variable_restore_strategy(self) -> str:
+        return self.get_restore_strategy(DR_VARIABLE_RESTORE_STRATEGY)
+
+    @property
+    def dr_connection_restore_strategy(self) -> str:
+        return self.get_restore_strategy(DR_CONNECTION_RESTORE_STRATEGY)
+
+    def get_restore_strategy(self, variable) -> str:
+        strategy = self.get(variable)
+        if strategy == DO_NOTHING:
+            return strategy
+
+        if self.dr_type == DR_BACKUP_RESTORE:
+            return REPLACE
+
+        if strategy not in ["APPEND", "REPLACE"]:
+            raise ValueError(f"The restore strategy, {strategy}, is not supported!")
+
+        return strategy
 
     @property
     def mwaa_version(self) -> str:

@@ -36,7 +36,6 @@ from lib.functions.airflow_cli_client import AirflowCliCommand, AirflowCliInput
 from lib.stacks.mwaa_base_stack import MwaaBaseStack
 
 
-
 class MwaaPrimaryStack(MwaaBaseStack):
     @property
     def backup_bucket(self) -> s3.Bucket:
@@ -101,10 +100,6 @@ class MwaaPrimaryStack(MwaaBaseStack):
         self.setup_variables_airflow_cli(conf)
         self.setup_dags_unpause_cli(conf)
 
-        self.variables_airflow_cli.node.add_dependency(failure_notification_topic)
-        self.dags_deployment.node.add_dependency(self.variables_airflow_cli)
-        self.unpause_airflow_cli.node.add_dependency(self.dags_deployment)
-
         self.report_bucket = self.create_replication_report_bucket(
             self.conf.get_name("replication-report-bucket")
         )
@@ -114,26 +109,36 @@ class MwaaPrimaryStack(MwaaBaseStack):
             self.report_bucket,
         )
         self.replication_state_machine = self.create_batch_replication_state_machine(
-            self.conf.get_name("state-machine"),
+            self.conf.get_name("replication-job-sm"),
             self.source_bucket,
             self.report_bucket,
             self.replication_job_role,
         )
-
-        self.replication_job_custom_resource = self.create_replication_job_custom_resource(
-            self.conf.get_name("replication-job-custom-resource"),
-            state_machine=self.replication_state_machine,
+        self.setup_notification(
+            self.conf,
+            failure_notification_topic,
+            self.replication_state_machine,
+            ["FAILED", "TIMED_OUT", "ABORTED", "SUCCEEDED"],
         )
 
+        self.replication_job_custom_resource = (
+            self.create_replication_job_custom_resource(
+                self.conf.get_name("replication-job-custom-resource"),
+                state_machine=self.replication_state_machine,
+            )
+        )
+
+        self.variables_airflow_cli.node.add_dependency(failure_notification_topic)
+        self.dags_deployment.node.add_dependency(self.variables_airflow_cli)
         self.replication_job_custom_resource.node.add_dependency(
             self.replication_state_machine
         )
-        self.replication_job_custom_resource.node.add_dependency(
-            self.report_bucket
-        )
+        self.replication_job_custom_resource.node.add_dependency(self.report_bucket)
         self.replication_job_custom_resource.node.add_dependency(
             self.replication_job_role
         )
+        self.unpause_airflow_cli.node.add_dependency(self.dags_deployment)
+        self.unpause_airflow_cli.node.add_dependency(self.replication_job_custom_resource)
 
 
     def setup_variables_airflow_cli(self, conf: config.Config) -> AirflowCli:
@@ -418,7 +423,6 @@ class MwaaPrimaryStack(MwaaBaseStack):
         )
         return custom_resource
 
-
     def create_replication_report_bucket(self, bucket_id: str) -> s3.Bucket:
         _report_bucket = s3.Bucket(
             self,
@@ -432,7 +436,11 @@ class MwaaPrimaryStack(MwaaBaseStack):
             enforce_ssl=True,
         )
 
-        cdk.CfnOutput(self, "MWAA-Replication-Report-Bucket-Name", value=_report_bucket.bucket_name)
+        cdk.CfnOutput(
+            self,
+            "MWAA-Replication-Report-Bucket-Name",
+            value=_report_bucket.bucket_name,
+        )
         return _report_bucket
 
     def create_replication_role(
@@ -481,15 +489,7 @@ class MwaaPrimaryStack(MwaaBaseStack):
             )
         )
 
-        # _role.add_to_policy(
-        #     iam.PolicyStatement(
-        #         actions=["iam:PassRole"],
-        #         resources=["*"],
-        #     )
-        # )
-
         return _role
-
 
     def create_batch_replication_state_machine(
         self,
@@ -511,7 +511,9 @@ class MwaaPrimaryStack(MwaaBaseStack):
             self,
             f"Wait {self.conf.primary_replication_polling_interval_secs}s",
             time=sfn.WaitTime.duration(
-                cdk.Duration.seconds(self.conf.primary_replication_polling_interval_secs)
+                cdk.Duration.seconds(
+                    self.conf.primary_replication_polling_interval_secs
+                )
             ),
         )
 
@@ -545,16 +547,13 @@ class MwaaPrimaryStack(MwaaBaseStack):
         )
         return state_machine
 
-
-
-
     def create_replication_job_state(
         self,
-        state_name: str, 
+        state_name: str,
         replication_job_function: _lambda.Function,
         source_bucket: s3.Bucket,
         report_bucket: s3.Bucket,
-        role: iam.Role 
+        role: iam.Role,
     ) -> tasks.LambdaInvoke:
         state = tasks.LambdaInvoke(
             self,
@@ -566,16 +565,13 @@ class MwaaPrimaryStack(MwaaBaseStack):
                     "source_bucket": source_bucket.bucket_arn,
                     "report_bucket": report_bucket.bucket_arn,
                     "replication_job_role": role.role_arn,
-                    "result": sfn.JsonPath.string_at('$.result'),
+                    "result": sfn.JsonPath.string_at("$.result"),
                 }
             ),
             retry_on_service_exceptions=False,
-            result_selector={
-                "result.$": "States.StringToJson($.Payload)"
-            },
+            result_selector={"result.$": "States.StringToJson($.Payload)"},
         )
         return state
-
 
     def create_replication_job_function(self):
         replication_job_fn = _lambda.Function(
@@ -598,7 +594,9 @@ class MwaaPrimaryStack(MwaaBaseStack):
         )
         replication_job_fn.add_to_role_policy(
             iam.PolicyStatement(
-                resources=[f"arn:aws:s3:{self.conf.primary_region}:{self.conf.aws_account_id}:job/*"],
+                resources=[
+                    f"arn:aws:s3:{self.conf.primary_region}:{self.conf.aws_account_id}:job/*"
+                ],
                 actions=["s3:DescribeJob", "s3:CreateJob"],
             )
         )
@@ -610,7 +608,6 @@ class MwaaPrimaryStack(MwaaBaseStack):
         )
         return replication_job_fn
 
-
     def create_replication_job_custom_resource(
         self,
         custom_resource_id: str,
@@ -619,7 +616,7 @@ class MwaaPrimaryStack(MwaaBaseStack):
         custom_resource = cr.AwsCustomResource(
             self,
             custom_resource_id,
-            on_update=cr.AwsSdkCall(
+            on_create=cr.AwsSdkCall(
                 service="stepfunctions",
                 action="StartExecution",
                 parameters={

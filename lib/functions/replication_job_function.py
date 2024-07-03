@@ -18,54 +18,51 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 import json
 import boto3
 
-client = boto3.client('s3control')
+client = boto3.client("s3control")
+
 
 def handler(event, context):
-    print(f'Event: {json.dumps(event, default=str)}')
+    print(f"Event: {json.dumps(event, default=str)}")
 
-    account = event['account']
-    result = event.get('result')
-    job_id = ''
+    account = event["account"]
+    result = event.get("result")
+    job_id = ""
 
     if not result:
-        source_bucket = event['source_bucket']
-        report_bucket = event['report_bucket']
-        role_arn = event['replication_job_role']
+        source_bucket = event["source_bucket"]
+        report_bucket = event["report_bucket"]
+        role_arn = event["replication_job_role"]
 
         result = client.create_job(
             AccountId=account,
-            Operation={
-                'S3ReplicateObject': {}
-            },
+            Operation={"S3ReplicateObject": {}},
             Report={
-                'Bucket': report_bucket,
-                'Format': 'Report_CSV_20180820',
-                'Enabled': True,
-                'Prefix': 'replication-report',
-                'ReportScope': 'AllTasks',
+                "Bucket": report_bucket,
+                "Format": "Report_CSV_20180820",
+                "Enabled": True,
+                "Prefix": "replication-report",
+                "ReportScope": "AllTasks",
             },
             Priority=1,
             RoleArn=role_arn,
             ConfirmationRequired=False,
             ManifestGenerator={
-                'S3JobManifestGenerator': {
-                    'ExpectedBucketOwner': account,
-                    'SourceBucket': source_bucket,
-                    'EnableManifestOutput': False,
-                    'Filter': {
-                        'EligibleForReplication': True,
-                        'ObjectReplicationStatuses': ['NONE', 'FAILED'],
+                "S3JobManifestGenerator": {
+                    "ExpectedBucketOwner": account,
+                    "SourceBucket": source_bucket,
+                    "EnableManifestOutput": False,
+                    "Filter": {
+                        "EligibleForReplication": True,
+                        "ObjectReplicationStatuses": ["NONE", "FAILED"],
                     },
                 }
-            }
+            },
         )
+        print(f"Create Job Result: {json.dumps(result, default=str)}")
 
-    job_id = result['JobId']
-    result = client.describe_job(
-        AccountId=account,
-        JobId=job_id
-    )
+    job_id = result["JobId"]
+    result = client.describe_job(AccountId=account, JobId=job_id)
 
-    output = json.dumps(result['Job'], default=str)
-    print(f'Output: {output}')
+    output = json.dumps(result["Job"], default=str)
+    print(f"Describe Job Result: {output}")
     return output
