@@ -1,4 +1,4 @@
-aws-cdk-lib~=2.139.1
+aws-cdk-lib~=2.147.2
 constructs~=10.3.0
 boto3~=1.34.94
 smart-open~=7.0.4

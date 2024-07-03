@@ -28,11 +28,16 @@ load_dotenv()
 # DR Option
 DR_BACKUP_RESTORE = "BACKUP_RESTORE"
 DR_WARM_STANDBY = "WARM_STANDBY"
+APPEND = "APPEND"
+REPLACE = "REPLACE"
+DO_NOTHING = "DO_NOTHING"
 
-# Environment variables for stack configuration
+# Environment variables for stack and the mwaa_dr framework configuration
 STACK_NAME_PREFIX = "STACK_NAME_PREFIX"
 AWS_ACCOUNT_ID = "AWS_ACCOUNT_ID"
 DR_TYPE = "DR_TYPE"
+DR_VARIABLE_RESTORE_STRATEGY = "DR_VARIABLE_RESTORE_STRATEGY"
+DR_CONNECTION_RESTORE_STRATEGY = "DR_CONNECTION_RESTORE_STRATEGY"
 MWAA_VERSION = "MWAA_VERSION"
 MWAA_DAGS_S3_PATH = "MWAA_DAGS_S3_PATH"
 MWAA_NOTIFICATION_EMAILS = "MWAA_NOTIFICATION_EMAILS"
@@ -62,6 +67,7 @@ PRIMARY_VPC_ID = "PRIMARY_VPC_ID"
 PRIMARY_SUBNET_IDS = "PRIMARY_SUBNET_IDS"
 PRIMARY_SECURITY_GROUP_IDS = "PRIMARY_SECURITY_GROUP_IDS"
 PRIMARY_BACKUP_SCHEDULE = "PRIMARY_BACKUP_SCHEDULE"
+PRIMARY_REPLICATION_POLLING_INTERVAL_SECS = "PRIMARY_REPLICATION_POLLING_INTERVAL_SECS"
 
 # Environment variables for secondary stack configuration
 SECONDARY_REGION = "SECONDARY_REGION"
@@ -99,6 +105,8 @@ REQUIRED_CONFIGS = [
 ]
 
 DEFAULT_CONFIGS = {
+    DR_VARIABLE_RESTORE_STRATEGY: "APPEND",
+    DR_CONNECTION_RESTORE_STRATEGY: "APPEND",
     MWAA_DAGS_S3_PATH: "dags",
     MWAA_NOTIFICATION_EMAILS: "[]",
     MWAA_BACKUP_FILE_NAME: "environment.json",
@@ -114,6 +122,7 @@ DEFAULT_CONFIGS = {
     HEALTH_CHECK_RETRY_INTERVAL_SECS: "10",
     HEALTH_CHECK_RETRY_BACKOFF_RATE: "2",
     PRIMARY_SCHEDULE_INTERVAL: "0 * * * *",
+    PRIMARY_REPLICATION_POLLING_INTERVAL_SECS: "30",
     SECONDARY_CLEANUP_COOL_OFF_SECS: "30",
 }
 
@@ -150,6 +159,27 @@ class Config:
         if type not in [DR_BACKUP_RESTORE, DR_WARM_STANDBY]:
             raise ValueError(f"The DR type, {type}, is not supported!")
         return type
+
+    @property
+    def dr_variable_restore_strategy(self) -> str:
+        return self.get_restore_strategy(DR_VARIABLE_RESTORE_STRATEGY)
+
+    @property
+    def dr_connection_restore_strategy(self) -> str:
+        return self.get_restore_strategy(DR_CONNECTION_RESTORE_STRATEGY)
+
+    def get_restore_strategy(self, variable) -> str:
+        strategy = self.get(variable)
+        if strategy == DO_NOTHING:
+            return strategy
+
+        if self.dr_type == DR_BACKUP_RESTORE:
+            return REPLACE
+
+        if strategy not in ["APPEND", "REPLACE"]:
+            raise ValueError(f"The restore strategy, {strategy}, is not supported!")
+
+        return strategy
 
     @property
     def mwaa_version(self) -> str:
@@ -256,6 +286,10 @@ class Config:
     @property
     def primary_backup_schedule(self) -> str:
         return self.get(PRIMARY_BACKUP_SCHEDULE)
+
+    @property
+    def primary_replication_polling_interval_secs(self) -> int:
+        return int(self.get(PRIMARY_REPLICATION_POLLING_INTERVAL_SECS))
 
     @property
     def secondary_region(self) -> str:

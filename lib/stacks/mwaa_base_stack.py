@@ -22,6 +22,10 @@ from aws_cdk import Stack
 from aws_cdk import aws_ec2 as ec2
 from aws_cdk import aws_sns as sns
 from aws_cdk import aws_sns_subscriptions as sns_sub
+from aws_cdk import aws_stepfunctions as sfn
+from aws_cdk import aws_events as events
+from aws_cdk import aws_events_targets as targets
+
 from constructs import Construct
 
 import config
@@ -83,3 +87,25 @@ class MwaaBaseStack(Stack):
         for email in emails:
             topic.add_subscription(sns_sub.EmailSubscription(email))
         return topic
+
+    def setup_notification(
+        self,
+        conf: config.Config,
+        sns_topic: sns.Topic,
+        state_machine: sfn.StateMachine,
+        statuses: list[str],
+    ) -> tuple[sns.Topic, events.Rule]:
+        rule = events.Rule(
+            self,
+            conf.get_name("sfn-failure-rule"),
+            event_pattern=events.EventPattern(
+                source=["aws.states"],
+                detail_type=["Step Functions Execution Status Change"],
+                detail={
+                    "status": statuses,
+                    "stateMachineArn": [state_machine.state_machine_arn],
+                },
+            ),
+            targets=[targets.SnsTopic(sns_topic)],
+        )
+        return sns_topic, rule

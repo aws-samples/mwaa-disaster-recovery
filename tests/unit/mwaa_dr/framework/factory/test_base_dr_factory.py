@@ -328,10 +328,10 @@ class TestBaseDRFactory:
         ):
             factory.cleanup_tables(**mock_context)
 
-            expect(query.call_count).to.equal(11)
-            expect(query().filter.call_count).to.equal(1)
-            expect(query().filter().delete.call_count).to.equal(1)
-            expect(query().delete.call_count).to.equal(10)
+            expect(query.call_count).to.equal(14)
+            expect(query().filter.call_count).to.equal(2)
+            expect(query().filter().delete.call_count).to.equal(2)
+            expect(query().delete.call_count).to.equal(12)
             expect(notify_success_to_sfn.called).to.be.true
 
     def test_cleanup_tables_v_2_6_and_above_error(self, mock_context):

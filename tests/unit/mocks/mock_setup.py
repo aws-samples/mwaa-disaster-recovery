@@ -79,6 +79,9 @@ def warm_standby_env_vars():
     os.environ["SECONDARY_SECURITY_GROUP_IDS"] = '["sg-00001111aaaabbcc22"]'
     os.environ["SECONDARY_CREATE_SFN_VPCE"] = "YES"
 
+    os.environ["DR_VARIABLE_RESTORE_STRATEGY"] = "APPEND"
+    os.environ["DR_CONNECTION_RESTORE_STRATEGY"] = "APPEND"
+
 
 @pytest.fixture(scope="function")
 def backup_restore_env_vars():
@@ -119,6 +122,9 @@ def backup_restore_env_vars():
     )
     os.environ["SECONDARY_SECURITY_GROUP_IDS"] = '["sg-00001111aaaabbcc22"]'
     os.environ["SECONDARY_CREATE_SFN_VPCE"] = "YES"
+
+    os.environ["DR_VARIABLE_RESTORE_STRATEGY"] = "REPLACE"
+    os.environ["DR_CONNECTION_RESTORE_STRATEGY"] = "REPLACE"
 
 
 boto_make_api_call = "botocore.client.BaseClient._make_api_call"

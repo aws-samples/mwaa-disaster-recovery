@@ -9,19 +9,12 @@ dependencies = [
   "smart-open>=7.0.4"
 ]
 requires-python = ">=3.7"
-authors = [
-  {name = "Chandan Rupakheti"},
-  {name = "Parnab Basak"},
-]
-maintainers = [
-  {name = "Chandan Rupakheti"}
-]
 description = "DR Solution for Amazon Managed Workflows for Apache Airflow (MWAA)"
 readme = "PYPIDOC.md"
 license = {file = "LICENSE.md"}
 keywords = ["MWAA", "airflow", "disaster", "recovery", "DR"]
 classifiers = [
-  "Development Status :: 4 - Beta",
+  "Development Status :: 5 - Production/Stable",
   "Programming Language :: Python"
 ]
 

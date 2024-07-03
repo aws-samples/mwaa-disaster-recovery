@@ -23,6 +23,9 @@ from airflow.models import Variable
 from mwaa_dr.framework.model.base_table import BaseTable
 from mwaa_dr.framework.model.dependency_model import DependencyModel
 
+APPEND = "APPEND"
+MISSING = "--missing--"
+
 
 class VariableTable(BaseTable):
     """
@@ -93,21 +96,40 @@ class VariableTable(BaseTable):
         Returns:
             None
         """
-        missing = "--missing--"
-        csv_file = self.read(context)
+        strategy = VariableTable.config(
+            conf_key="variable_restore_strategy",
+            var_key="DR_VARIABLE_RESTORE_STRATEGY",
+            default_val=APPEND,
+            context=context,
+        )
 
+        print(f"Variable restore strategy: {strategy}")
+        if strategy == "DO_NOTHING":
+            return
+
+        skips = ["DR_VARIABLE_RESTORE_STRATEGY", "DR_CONNECTION_RESTORE_STRATEGY"]
+        csv_file = self.read(context)
         try:
             with settings.Session() as session:
                 reader = csv.reader(csv_file)
                 for row in reader:
-                    var = Variable.get(key=row[0], default_var=missing)
-                    if var == missing:
-                        Variable.set(
-                            key=row[0],
-                            value=row[1],
-                            description=row[2],
-                            session=session,
-                        )
+                    if row[0] in skips:
+                        print(f"Skipping restoring {row[0]}")
+                        continue
+
+                    var = Variable.get(key=row[0], default_var=MISSING)
+
+                    if var != MISSING:
+                        if strategy == APPEND:
+                            continue
+                        Variable.delete(key=row[0], session=session)
+
+                    Variable.set(
+                        key=row[0],
+                        value=row[1],
+                        description=row[2],
+                        session=session,
+                    )
 
                 session.commit()
         finally:

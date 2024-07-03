@@ -19,6 +19,7 @@ import csv
 import os
 from io import StringIO
 from copy import deepcopy
+from typing import Optional
 
 from airflow import settings
 from mwaa_dr.framework.model.dependency_model import DependencyModel
@@ -99,15 +100,45 @@ class BaseTable:
         Returns:
             str: The bucket name for storing backups.
         """
+        return BaseTable.config(
+            "bucket",
+            "DR_BACKUP_BUCKET",
+            default_val="--dummy-bucket--",
+            context=context,
+        )
 
+    @staticmethod
+    def config(
+        conf_key: str, var_key: Optional[str] = None, default_val=None, context=None
+    ):
+        """
+        Retrieves a configuration value from either the Airflow `dag_run` context or Airflow variables.
+
+        If the `conf_key` is found in the Airflow `dag_run` context, it returns the corresponding value.
+        Otherwise, it tries to retrieve the value from Airflow variables using the `var_key` if supplied,
+        otherwise it will use `conf_key` to lookup the variable store.
+        If neither is found, it returns the `default_val`.
+
+        Args:
+            conf_key (str): The key for the configuration value in the Airflow context.
+            var_key (str, optional): The key for the configuration value in Airflow variables.
+            default_val (any, optional): The default value to return if the configuration value is not found.
+            context (dict, optional): The context dictionary containing the 'dag_run' information.
+
+        Returns:
+            any: The configuration value or the 'default_val' if not found.
+        """
         if context:
             dag_run = context.get("dag_run")
-            if "bucket" in dag_run.conf:
-                return dag_run.conf["bucket"]
+            if conf_key in dag_run.conf:
+                return dag_run.conf[conf_key]
+
+        if not var_key:
+            var_key = conf_key
 
         from airflow.models import Variable
 
-        return Variable.get("DR_BACKUP_BUCKET", default_var="--dummy-bucket--")
+        return Variable.get(key=var_key, default_var=default_val)
 
     def __str__(self):
         """

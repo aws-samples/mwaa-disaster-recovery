@@ -93,6 +93,59 @@ class TestConfig:
         with pytest.raises(ValueError) as exception:
             config.dr_type
 
+    def test_get_restore_strategy_do_nothing(backup_restore_env_vars):
+        os.environ["DR_TYPE"] = "BACKUP_RESTORE"
+        os.environ["DR_VARIABLE_RESTORE_STRATEGY"] = "DO_NOTHING"
+        os.environ["DR_CONNECTION_RESTORE_STRATEGY"] = "DO_NOTHING"
+
+        config = Config()
+
+        expect(config.dr_variable_restore_strategy).to.equal("DO_NOTHING")
+        expect(config.dr_connection_restore_strategy).to.equal("DO_NOTHING")
+
+    def test_get_restore_strategy_backup_restore(backup_restore_env_vars):
+        os.environ["DR_TYPE"] = "BACKUP_RESTORE"
+        os.environ["DR_VARIABLE_RESTORE_STRATEGY"] = "APPEND"
+        os.environ["DR_CONNECTION_RESTORE_STRATEGY"] = "APPEND"
+
+        config = Config()
+
+        expect(config.dr_variable_restore_strategy).to.equal("REPLACE")
+        expect(config.dr_connection_restore_strategy).to.equal("REPLACE")
+
+    def test_get_restore_strategy_warm_standby(backup_restore_env_vars):
+        os.environ["DR_TYPE"] = "WARM_STANDBY"
+        os.environ["DR_VARIABLE_RESTORE_STRATEGY"] = "APPEND"
+        os.environ["DR_CONNECTION_RESTORE_STRATEGY"] = "APPEND"
+
+        config = Config()
+
+        expect(config.dr_variable_restore_strategy).to.equal("APPEND")
+        expect(config.dr_connection_restore_strategy).to.equal("APPEND")
+
+    def test_get_restore_strategy_warm_standby(backup_restore_env_vars):
+        os.environ["DR_TYPE"] = "WARM_STANDBY"
+        os.environ["DR_VARIABLE_RESTORE_STRATEGY"] = "REPLACE"
+        os.environ["DR_CONNECTION_RESTORE_STRATEGY"] = "REPLACE"
+
+        config = Config()
+
+        expect(config.dr_variable_restore_strategy).to.equal("REPLACE")
+        expect(config.dr_connection_restore_strategy).to.equal("REPLACE")
+
+    def test_get_restore_strategy_invalid(backup_restore_env_vars):
+        os.environ["DR_TYPE"] = "WARM_STANDBY"
+        os.environ["DR_VARIABLE_RESTORE_STRATEGY"] = "OVERWRITE"
+        os.environ["DR_CONNECTION_RESTORE_STRATEGY"] = "OVERWRITE"
+
+        config = Config()
+
+        with pytest.raises(ValueError):
+            config.dr_variable_restore_strategy
+
+        with pytest.raises(ValueError):
+            config.dr_connection_restore_strategy
+
     def test_mwaa_version_supported(backup_restore_env_vars):
         for version in ["2.5.1", "2.6.3", "2.7.2", "2.8.1"]:
             os.environ["MWAA_VERSION"] = version
@@ -288,6 +341,12 @@ class TestConfig:
         config = Config()
 
         expect(config.primary_backup_schedule).to.equal("1 * * * *")
+
+    def test_primary_replication_polling_internal_secs(backup_restore_env_vars):
+        os.environ["PRIMARY_REPLICATION_POLLING_INTERVAL_SECS"] = "15"
+        config = Config()
+
+        expect(config.primary_replication_polling_interval_secs).to.equal(15)
 
     def test_secondary_region(backup_restore_env_vars):
         os.environ["SECONDARY_REGION"] = "us-west-2"

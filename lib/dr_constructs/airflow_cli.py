@@ -146,6 +146,7 @@ class AirflowCli(Construct):
                 "MWAA_ENV_NAME": env_name,
                 "MWAA_ENV_VERSION": env_version,
             },
+            allow_public_subnet=True,
         )
 
         return cli_fn

@@ -34,7 +34,7 @@ def handler(event, context):
 
     if simulate_dr == "YES":
         print(f"Simulating DR for {env_name}!")
-        env_name = "DummyEnvForSimulatingDR"
+        env_name = "--DummyEnvForSimulatingDR--"
 
     data_points = DATA_POINTS
     period = PERIOD_SECS
@@ -74,7 +74,7 @@ def handler(event, context):
         print(f"Response: {json.dumps(response, default=str)}")
 
         values = response["MetricDataResults"][0]["Values"]
-        if len(values) > 0 and values[0] > 0:
+        if values and values[0] > 0:
             return "HEALTHY"
     except Exception as e:
         print(f"Error: {e}")

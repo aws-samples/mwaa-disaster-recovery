@@ -20,8 +20,6 @@ from dataclasses import dataclass
 
 import aws_cdk as cdk
 from aws_cdk import aws_ec2 as ec2
-from aws_cdk import aws_events as events
-from aws_cdk import aws_events_targets as targets
 from aws_cdk import aws_iam as iam
 from aws_cdk import aws_lambda as _lambda
 from aws_cdk import aws_s3 as s3
@@ -89,7 +87,13 @@ class MwaaSecondaryStack(MwaaBaseStack):
         self.create_scheduler(
             conf=conf, schedule_name=schedule_name, state_machine=self._state_machine
         )
-        self.setup_notification(conf, self._state_machine)
+        self.sns_topic = self.create_sns_topic_with_email_subscriptions(conf)
+        self.setup_notification(
+            conf,
+            self.sns_topic,
+            self._state_machine,
+            ["FAILED", "TIMED_OUT", "ABORTED"],
+        )
 
         if conf.secondary_create_step_functions_vpce:
             self.setup_sfn_vpce(conf, self._vpc)
@@ -163,6 +167,8 @@ class MwaaSecondaryStack(MwaaBaseStack):
             dag_name=conf.metadata_cleanup_dag_name,
             bucket=self.backup_bucket.bucket_name,
             dr_type=conf.dr_type,
+            connection_restore_strategy=conf.dr_connection_restore_strategy,
+            variable_restore_strategy=conf.dr_variable_restore_strategy,
             function=dag_trigger_function,
         )
 
@@ -181,6 +187,8 @@ class MwaaSecondaryStack(MwaaBaseStack):
             dag_name=conf.metadata_import_dag_name,
             bucket=self.backup_bucket.bucket_name,
             dr_type=conf.dr_type,
+            connection_restore_strategy=conf.dr_connection_restore_strategy,
+            variable_restore_strategy=conf.dr_variable_restore_strategy,
             function=dag_trigger_function,
         )
 
@@ -269,6 +277,8 @@ class MwaaSecondaryStack(MwaaBaseStack):
             dag_name=conf.metadata_import_dag_name,
             bucket=self.backup_bucket.bucket_name,
             dr_type=conf.dr_type,
+            connection_restore_strategy=conf.dr_connection_restore_strategy,
+            variable_restore_strategy=conf.dr_variable_restore_strategy,
             function=dag_trigger_function,
         )
 
@@ -462,6 +472,8 @@ class MwaaSecondaryStack(MwaaBaseStack):
         dag_name: str,
         bucket: str,
         dr_type: str,
+        variable_restore_strategy: str,
+        connection_restore_strategy: str,
         function: _lambda.Function,
     ) -> tasks.LambdaInvoke:
         state = tasks.LambdaInvoke(
@@ -477,6 +489,8 @@ class MwaaSecondaryStack(MwaaBaseStack):
                     "dag": dag_name,
                     "bucket": bucket,
                     "dr_type": dr_type,
+                    "variable_restore_strategy": variable_restore_strategy,
+                    "connection_restore_strategy": connection_restore_strategy,
                 }
             ),
             retry_on_service_exceptions=True,
@@ -735,25 +749,6 @@ class MwaaSecondaryStack(MwaaBaseStack):
         )
 
         return cloudwatch_health_check_fn
-
-    def setup_notification(
-        self, conf: config.Config, state_machine: sfn.StateMachine
-    ) -> events.Rule:
-        sns_topic = self.create_sns_topic_with_email_subscriptions(conf)
-        rule = events.Rule(
-            self,
-            conf.get_name("sfn-failure-rule"),
-            event_pattern=events.EventPattern(
-                source=["aws.states"],
-                detail_type=["Step Functions Execution Status Change"],
-                detail={
-                    "status": ["FAILED", "TIMED_OUT", "ABORTED", "SUCCEEDED"],
-                    "stateMachineArn": [state_machine.state_machine_arn],
-                },
-            ),
-            targets=[targets.SnsTopic(sns_topic)],
-        )
-        return rule
 
     def setup_sfn_vpce(
         self, conf: config.Config, vpc_info: VpcInfo

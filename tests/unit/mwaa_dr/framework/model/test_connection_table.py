@@ -101,7 +101,7 @@ class TestConnectionTable:
 
             write.assert_called_once_with("", context)
 
-    def test_restore_non_existing_connection(self):
+    def test_restore_non_existing_connection_append(self):
         model = DependencyModel()
         table = ConnectionTable(
             model=model, storage_type="LOCAL_FS", path_prefix="data", batch_size=1000
@@ -109,9 +109,11 @@ class TestConnectionTable:
         context = {}
         data = 'id,type,description,"{""extra"": ""value""}",host,login,password,1234,schema\r\n'
         buffer = StringIO(data)
+
         with (
             patch.object(table, "read", return_value=buffer),
             patch("sqlalchemy.orm.Session.__enter__") as session,
+            patch("airflow.models.Variable.get", return_value="APPEND"),
         ):
             session.return_value.query.return_value.filter.return_value.all.return_value = (
                 []
@@ -120,10 +122,11 @@ class TestConnectionTable:
             table.restore(**context)
 
             # Cannot do object comparison for the session.add_all() call because Connection does on implement __eq__
+            session.return_value.delete.assert_not_called()
             session.return_value.add_all.assert_called_once()
-            session.return_value.add_all.assert_called_once()
+            expect(session.return_value.commit.call_count).to.equal(2)
 
-    def test_restore_existing_connection(self):
+    def test_restore_existing_connection_append(self):
         model = DependencyModel()
         table = ConnectionTable(
             model=model, storage_type="LOCAL_FS", path_prefix="data", batch_size=1000
@@ -135,6 +138,7 @@ class TestConnectionTable:
         with (
             patch.object(table, "read", return_value=buffer),
             patch("sqlalchemy.orm.Session.__enter__") as session,
+            patch("airflow.models.Variable.get", return_value="APPEND"),
         ):
             session.return_value.query.return_value.filter.return_value.all.return_value = [
                 Connection(
@@ -152,10 +156,45 @@ class TestConnectionTable:
 
             table.restore(**context)
 
+            session.return_value.delete.assert_not_called()
             session.return_value.add_all.assert_not_called()
-            session.return_value.add_all.assert_not_called()
+            session.return_value.commit.assert_not_called()
 
-    def test_restore_missing_port(self):
+    def test_restore_existing_connection_replace(self):
+        model = DependencyModel()
+        table = ConnectionTable(
+            model=model, storage_type="LOCAL_FS", path_prefix="data", batch_size=1000
+        )
+        context = dict()
+        data = 'id,type,description,"{""extra"": ""value""}",host,login,password,1234,schema\r\n'
+        buffer = StringIO(data)
+
+        with (
+            patch.object(table, "read", return_value=buffer),
+            patch("sqlalchemy.orm.Session.__enter__") as session,
+            patch("airflow.models.Variable.get", return_value="REPLACE"),
+        ):
+            session.return_value.query.return_value.filter.return_value.all.return_value = [
+                Connection(
+                    conn_id="id",
+                    conn_type="type",
+                    description="description",
+                    extra='{"extra": "value"}',
+                    host="host",
+                    login="login",
+                    password="XXXXXXXX",
+                    port=1234,
+                    schema="schema",
+                )
+            ]
+
+            table.restore(**context)
+
+            session.return_value.delete.assert_called_once()
+            session.return_value.add_all.assert_called_once()
+            expect(session.return_value.commit.call_count).to.equal(2)
+
+    def test_restore_missing_port_append(self):
         model = DependencyModel()
         table = ConnectionTable(
             model=model, storage_type="LOCAL_FS", path_prefix="data", batch_size=1000
@@ -167,6 +206,7 @@ class TestConnectionTable:
         with (
             patch.object(table, "read", return_value=buffer),
             patch("sqlalchemy.orm.Session.__enter__") as session,
+            patch("airflow.models.Variable.get", return_value="APPEND"),
         ):
             session.return_value.query.return_value.filter.return_value.all.return_value = (
                 []
@@ -175,5 +215,30 @@ class TestConnectionTable:
             table.restore(**context)
 
             # Cannot do object comparison for the session.add_all() call because Connection does on implement __eq__
+            session.return_value.delete.assert_not_called()
             session.return_value.add_all.assert_called_once()
             session.return_value.add_all.assert_called_once()
+
+    def test_restore_connection_do_nothing(self):
+        model = DependencyModel()
+        table = ConnectionTable(
+            model=model, storage_type="LOCAL_FS", path_prefix="data", batch_size=1000
+        )
+        context = dict()
+        data = 'id,type,description,"{""extra"": ""value""}",host,login,password,,schema\r\n'
+        buffer = StringIO(data)
+
+        with (
+            patch.object(table, "read", return_value=buffer),
+            patch("sqlalchemy.orm.Session.__enter__") as session,
+            patch("airflow.models.Variable.get", return_value="DO_NOTHING"),
+        ):
+            session.return_value.query.return_value.filter.return_value.all.return_value = (
+                []
+            )
+
+            table.restore(**context)
+
+            session.return_value.delete.assert_not_called()
+            session.return_value.add_all.assert_not_called()
+            session.return_value.add_all.assert_not_called()

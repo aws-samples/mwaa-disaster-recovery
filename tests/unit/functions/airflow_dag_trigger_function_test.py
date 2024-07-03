@@ -39,6 +39,8 @@ def test_handler(aws_mwaa):
         "bucket": "test-bucket",
         "task_token": "test-sfn-token",
         "dr_type": "BACKUP_RESTORE",
+        "connection_restore_strategy": "REPLACE",
+        "variable_restore_strategy": "REPLACE",
     }
 
     unpause_result = AirflowCliResult(stdout="Dag: test-dag, paused: False", stderr="")
@@ -48,6 +50,8 @@ def test_handler(aws_mwaa):
                 "bucket": "backup-bucket",
                 "task_token": "sfn-task-token",
                 "dr_type": "WARM_STANDBY",
+                "connection_restore_strategy": "REPLACE",
+                "variable_restore_strategy": "REPLACE",
             },
             "dag_id": "test-dag",
             "dag_run_id": "manual__2024-04-29T19:17:11+00:00",
