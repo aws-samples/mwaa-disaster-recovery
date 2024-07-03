@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2024-07-03
+### Added
+- Cross region replication of existing DAGs S3 bucket objects from primary to secondary during primary stack deployment
+- Clean up of the metadata store before restore operation for the `WARM_STANDBY` deployment
+- Customizable recovery strategy for `variable` and `connection`
+
+### Changed
+- Documentation and test cases updates to reflect the changes
+
 ## [0.4.0] - 2024-06-26
 ### Added
 - Added support for cleaning up the metadata store before running restore operations as a part of the automated restore StepFunctions workflow
@@ -87,7 +96,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial commit with sample readme, code of conduct, and license
 
 
-[unreleased]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v0.4.0...HEAD
+[unreleased]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v0.4.0...v1.0.0
 [0.4.0]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v0.2.4...v0.3.0
 [0.2.4]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v0.2.3...v0.2.4

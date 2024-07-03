@@ -113,7 +113,7 @@ class TestConnectionTable:
         with (
             patch.object(table, "read", return_value=buffer),
             patch("sqlalchemy.orm.Session.__enter__") as session,
-            patch("airflow.models.Variable.get", return_value='APPEND')
+            patch("airflow.models.Variable.get", return_value="APPEND"),
         ):
             session.return_value.query.return_value.filter.return_value.all.return_value = (
                 []
@@ -138,7 +138,7 @@ class TestConnectionTable:
         with (
             patch.object(table, "read", return_value=buffer),
             patch("sqlalchemy.orm.Session.__enter__") as session,
-            patch("airflow.models.Variable.get", return_value='APPEND')
+            patch("airflow.models.Variable.get", return_value="APPEND"),
         ):
             session.return_value.query.return_value.filter.return_value.all.return_value = [
                 Connection(
@@ -172,7 +172,7 @@ class TestConnectionTable:
         with (
             patch.object(table, "read", return_value=buffer),
             patch("sqlalchemy.orm.Session.__enter__") as session,
-            patch("airflow.models.Variable.get", return_value='REPLACE')
+            patch("airflow.models.Variable.get", return_value="REPLACE"),
         ):
             session.return_value.query.return_value.filter.return_value.all.return_value = [
                 Connection(
@@ -206,7 +206,7 @@ class TestConnectionTable:
         with (
             patch.object(table, "read", return_value=buffer),
             patch("sqlalchemy.orm.Session.__enter__") as session,
-            patch("airflow.models.Variable.get", return_value='APPEND')
+            patch("airflow.models.Variable.get", return_value="APPEND"),
         ):
             session.return_value.query.return_value.filter.return_value.all.return_value = (
                 []
@@ -231,7 +231,7 @@ class TestConnectionTable:
         with (
             patch.object(table, "read", return_value=buffer),
             patch("sqlalchemy.orm.Session.__enter__") as session,
-            patch("airflow.models.Variable.get", return_value='DO_NOTHING')
+            patch("airflow.models.Variable.get", return_value="DO_NOTHING"),
         ):
             session.return_value.query.return_value.filter.return_value.all.return_value = (
                 []

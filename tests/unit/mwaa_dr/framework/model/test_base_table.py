@@ -107,7 +107,9 @@ class TestBaseTable:
 
     @patch("airflow.models.Variable.get", return_value="default")
     def test_get_config_no_context_no_var_key(self, mock):
-        expect(BaseTable.config(conf_key="key", default_val='default')).to.equal('default')
+        expect(BaseTable.config(conf_key="key", default_val="default")).to.equal(
+            "default"
+        )
 
     def test_base_table__str__and__repr__(self):
         model = DependencyModel()
@@ -424,8 +426,8 @@ class TestBaseTable:
             yield s3
 
     def test_read_from_s3(self, mock_table_for_s3, mock_s3_bucket, mock_context):
-        buffer = io.StringIO('')
-        with patch('smart_open.open', return_value=buffer):
+        buffer = io.StringIO("")
+        with patch("smart_open.open", return_value=buffer):
             stream = mock_table_for_s3.read_from_s3(mock_context)
             expect(stream).to.be(buffer)
 

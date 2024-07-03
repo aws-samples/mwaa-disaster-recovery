@@ -138,8 +138,9 @@ class MwaaPrimaryStack(MwaaBaseStack):
             self.replication_job_role
         )
         self.unpause_airflow_cli.node.add_dependency(self.dags_deployment)
-        self.unpause_airflow_cli.node.add_dependency(self.replication_job_custom_resource)
-
+        self.unpause_airflow_cli.node.add_dependency(
+            self.replication_job_custom_resource
+        )
 
     def setup_variables_airflow_cli(self, conf: config.Config) -> AirflowCli:
         set_backup_schedule_cmd = AirflowCliCommand(

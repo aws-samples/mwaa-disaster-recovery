@@ -26,6 +26,7 @@ from mwaa_dr.framework.model.dependency_model import DependencyModel
 APPEND = "APPEND"
 MISSING = "--missing--"
 
+
 class VariableTable(BaseTable):
     """
     A class representing the Airflow Variable table. Inherits from the BaseTable class.

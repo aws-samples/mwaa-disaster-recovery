@@ -101,14 +101,16 @@ class BaseTable:
             str: The bucket name for storing backups.
         """
         return BaseTable.config(
-            "bucket", 
-            "DR_BACKUP_BUCKET", 
-            default_val="--dummy-bucket--", 
-            context=context
+            "bucket",
+            "DR_BACKUP_BUCKET",
+            default_val="--dummy-bucket--",
+            context=context,
         )
 
     @staticmethod
-    def config(conf_key: str, var_key: Optional[str]=None, default_val=None, context=None):
+    def config(
+        conf_key: str, var_key: Optional[str] = None, default_val=None, context=None
+    ):
         """
         Retrieves a configuration value from either the Airflow `dag_run` context or Airflow variables.
 
@@ -124,7 +126,7 @@ class BaseTable:
             context (dict, optional): The context dictionary containing the 'dag_run' information.
 
         Returns:
-            any: The configuration value or the 'default_val' if not found.        
+            any: The configuration value or the 'default_val' if not found.
         """
         if context:
             dag_run = context.get("dag_run")
@@ -135,6 +137,7 @@ class BaseTable:
             var_key = conf_key
 
         from airflow.models import Variable
+
         return Variable.get(key=var_key, default_var=default_val)
 
     def __str__(self):

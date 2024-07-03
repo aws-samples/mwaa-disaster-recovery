@@ -93,7 +93,7 @@ class MwaaBaseStack(Stack):
         conf: config.Config,
         sns_topic: sns.Topic,
         state_machine: sfn.StateMachine,
-        statuses: list[str]
+        statuses: list[str],
     ) -> tuple[sns.Topic, events.Rule]:
         rule = events.Rule(
             self,

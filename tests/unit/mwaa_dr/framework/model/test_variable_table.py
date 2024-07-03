@@ -18,7 +18,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 
-from unittest.mock import patch, call
+from unittest.mock import patch
 from io import StringIO
 
 from airflow.models import Variable
@@ -113,7 +113,6 @@ class TestVariableTable:
             )
             session.return_value.commit.assert_called_once()
 
-
     def test_restore_existing_variables_append(self):
         model = DependencyModel()
         table = VariableTable(
@@ -128,6 +127,7 @@ class TestVariableTable:
             if key == "key1":
                 return "val1"
             return default_var
+
         with (
             patch.object(table, "read", return_value=buffer),
             patch("sqlalchemy.orm.Session.__enter__") as session,
@@ -155,6 +155,7 @@ class TestVariableTable:
             if key == "key1":
                 return "val1"
             return default_var
+
         with (
             patch.object(table, "read", return_value=buffer),
             patch("sqlalchemy.orm.Session.__enter__") as session,
@@ -180,8 +181,8 @@ class TestVariableTable:
         )
         context = {}
         buffer = StringIO(
-            "key1,val1,description1\r\n" +
-            "DR_VARIABLE_RESTORE_STRATEGY,APPEND,description2\r\n"
+            "key1,val1,description1\r\n"
+            + "DR_VARIABLE_RESTORE_STRATEGY,APPEND,description2\r\n"
             "DR_CONNECTION_RESTORE_STRATEGY,APPEND,description2\r\n"
         )
 
@@ -191,6 +192,7 @@ class TestVariableTable:
             if key == "key1":
                 return "val1"
             return default_var
+
         with (
             patch.object(table, "read", return_value=buffer),
             patch("sqlalchemy.orm.Session.__enter__") as session,
@@ -223,6 +225,7 @@ class TestVariableTable:
             if key == "key1":
                 return "val1"
             return default_var
+
         with (
             patch.object(table, "read", return_value=buffer),
             patch("sqlalchemy.orm.Session.__enter__") as session,
@@ -233,4 +236,3 @@ class TestVariableTable:
 
             var_set.assert_not_called()
             session.return_value.commit.assert_not_called()
-            

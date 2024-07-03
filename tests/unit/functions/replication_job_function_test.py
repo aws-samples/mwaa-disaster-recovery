@@ -27,55 +27,67 @@ from unittest.mock import patch
 from tests.unit.mocks.mock_setup import aws_credentials, boto_make_api_call
 
 create_job_result = {
-    'JobId': 'XXX',
+    "JobId": "XXX",
 }
 
 describe_job_result = {
-    'Job': {
-        'JobId': 'XXX',
-        'Status': 'COMPLETE',
+    "Job": {
+        "JobId": "XXX",
+        "Status": "COMPLETE",
     }
 }
 
+
 def test_handler_no_result_input():
     event = {
-        'account': 'XXX',
-        'source_bucket': 'XXX',
-        'report_bucket': 'XXX',
-        'replication_job_role': 'XXX',
-        'result': ''
+        "account": "XXX",
+        "source_bucket": "XXX",
+        "report_bucket": "XXX",
+        "replication_job_role": "XXX",
+        "result": "",
     }
-    with patch('boto3.client') as boto3_client:
+    with patch("boto3.client") as boto3_client:
         boto3_client().create_job.return_value = create_job_result
         boto3_client().describe_job.return_value = describe_job_result
 
         import replication_job_function
+
         result = replication_job_function.handler(event, {})
 
-        expect(result).to.equal(json.dumps({
-            'JobId': 'XXX',
-            'Status': 'COMPLETE',
-        }))
+        expect(result).to.equal(
+            json.dumps(
+                {
+                    "JobId": "XXX",
+                    "Status": "COMPLETE",
+                }
+            )
+        )
+
 
 def test_handler_with_result_input():
     event = {
-        'account': 'XXX',
-        'source_bucket': 'XXX',
-        'report_bucket': 'XXX',
-        'replication_job_role': 'XXX',
-        'result': {
-            'JobId': 'XXX',
-            'Status': 'CREATING',
-        }
+        "account": "XXX",
+        "source_bucket": "XXX",
+        "report_bucket": "XXX",
+        "replication_job_role": "XXX",
+        "result": {
+            "JobId": "XXX",
+            "Status": "CREATING",
+        },
     }
 
-    with patch('boto3.client') as boto3_client:
+    with patch("boto3.client") as boto3_client:
         boto3_client().describe_job.return_value = describe_job_result
 
         import replication_job_function
+
         result = replication_job_function.handler(event, {})
 
-        expect(result).to.equal(json.dumps({
-            'JobId': 'XXX',
-            'Status': 'COMPLETE',
-        }))
+        expect(result).to.equal(
+            json.dumps(
+                {
+                    "JobId": "XXX",
+                    "Status": "COMPLETE",
+                }
+            )
+        )

@@ -133,7 +133,6 @@ class TestConfig:
         expect(config.dr_variable_restore_strategy).to.equal("REPLACE")
         expect(config.dr_connection_restore_strategy).to.equal("REPLACE")
 
-
     def test_get_restore_strategy_invalid(backup_restore_env_vars):
         os.environ["DR_TYPE"] = "WARM_STANDBY"
         os.environ["DR_VARIABLE_RESTORE_STRATEGY"] = "OVERWRITE"
@@ -146,7 +145,6 @@ class TestConfig:
 
         with pytest.raises(ValueError):
             config.dr_connection_restore_strategy
-
 
     def test_mwaa_version_supported(backup_restore_env_vars):
         for version in ["2.5.1", "2.6.3", "2.7.2", "2.8.1"]:
@@ -344,13 +342,11 @@ class TestConfig:
 
         expect(config.primary_backup_schedule).to.equal("1 * * * *")
 
-
     def test_primary_replication_polling_internal_secs(backup_restore_env_vars):
         os.environ["PRIMARY_REPLICATION_POLLING_INTERVAL_SECS"] = "15"
         config = Config()
 
         expect(config.primary_replication_polling_interval_secs).to.equal(15)
-
 
     def test_secondary_region(backup_restore_env_vars):
         os.environ["SECONDARY_REGION"] = "us-west-2"

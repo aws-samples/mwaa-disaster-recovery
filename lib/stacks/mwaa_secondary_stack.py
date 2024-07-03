@@ -92,7 +92,7 @@ class MwaaSecondaryStack(MwaaBaseStack):
             conf,
             self.sns_topic,
             self._state_machine,
-            ["FAILED", "TIMED_OUT", "ABORTED"]
+            ["FAILED", "TIMED_OUT", "ABORTED"],
         )
 
         if conf.secondary_create_step_functions_vpce:
@@ -749,7 +749,6 @@ class MwaaSecondaryStack(MwaaBaseStack):
         )
 
         return cloudwatch_health_check_fn
-
 
     def setup_sfn_vpce(
         self, conf: config.Config, vpc_info: VpcInfo

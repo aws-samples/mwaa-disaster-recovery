@@ -73,7 +73,7 @@ Here is a sample run of the restore workflow:
 
 Please note that `variable` and `connection` tables are handled specially during the restore process. You can specify a restore strategy to be applied for these two tables by setting `DR_VARIABLE_RESTORE_STRATEGY` and `DR_CONNECTION_RESTORE_STRATEGY` Airflow variables. These variables can take on of the following values:
 
-1. **DO_NOTHING**: As the name suggests, this strategy will not restore the variable and connection tables from the backup. This strategy is particularly useful if your MWAA environments have been configured to use [AWS Secrets Manager](https://docs.aws.amazon.com/mwaa/latest/userguide/connections-secrets-manager.html) for storing variables and connections. 
+1. **DO_NOTHING**: As the name suggests, this strategy will not restore the variable and connection tables from the backup. This strategy is particularly useful if your MWAA environments have been configured to use [AWS Secrets Manager](https://docs.aws.amazon.com/mwaa/latest/userguide/connections-secrets-manager.html) for storing variables and connections.
 
 2. **APPEND**: With this strategy, the restore workflow will not overwrite existing entries of the variable and connection tables and only add missing entries from the backup.
 

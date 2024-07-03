@@ -678,7 +678,7 @@ The project **only** takes metadata backup of the tasks that are not actively ru
 
 The most recent backup of the primary environment will always override the metadata of the secondary environment except for the `variable` and `connection` tables. These tables may need to be handled specially and the solution supports three different restore strategies for them as follows:
 
-1. **DO_NOTHING**: As the name suggests, this strategy will not restore the variable and connection tables from the backup. This strategy is particularly useful if your MWAA environments have been configured to use [AWS Secrets Manager](https://docs.aws.amazon.com/mwaa/latest/userguide/connections-secrets-manager.html) for storing variables and connections, particularly, applicable for the [warm standby](#warm-standby) deployment. 
+1. **DO_NOTHING**: As the name suggests, this strategy will not restore the variable and connection tables from the backup. This strategy is particularly useful if your MWAA environments have been configured to use [AWS Secrets Manager](https://docs.aws.amazon.com/mwaa/latest/userguide/connections-secrets-manager.html) for storing variables and connections, particularly, applicable for the [warm standby](#warm-standby) deployment.
 
 2. **APPEND**: In many cases, the secondary Amazon MWAA environment will likely need to interact with different data sources and web services running in the secondary region. Hence, with this strategy, the restore workflow will not overwrite existing entries of the variable and connection tables in the secondary MWAA environment from the backup. This is the default strategy for the [warm standby](#warm-standby) deployment.
 
@@ -789,7 +789,7 @@ To resolve this issue, please follow these steps:
 
 1. Modify the `create_replication_job_custom_resource` function in [mwaa_primary_stack](lib/stacks/mwaa_primary_stack.py#L619) to replace `on_create` with `on_update`.
 2. Redeploy your stack with `MWAA_SIMULATE_DR=NO` and wait for the StepFunctions workflow in the secondary region stack to finish successfully at least once. This will ensure that the latest primary environment configuration is stored in the secondary region backup bucket for future use.
-3. Enable the Event Bridge schedule if it's in disabled state from your AWS console in the secondary region so the restore workflow can start again. 
+3. Enable the Event Bridge schedule if it's in disabled state from your AWS console in the secondary region so the restore workflow can start again.
 4. Redeploy your stack with `MWAA_SIMULATE_DR=YES`, which should now pick up the right version of the requirements file from the secondary DAGs bucket.
 5. Revert the change you made to the [mwaa_primary_stack](lib/stacks/mwaa_primary_stack.py#L619) by replacing `on_update` with `on_create` in the `create_replication_job_custom_resource` function.
 

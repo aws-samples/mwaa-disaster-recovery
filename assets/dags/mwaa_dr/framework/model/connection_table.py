@@ -25,6 +25,7 @@ from mwaa_dr.framework.model.dependency_model import DependencyModel
 
 APPEND = "APPEND"
 
+
 class ConnectionTable(BaseTable):
     """
     A class representing the connection table in Apache Airflow.
@@ -145,9 +146,9 @@ class ConnectionTable(BaseTable):
                     if existing_connections:
                         if strategy == APPEND:
                             continue
-                        for existing_connection in existing_connections:                            
+                        for existing_connection in existing_connections:
                             session.delete(existing_connection)
-                    
+
                     port = None
                     if connection[7]:
                         port = int(connection[7])

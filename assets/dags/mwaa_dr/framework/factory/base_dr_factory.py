@@ -448,7 +448,7 @@ class BaseDRFactory(ABC):
                 SlaMiss,
                 RenderedTaskInstanceFields,
                 XCom,
-                Pool
+                Pool,
             ]
 
             print("Running metadata tables cleanup ...")
@@ -460,7 +460,7 @@ class BaseDRFactory(ABC):
                     if table.__tablename__ == "job":
                         query = query.filter(Job.job_type != "SchedulerJob")
                     elif table.__tablename__ == "slot_pool":
-                        query = query.filter(Pool.pool != 'default_pool')
+                        query = query.filter(Pool.pool != "default_pool")
                     query.delete(synchronize_session=False)
                 session.commit()
 
