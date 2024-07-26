@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1] - 2024-07-26
+### Changed
+- Security fix for the `setuptools` dev dependencies
+
+
 ## [1.0.0] - 2024-07-03
 ### Added
 - Cross region replication of existing DAGs S3 bucket objects from primary to secondary during primary stack deployment
@@ -97,7 +102,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial commit with sample readme, code of conduct, and license
 
 
-[unreleased]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v1.0.0...HEAD
+[unreleased]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v0.4.0...v1.0.0
 [0.4.0]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v0.2.4...v0.3.0
