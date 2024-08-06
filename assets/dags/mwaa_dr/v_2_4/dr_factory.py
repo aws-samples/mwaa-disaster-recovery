@@ -317,13 +317,13 @@ class DRFactory_2_4(BaseDRFactory):
 
     def xcom(self, model: DependencyModel[BaseTable]) -> BaseTable:
         """
-        Creates an instance of the BaseTable for the 'task_fail' table.
+        Creates an instance of the BaseTable for the 'xcom' table.
 
         Args:
             model (DependencyModel[BaseTable]): The dependency model for the table.
 
         Returns:
-            BaseTable: An instance of the BaseTable representing the 'task_fail' table.
+            BaseTable: An instance of the BaseTable representing the 'xcom' table.
         """
         return BaseTable(
             name="xcom",
