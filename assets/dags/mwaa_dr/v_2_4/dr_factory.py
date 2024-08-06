@@ -82,7 +82,7 @@ class DRFactory_2_4(BaseDRFactory):
             trigger,
             task_instance,
             task_fail,
-            xcom
+            xcom,
         ]
 
         return [
@@ -96,7 +96,7 @@ class DRFactory_2_4(BaseDRFactory):
             task_instance,
             task_fail,
             active_dag,
-            xcom
+            xcom,
         ]
 
     def active_dag(self, model: DependencyModel[BaseTable]) -> BaseTable:
@@ -180,7 +180,6 @@ class DRFactory_2_4(BaseDRFactory):
                 "run_type",
                 "start_date",
                 "state",
-                "updated_at",
             ],
             export_mappings={"conf": "'\\x' || encode(conf,'hex') as conf"},
             storage_type=self.storage_type,
@@ -198,6 +197,7 @@ class DRFactory_2_4(BaseDRFactory):
         Returns:
             BaseTable: An instance of the BaseTable representing the 'task_instance' table.
         """
+
         return BaseTable(
             name="task_instance",
             model=model,
@@ -228,7 +228,7 @@ class DRFactory_2_4(BaseDRFactory):
                 "trigger_id",
                 "trigger_timeout",
                 "try_number",
-                "unixname"
+                "unixname",
             ],
             export_mappings={
                 "executor_config": "'\\x' || encode(executor_config,'hex') as executor_config"
@@ -269,6 +269,7 @@ class DRFactory_2_4(BaseDRFactory):
         Returns:
             BaseTable: An instance of the BaseTable representing the 'log' table.
         """
+
         return BaseTable(
             name="log",
             model=model,
@@ -328,14 +329,16 @@ class DRFactory_2_4(BaseDRFactory):
             name="xcom",
             model=model,
             columns=[
-                "id",
+                "dag_run_id",
                 "key",
-                "value",
-                "timestamp",
-                "execution_date",
+                "map_index",
                 "task_id",
                 "dag_id",
+                "run_id",
+                "timestamp",
+                "value",
             ],
+            export_mappings={"value": "'\\x' || encode(value,'hex') as value"},
             storage_type=self.storage_type,
             path_prefix=self.path_prefix,
             batch_size=self.batch_size,

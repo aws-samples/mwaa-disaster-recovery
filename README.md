@@ -803,6 +803,10 @@ The stack deployment triggers a StepFunctions workflow that replicates existing 
 The [contributing guide](contributing.md) explains the process of forking the project before creating a pull request. After you have cloned your forked repository locally and made some code changes, please ensure that you have run the following commands supplied in [build.sh](build.sh) script as follows:
 
 ```bash
+python3 -m venv venv # Create venv
+source ./venv/bin/activate # Activate venv
+python3 -m pip install -r requirements.txt # Install requirements.txt
+python3 -m pip install -r requirements-dev.txt # Install requirements-dev.txt
 ./build.sh lint # To run linting
 ./build.sh unit # To run unit tests
 ```
