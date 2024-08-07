@@ -20,7 +20,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 from sure import expect
 
-from tests.unit.mwaa_dr.v_2_5.test_dr_factory_2_5 import check_base_table
+from tests.unit.mwaa_dr.v_2_4.test_dr_factory_2_4 import check_base_table
 from mwaa_dr.v_2_8.dr_factory import DRFactory_2_8
 
 

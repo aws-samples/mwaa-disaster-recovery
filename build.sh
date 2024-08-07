@@ -17,8 +17,9 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 '
 
-versions=("2_5" "2_6" "2_7" "2_8")
+versions=("2_4" "2_5" "2_6" "2_7" "2_8")
 
+v_2_4="2.4.3"
 v_2_5="2.5.1"
 v_2_6="2.6.3"
 v_2_7="2.7.2"
@@ -151,7 +152,7 @@ start_mwaa() {
     cp -r ../tests/integration/data/v_$version/* ./dags/data
 
     DOCKER_COMPOSE_PROJECT_NAME=aws-mwaa-local-runner-$version
-    docker-compose -p $DOCKER_COMPOSE_PROJECT_NAME -f ./docker/docker-compose-local.yml up -d --wait
+    docker-compose -p $DOCKER_COMPOSE_PROJECT_NAME -f ./docker/docker-compose-local.yml up -d
 }
 
 

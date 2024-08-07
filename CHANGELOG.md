@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.2] - 2024-08-07
+### Changed
+- Add MWAA 2.4.3 support
+- Backup and restore of `XCOM` table
+
 ## [1.0.1] - 2024-07-26
 ### Changed
 - Security fix for the `setuptools` dev dependencies
