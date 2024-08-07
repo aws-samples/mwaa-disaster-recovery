@@ -111,7 +111,7 @@ class TestDRFactory_2_4:
                 "run_id",
                 "run_type",
                 "start_date",
-                "state"
+                "state",
             ],
             expected_mappings={"conf": "'\\x' || encode(conf,'hex') as conf"},
         )
@@ -149,7 +149,7 @@ class TestDRFactory_2_4:
                 "trigger_id",
                 "trigger_timeout",
                 "try_number",
-                "unixname"
+                "unixname",
             ],
             expected_mappings={
                 "executor_config": "'\\x' || encode(executor_config,'hex') as executor_config"
@@ -240,10 +240,17 @@ class TestDRFactory_2_4:
             factory=factory,
             actual_table=factory.xcom(factory.model),
             expected_name="xcom",
-            expected_columns=["dag_run_id", "key", "map_index", "task_id", "dag_id", "run_id", "timestamp", "value"],
-            expected_mappings={
-                "value": "'\\x' || encode(value,'hex') as value"
-            },
+            expected_columns=[
+                "dag_run_id",
+                "key",
+                "map_index",
+                "task_id",
+                "dag_id",
+                "run_id",
+                "timestamp",
+                "value",
+            ],
+            expected_mappings={"value": "'\\x' || encode(value,'hex') as value"},
         )
 
     def test_setup_tables(self):
@@ -290,7 +297,7 @@ class TestDRFactory_2_4:
                 task_instance,
                 task_fail,
                 active_dag,
-                xcom
+                xcom,
             ]
         )
 
@@ -381,7 +388,7 @@ class TestDRFactory_2_4:
                 task_instance,
                 task_fail,
                 active_dag,
-                xcom
+                xcom,
             }
 
             expect(setup.downstream_task_ids).to.equal({t.task_id for t in table_tasks})
@@ -431,8 +438,7 @@ class TestDRFactory_2_4:
                 job.task_id,
                 dag_run.task_id,
                 trigger.task_id,
-                xcom.task_id
-
+                xcom.task_id,
             }
         )
         expect(active_dag.upstream_task_ids).to.equal(
@@ -446,7 +452,7 @@ class TestDRFactory_2_4:
                 trigger.task_id,
                 task_instance.task_id,
                 task_fail.task_id,
-                xcom.task_id
+                xcom.task_id,
             }
         )
         expect(task_instance.upstream_task_ids).to.equal(

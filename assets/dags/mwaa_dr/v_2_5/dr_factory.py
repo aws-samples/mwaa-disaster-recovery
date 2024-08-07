@@ -20,7 +20,6 @@ from mwaa_dr.framework.model.dependency_model import DependencyModel
 from mwaa_dr.v_2_4.dr_factory import DRFactory_2_4
 
 
-
 class DRFactory_2_5(DRFactory_2_4):
     """
     A factory class for creating and managing database tables and their dependencies
