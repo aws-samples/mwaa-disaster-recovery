@@ -2,7 +2,7 @@
 <!-- TOC ignore:true -->
 # MWAA Disaster Recovery
 
-![MWAA](https://img.shields.io/badge/MWAA-2.8.1_|_2.7.2_|_2.6.3_|_2.5.1-blue)
+![MWAA](https://img.shields.io/badge/MWAA-2.8.1_|_2.7.2_|_2.6.3_|_2.5.1|_2.4.3-blue)
 ![CDK](https://img.shields.io/badge/CDK-Python-orange)
 ![Python](https://img.shields.io/badge/Python-3.7+-blue)
 [![Black](https://img.shields.io/badge/Code%20Style-Black-000000.svg)](https://github.com/psf/black)
@@ -81,6 +81,7 @@ This solution is a part of an AWS blog series on MWAA Disaster Recovery. Please 
 > - **2.7.2**
 > - **2.6.3**
 > - **2.5.1**
+> - **2.4.3**
 
 # Architecture
 
