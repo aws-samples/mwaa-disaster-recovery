@@ -828,6 +828,6 @@ git clone https://github.com/aws/aws-mwaa-local-runner.git
 > - Make sure port 8080 is not used by another process.
 > - Check the container startup progress with docker ps.
 > - After the aws-mwaaa-local-runner container is up and healthy, you can access Airflow by navigating to http://localhost:8080
-> - User as username admin and password test.
+> - Username/password: admin/test
 
 Please also review the [Using the Metadata Backup and Restore DAGs Independently](#using-the-metadata-backup-and-restore-dags-independently) section on how to run the backup and restore locally for testing the `mwaa_dr` framework.
