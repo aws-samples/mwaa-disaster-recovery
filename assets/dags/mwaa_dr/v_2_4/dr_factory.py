@@ -29,8 +29,8 @@ class DRFactory_2_4(BaseDRFactory):
     for the Airflow 2.4.1 version.
 
     This class inherits from the `BaseDRFactory` class and is responsible for setting up
-    the necessary tables and their relationships based on the Airflow 2.4.1 database
-    schema: https://airflow.apache.org/docs/apache-airflow/2.4.1/database-erd-ref.html.
+    the necessary tables and their relationships based on the Airflow 2.4.3 database
+    schema: https://airflow.apache.org/docs/apache-airflow/2.4.3/database-erd-ref.html.
 
     Args:
         dag_id (str): The ID of the DAG.
@@ -47,7 +47,7 @@ class DRFactory_2_4(BaseDRFactory):
 
     def setup_tables(self, model: DependencyModel[BaseTable]) -> list[BaseTable]:
         """
-        Sets up the necessary tables and their dependencies based on the Airflow 2.5.1 database schema.
+        Sets up the necessary tables and their dependencies based on the Airflow 2.4.3 database schema.
 
         Args:
             model (DependencyModel[BaseTable]): The dependency model for the tables.
