@@ -823,7 +823,7 @@ git clone https://github.com/aws/aws-mwaa-local-runner.git
 ./build.sh setup <VERSION>
 ```
 > [!IMPORTANT]
-> - You will need to have [Docker](https://www.docker.com/) running for the integration test to work.
+> - You will need to have [Docker](https://www.docker.com/) running for both unit and integration tests to work.
 > - You may need to enable [Windows Subsystem for Linux](https://blogs.windows.com/windowsdeveloper/2016/03/30/run-bash-on-ubuntu-on-windows/) to run the build scripts in a Windows OS.
 > - Make sure port 8080 is not used by another process.
 > - View the container startup with the docker logs command.
