@@ -72,6 +72,7 @@ class DRFactory_2_4(BaseDRFactory):
 
         task_instance << [job, trigger, dag_run]
         task_fail << [task_instance, dag_run]
+        xcom << [task_instance, dag_run]
         active_dag << [
             variable,
             connection,
