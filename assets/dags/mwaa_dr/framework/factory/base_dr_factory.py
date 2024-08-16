@@ -334,12 +334,24 @@ class BaseDRFactory(ABC):
         )
 
         with TaskGroup(group_id="export_tables", dag=dag) as export_tables_t:
+            export_tasks = {}
             for table in self.tables():
-                PythonOperator(
-                    task_id=f"export_{table.name}s",
-                    python_callable=table.backup,
-                    dag=dag,
-                )
+                if table.name != "xcom":
+                    export_task = PythonOperator(
+                        task_id=f"export_{table.name}s",
+                        python_callable=table.backup,
+                        dag=dag,
+                    )
+                    export_tasks[table.name] = export_task
+
+            xcom_task = PythonOperator(
+                task_id="export_xcom",
+                python_callable=[
+                    table.backup for table in self.tables() if table.name == "xcom"
+                ][0],
+                dag=dag,
+            )
+            xcom_task >> export_tasks["task_instance"]
 
         teardown_t = PythonOperator(
             task_id="teardown", python_callable=self.teardown_backup, dag=dag
