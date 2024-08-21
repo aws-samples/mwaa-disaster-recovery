@@ -7,7 +7,7 @@
 | assets/dags/mwaa\_dr/\_\_init\_\_.py                            |        0 |        0 |        0 |        0 |     100% |           |
 | assets/dags/mwaa\_dr/framework/\_\_init\_\_.py                  |        0 |        0 |        0 |        0 |     100% |           |
 | assets/dags/mwaa\_dr/framework/factory/\_\_init\_\_.py          |        0 |        0 |        0 |        0 |     100% |           |
-| assets/dags/mwaa\_dr/framework/factory/base\_dr\_factory.py     |      173 |        0 |       44 |        0 |     100% |           |
+| assets/dags/mwaa\_dr/framework/factory/base\_dr\_factory.py     |      178 |        0 |       46 |        0 |     100% |           |
 | assets/dags/mwaa\_dr/framework/factory/default\_dag\_factory.py |       23 |        0 |        2 |        0 |     100% |           |
 | assets/dags/mwaa\_dr/framework/model/\_\_init\_\_.py            |        0 |        0 |        0 |        0 |     100% |           |
 | assets/dags/mwaa\_dr/framework/model/active\_dag\_table.py      |       32 |        0 |        8 |        0 |     100% |           |
@@ -15,15 +15,17 @@
 | assets/dags/mwaa\_dr/framework/model/connection\_table.py       |       50 |        0 |       22 |        0 |     100% |           |
 | assets/dags/mwaa\_dr/framework/model/dependency\_model.py       |       61 |        0 |       28 |        0 |     100% |           |
 | assets/dags/mwaa\_dr/framework/model/variable\_table.py         |       44 |        0 |       18 |        0 |     100% |           |
+| assets/dags/mwaa\_dr/v\_2\_4/\_\_init\_\_.py                    |        0 |        0 |        0 |        0 |     100% |           |
+| assets/dags/mwaa\_dr/v\_2\_4/dr\_factory.py                     |       46 |        0 |        0 |        0 |     100% |           |
 | assets/dags/mwaa\_dr/v\_2\_5/\_\_init\_\_.py                    |        0 |        0 |        0 |        0 |     100% |           |
-| assets/dags/mwaa\_dr/v\_2\_5/dr\_factory.py                     |       42 |        0 |        0 |        0 |     100% |           |
+| assets/dags/mwaa\_dr/v\_2\_5/dr\_factory.py                     |        6 |        0 |        0 |        0 |     100% |           |
 | assets/dags/mwaa\_dr/v\_2\_6/\_\_init\_\_.py                    |        0 |        0 |        0 |        0 |     100% |           |
 | assets/dags/mwaa\_dr/v\_2\_6/dr\_factory.py                     |        2 |        0 |        0 |        0 |     100% |           |
 | assets/dags/mwaa\_dr/v\_2\_7/\_\_init\_\_.py                    |        0 |        0 |        0 |        0 |     100% |           |
 | assets/dags/mwaa\_dr/v\_2\_7/dr\_factory.py                     |        8 |        0 |        0 |        0 |     100% |           |
 | assets/dags/mwaa\_dr/v\_2\_8/\_\_init\_\_.py                    |        0 |        0 |        0 |        0 |     100% |           |
 | assets/dags/mwaa\_dr/v\_2\_8/dr\_factory.py                     |        8 |        0 |        0 |        0 |     100% |           |
-| config.py                                                       |      204 |        0 |       94 |        0 |     100% |           |
+| config.py                                                       |      205 |        0 |       94 |        0 |     100% |           |
 | lib/\_\_init\_\_.py                                             |        0 |        0 |        0 |        0 |     100% |           |
 | lib/dr\_constructs/\_\_init\_\_.py                              |        0 |        0 |        0 |        0 |     100% |           |
 | lib/dr\_constructs/airflow\_cli.py                              |       35 |        0 |        5 |        0 |     100% |           |
@@ -40,7 +42,7 @@
 | lib/stacks/mwaa\_base\_stack.py                                 |       39 |        0 |       10 |        0 |     100% |           |
 | lib/stacks/mwaa\_primary\_stack.py                              |      144 |        0 |       12 |        0 |     100% |           |
 | lib/stacks/mwaa\_secondary\_stack.py                            |      163 |        0 |       14 |        0 |     100% |           |
-|                                                       **TOTAL** | **1462** |    **0** |  **354** |    **0** | **100%** |           |
+|                                                       **TOTAL** | **1478** |    **0** |  **356** |    **0** | **100%** |           |
 
 
 ## Setup coverage badge
