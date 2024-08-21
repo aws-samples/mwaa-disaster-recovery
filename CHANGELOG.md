@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.1] - 2024-08-21
+### Changed
+- Updates to the `README` and `PYPIDOC`
+- Depedendency upgrades
+- Updates to PR workflow to skip publishing to `testpypi` from a fork
+
 ## [2.0.0] - 2024-08-21
 ### Added
 - Support for MWAA 2.4.3
@@ -114,7 +120,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial commit with sample readme, code of conduct, and license
 
 
-[unreleased]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v2.0.0...HEAD
+[unreleased]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v2.0.1...HEAD
+[2.0.1]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v1.0.1...v2.0.0
 [1.0.1]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v0.4.0...v1.0.0
