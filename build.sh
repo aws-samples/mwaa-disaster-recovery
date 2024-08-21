@@ -74,7 +74,9 @@ unit_test() {
     rm -rf coverage
     mkdir -p coverage
     coverage run -m pytest $path && coverage report -m
+    result=$?
     find . | grep -E "(/__pycache__$|\.pyc$|\.pyo$|\.DS_Store$)" | xargs rm -rf
+    return $result
 }
 
 

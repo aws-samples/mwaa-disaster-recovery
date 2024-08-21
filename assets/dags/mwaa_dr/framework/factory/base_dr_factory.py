@@ -345,7 +345,7 @@ class BaseDRFactory(ABC):
                     export_tasks[table.name] = export_task
 
             xcom_task = PythonOperator(
-                task_id="export_xcom",
+                task_id="export_xcoms",
                 python_callable=[
                     table.backup for table in self.tables() if table.name == "xcom"
                 ][0],

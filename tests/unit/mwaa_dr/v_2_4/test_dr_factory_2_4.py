@@ -377,7 +377,7 @@ class TestDRFactory_2_4:
                 model.search("name", "xcom").backup.__qualname__
             )
 
-            table_tasks = {
+            down_stream_tasks = {
                 variable,
                 connection,
                 slot_pool,
@@ -385,16 +385,32 @@ class TestDRFactory_2_4:
                 job,
                 dag_run,
                 trigger,
-                task_instance,
                 task_fail,
                 active_dag,
                 xcom,
             }
 
-            expect(setup.downstream_task_ids).to.equal({t.task_id for t in table_tasks})
-            expect(teardown.upstream_task_ids).to.equal(
-                {t.task_id for t in table_tasks}
+            expect(setup.downstream_task_ids).to.equal(
+                {t.task_id for t in down_stream_tasks}
             )
+
+            up_stream_tasks = {
+                variable,
+                connection,
+                slot_pool,
+                log,
+                job,
+                dag_run,
+                trigger,
+                task_fail,
+                active_dag,
+                task_instance,
+            }
+            expect(teardown.upstream_task_ids).to.equal(
+                {t.task_id for t in up_stream_tasks}
+            )
+
+            expect(xcom.downstream_task_ids).to.equal({task_instance.task_id})
 
     def test_base_dr_factory_create_restore_dag(self):
         factory = DRFactory_2_4("metadata_restore")
@@ -431,34 +447,39 @@ class TestDRFactory_2_4:
         expect(setup.downstream_task_ids).to.equal({restore_start.task_id})
         expect(restore_start.downstream_task_ids).to.equal(
             {
-                variable.task_id,
                 connection.task_id,
-                slot_pool.task_id,
                 log.task_id,
-                job.task_id,
                 dag_run.task_id,
+                job.task_id,
                 trigger.task_id,
-                xcom.task_id,
+                slot_pool.task_id,
+                variable.task_id,
             }
         )
         expect(active_dag.upstream_task_ids).to.equal(
             {
-                variable.task_id,
                 connection.task_id,
-                slot_pool.task_id,
                 log.task_id,
-                job.task_id,
                 dag_run.task_id,
-                trigger.task_id,
-                task_instance.task_id,
-                task_fail.task_id,
                 xcom.task_id,
+                job.task_id,
+                task_fail.task_id,
+                task_instance.task_id,
+                trigger.task_id,
+                slot_pool.task_id,
+                variable.task_id,
             }
         )
         expect(task_instance.upstream_task_ids).to.equal(
             {job.task_id, dag_run.task_id, trigger.task_id}
         )
         expect(task_fail.upstream_task_ids).to.equal(
+            {
+                dag_run.task_id,
+                task_instance.task_id,
+            }
+        )
+        expect(xcom.upstream_task_ids).to.equal(
             {
                 dag_run.task_id,
                 task_instance.task_id,

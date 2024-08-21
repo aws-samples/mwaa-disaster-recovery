@@ -383,8 +383,8 @@ class TestBaseTable:
         expect(mock_smart_open.call_count).to.equal(1)
 
         data = (
-            "dag_id_1,executor_config_1,state_1\r\n"
-            + "dag_id_2,executor_config_2,state_2\r\n"
+            "dag_id_1|executor_config_1|state_1\r\n"
+            + "dag_id_2|executor_config_2|state_2\r\n"
         )
         expect(self.backup_data).to.equal(data)
 
@@ -402,8 +402,8 @@ class TestBaseTable:
         expect(mock_builtins_open.call_count).to.equal(1)
 
         data = (
-            "dag_id_1,executor_config_1,state_1\r\n"
-            + "dag_id_2,executor_config_2,state_2\r\n"
+            "dag_id_1|executor_config_1|state_1\r\n"
+            + "dag_id_2|executor_config_2|state_2\r\n"
         )
         expect(self.backup_data).to.equal(data)
 
@@ -472,7 +472,7 @@ class TestBaseTable:
             expect(task_instance.read.call_count).to.equal(1)
             expect(task_instance.read.call_args[0][0]).to.equal(mock_context)
             mock_sql_raw_connection.return_value.cursor.return_value.copy_expert.assert_called_with(
-                "COPY task_instance (dag_id, state) FROM STDIN WITH (FORMAT CSV, HEADER FALSE)",
+                "COPY task_instance (dag_id, state) FROM STDIN WITH (FORMAT CSV, HEADER FALSE, DELIMITER '|')",
                 store,
             )
             mock_sql_raw_connection.return_value.commit.assert_called_once()
@@ -489,7 +489,8 @@ class TestBaseTable:
             expect(task_instance.read.call_count).to.equal(1)
             expect(task_instance.read.call_args[0][0]).to.equal(mock_context)
             mock_sql_raw_connection.return_value.cursor.return_value.copy_expert.assert_called_with(
-                "COPY task_instance FROM STDIN WITH (FORMAT CSV, HEADER FALSE)", store
+                "COPY task_instance FROM STDIN WITH (FORMAT CSV, HEADER FALSE, DELIMITER '|')",
+                store,
             )
             mock_sql_raw_connection.return_value.commit.assert_called_once()
             mock_sql_raw_connection.return_value.close.assert_called_once()
