@@ -2,7 +2,7 @@
 <!-- TOC ignore:true -->
 # MWAA Disaster Recovery
 
-![MWAA](https://img.shields.io/badge/MWAA-2.8.1_|_2.7.2_|_2.6.3_|_2.5.1-blue)
+![MWAA](https://img.shields.io/badge/MWAA-2.8.1_|_2.7.2_|_2.6.3_|_2.5.1_|_2.4.3-blue)
 ![CDK](https://img.shields.io/badge/CDK-Python-orange)
 ![Python](https://img.shields.io/badge/Python-3.7+-blue)
 [![Black](https://img.shields.io/badge/Code%20Style-Black-000000.svg)](https://github.com/psf/black)
@@ -81,6 +81,7 @@ This solution is a part of an AWS blog series on MWAA Disaster Recovery. Please 
 > - **2.7.2**
 > - **2.6.3**
 > - **2.5.1**
+> - **2.4.3**
 
 # Architecture
 
@@ -323,7 +324,7 @@ Here are the required parameters that applies to both primary and secondary regi
 | `AWS_ACCOUNT_ID` | `111222333444` | Your AWS account id. |
 | `DR_TYPE` | `BACKUP_RESTORE`, `WARM_STANDBY` | The disaster recovery strategy to be deployed. |
 | `MWAA_UPDATE_EXECUTION_ROLE` | `YES` or `NO` | Flag to denote whether to update the existing MWAA execution role with new policies for allowing task token return calls from the StepFunctions workflow in the secondary stack. See the [Automated Updates to the Execution Role](#automated-updates-to-the-execution-role) for details. |
-| `MWAA_VERSION` | `2.5.1`, `2.6.3`, `2.7.2` | The deployed version of MWAA. |
+| `MWAA_VERSION` | `2.4.3`, `2.5.1`, `2.6.3`, `2.7.2`, `2.8.1` | The deployed version of MWAA. |
 | `PRIMARY_DAGS_BUCKET_NAME` | `mwaa-2-5-1-primary-bucket` | The name of the DAGs S3 bucket used by the environment in the primary region. |
 | `PRIMARY_MWAA_ENVIRONMENT_NAME` | `mwaa-2-5-1-primary` | The name of the MWAA environment in the primary region. |
 | `PRIMARY_MWAA_ROLE_ARN` | `arn:aws:...:role/service-role/primary-role` | The ARN of the execution role used by the primary MWAA environment. |
@@ -802,14 +803,32 @@ The stack deployment triggers a StepFunctions workflow that replicates existing 
 
 The [contributing guide](contributing.md) explains the process of forking the project before creating a pull request. After you have cloned your forked repository locally and made some code changes, please ensure that you have run the following commands supplied in [build.sh](build.sh) script as follows:
 
+## Lint and unit tests
+
 ```bash
+python3 -m venv venv # Create venv
+source ./venv/bin/activate # Activate venv
+pip install -r requirements.txt # Install requirements.txt
+pip install -r requirements-dev.txt # Install requirements-dev.txt
 ./build.sh lint # To run linting
 ./build.sh unit # To run unit tests
 ```
+Please ensure that the code coverage has not decreased after your changes before creating a pull request.
 
+
+## Integration tests
+Please clone the `aws-mwaa-local-runner` repository with:
+```bash
+git clone https://github.com/aws/aws-mwaa-local-runner.git
+./build.sh setup <VERSION>
+```
 > [!IMPORTANT]
-> - You will need to have [Docker](https://www.docker.com/) running for the unit test to work.
+> - You will need to have [Docker](https://www.docker.com/) running for both unit and integration tests to work.
 > - You may need to enable [Windows Subsystem for Linux](https://blogs.windows.com/windowsdeveloper/2016/03/30/run-bash-on-ubuntu-on-windows/) to run the build scripts in a Windows OS.
-> - Please ensure that the code coverage has not decreased after your changes before creating a pull request.
+> - Make sure port 8080 is not used by another process.
+> - View the container startup with the docker logs command.
+> - Monitor the containers with docker ps.
+> - After the aws-mwaaa-local-runner container is up and healthy, you can access Airflow by navigating to http://localhost:8080.
+> - Username/password: admin/test
 
 Please also review the [Using the Metadata Backup and Restore DAGs Independently](#using-the-metadata-backup-and-restore-dags-independently) section on how to run the backup and restore locally for testing the `mwaa_dr` framework.

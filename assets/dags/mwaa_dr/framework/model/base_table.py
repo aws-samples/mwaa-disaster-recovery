@@ -328,7 +328,7 @@ class BaseTable:
                 chunk = result.fetchmany(self.batch_size)
                 while chunk:
                     buffer = StringIO("")
-                    writer = csv.writer(buffer)
+                    writer = csv.writer(buffer, delimiter="|")
                     writer.writerows(chunk)
                     store.write(buffer.getvalue().encode("utf8"))
                     chunk = result.fetchmany(self.batch_size)
@@ -349,9 +349,9 @@ class BaseTable:
 
         restore_sql = ""
         if self.columns:
-            restore_sql = f'COPY {self.name} ({", ".join(self.columns)}) FROM STDIN WITH (FORMAT CSV, HEADER FALSE)'
+            restore_sql = f"COPY {self.name} ({', '.join(self.columns)}) FROM STDIN WITH (FORMAT CSV, HEADER FALSE, DELIMITER '|')"
         else:
-            restore_sql = f"COPY {self.name} FROM STDIN WITH (FORMAT CSV, HEADER FALSE)"
+            restore_sql = f"COPY {self.name} FROM STDIN WITH (FORMAT CSV, HEADER FALSE, DELIMITER '|')"
         print(f"Restore SQL: {restore_sql}")
 
         conn = settings.engine.raw_connection()

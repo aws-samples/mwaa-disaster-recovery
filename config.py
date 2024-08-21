@@ -25,6 +25,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# Suported MWAA versions
+SUPPORTED_MWAA_VERSIONS = ["2.4.3", "2.5.1", "2.6.3", "2.7.2", "2.8.1"]
+
 # DR Option
 DR_BACKUP_RESTORE = "BACKUP_RESTORE"
 DR_WARM_STANDBY = "WARM_STANDBY"
@@ -184,7 +187,7 @@ class Config:
     @property
     def mwaa_version(self) -> str:
         version = self.get(MWAA_VERSION)
-        if version not in ["2.5.1", "2.6.3", "2.7.2", "2.8.1"]:
+        if version not in SUPPORTED_MWAA_VERSIONS:
             raise ValueError(f"The MWAA version, {version}, is not supported!")
         return version
 

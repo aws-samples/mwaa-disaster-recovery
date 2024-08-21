@@ -26,7 +26,12 @@ kwargs = {
 airflow_version = version.version
 
 factory = None
-if airflow_version.startswith("2.5"):
+if airflow_version.startswith("2.4"):
+    from mwaa_dr.v_2_4.dr_factory import DRFactory_2_4
+
+    factory = DRFactory_2_4(**kwargs)
+
+elif airflow_version.startswith("2.5"):
     from mwaa_dr.v_2_5.dr_factory import DRFactory_2_5
 
     factory = DRFactory_2_5(**kwargs)

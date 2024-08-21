@@ -154,7 +154,7 @@ class TestConfig:
             expect(config.mwaa_version).to.equal(version)
 
     def test_mwaa_version_unsupported(backup_restore_env_vars):
-        os.environ["MWAA_VERSION"] = "2.4.3"
+        os.environ["MWAA_VERSION"] = "2.2.2"
         config = Config()
 
         with pytest.raises(ValueError) as exception:

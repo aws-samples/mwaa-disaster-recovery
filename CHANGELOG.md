@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.0] - 2024-08-21
+### Added
+- Support for MWAA 2.4.3
+- Backup and restore of `XCOM` table
+- Added `.airflowignore` in the [mwaa_dr](assets/dags/mwaa_dr/) to optimize DAG parsing
+
+### Changed
+- Updated csv delimeter in in the backup and restore scripts from `,` to `|`
+- Replaced the `cp -au` command with `rsync -au` for lambda function asset bundling
+- Updated unit test script in [build.sh](build.sh) to appropriately report test failure in the build pipeline
+
+
 ## [1.0.1] - 2024-07-26
 ### Changed
 - Security fix for the `setuptools` dev dependencies
@@ -102,7 +114,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial commit with sample readme, code of conduct, and license
 
 
-[unreleased]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v1.0.1...HEAD
+[unreleased]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v1.0.1...v2.0.0
 [1.0.1]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v0.4.0...v1.0.0
 [0.4.0]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v0.3.0...v0.4.0
