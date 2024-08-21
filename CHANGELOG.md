@@ -7,10 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.0.2] - 2024-08-07
-### Changed
-- Add MWAA 2.4.3 support
+## [2.0.0] - 2024-08-21
+### Added
+- Support for MWAA 2.4.3
 - Backup and restore of `XCOM` table
+
+### Changed
+- Replaced the `cp -au` command with `rsync -au` for lambda function asset bundling
+- Updated csv delimeter in in the backup and restore scripts from `,` to `|`
+
 
 ## [1.0.1] - 2024-07-26
 ### Changed

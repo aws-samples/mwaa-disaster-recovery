@@ -393,7 +393,7 @@ class MwaaSecondaryStack(MwaaBaseStack):
                     command=[
                         "bash",
                         "-c",
-                        "pip install --no-cache -r requirements.txt -t /asset-output && cp -au . /asset-output",
+                        "pip install --no-cache -r requirements.txt -t /asset-output && rsync -au . /asset-output",
                     ],
                 ),
             ),
@@ -446,7 +446,7 @@ class MwaaSecondaryStack(MwaaBaseStack):
                     command=[
                         "bash",
                         "-c",
-                        "pip install --no-cache -r requirements.txt -t /asset-output && cp -au . /asset-output",
+                        "pip install --no-cache -r requirements.txt -t /asset-output && rsync -au . /asset-output",
                     ],
                 ),
             ),
@@ -571,7 +571,7 @@ class MwaaSecondaryStack(MwaaBaseStack):
                     command=[
                         "bash",
                         "-c",
-                        "pip install --no-cache -r requirements.txt -t /asset-output && cp -au . /asset-output",
+                        "pip install --no-cache -r requirements.txt -t /asset-output && rsync -au . /asset-output",
                     ],
                 ),
             ),
@@ -704,7 +704,7 @@ class MwaaSecondaryStack(MwaaBaseStack):
                     command=[
                         "bash",
                         "-c",
-                        "pip install --no-cache -r requirements.txt -t /asset-output && cp -au . /asset-output",
+                        "pip install --no-cache -r requirements.txt -t /asset-output && rsync -au . /asset-output",
                     ],
                 ),
             ),
@@ -737,7 +737,7 @@ class MwaaSecondaryStack(MwaaBaseStack):
                     command=[
                         "bash",
                         "-c",
-                        "pip install --no-cache -r requirements.txt -t /asset-output && cp -au . /asset-output",
+                        "pip install --no-cache -r requirements.txt -t /asset-output && rsync -au . /asset-output",
                     ],
                 ),
             ),

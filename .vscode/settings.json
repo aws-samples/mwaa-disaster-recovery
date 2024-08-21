@@ -2,5 +2,6 @@
     "python.analysis.extraPaths": [
         "./assets/dags",
         "./lib/functions"
-    ]
+    ],
+    "python.envFile": "${workspaceFolder}/.env.none"
 }
