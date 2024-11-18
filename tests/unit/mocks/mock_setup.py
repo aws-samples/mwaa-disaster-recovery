@@ -41,12 +41,12 @@ def aws_credentials():
 
 @pytest.fixture(scope="function")
 def warm_standby_env_vars():
-    os.environ["STACK_NAME_PREFIX"] = "mwaa-2-8-1-public"
+    os.environ["STACK_NAME_PREFIX"] = "mwaa-2-10-1-public"
 
     os.environ["AWS_ACCOUNT_ID"] = "123456789999"
     os.environ["DR_TYPE"] = "WARM_STANDBY"
 
-    os.environ["MWAA_VERSION"] = "2.8.1"
+    os.environ["MWAA_VERSION"] = "2.10.1"
     os.environ["MWAA_UPDATE_EXECUTION_ROLE"] = "YES"
     os.environ["MWAA_NOTIFICATION_EMAILS"] = '["abc@example.com"]'
     os.environ["MWAA_SIMULATE_DR"] = "YES"
@@ -54,7 +54,7 @@ def warm_standby_env_vars():
     os.environ["HEALTH_CHECK_ENABLED"] = "YES"
 
     os.environ["PRIMARY_REGION"] = "us-east-1"
-    os.environ["PRIMARY_MWAA_ENVIRONMENT_NAME"] = "mwaa-2-8-1-public-primary"
+    os.environ["PRIMARY_MWAA_ENVIRONMENT_NAME"] = "mwaa-2-10-1-public-primary"
     os.environ["PRIMARY_MWAA_ROLE_ARN"] = (
         "arn:aws:iam::123456789999:role/mwaa-dr-primary-role"
     )
@@ -67,7 +67,7 @@ def warm_standby_env_vars():
     os.environ["PRIMARY_BACKUP_SCHEDULE"] = "0 * * * *"
 
     os.environ["SECONDARY_REGION"] = "us-east-2"
-    os.environ["SECONDARY_MWAA_ENVIRONMENT_NAME"] = "mwaa-2-8-1-public-secondary"
+    os.environ["SECONDARY_MWAA_ENVIRONMENT_NAME"] = "mwaa-2-10-1-public-secondary"
     os.environ["SECONDARY_MWAA_ROLE_ARN"] = (
         "arn:aws:iam::123456789999:role/mwaa-dr-secondary-role"
     )
@@ -85,12 +85,12 @@ def warm_standby_env_vars():
 
 @pytest.fixture(scope="function")
 def backup_restore_env_vars():
-    os.environ["STACK_NAME_PREFIX"] = "mwaa-2-8-1-public"
+    os.environ["STACK_NAME_PREFIX"] = "mwaa-2-10-1-public"
 
     os.environ["AWS_ACCOUNT_ID"] = "123456789999"
     os.environ["DR_TYPE"] = "BACKUP_RESTORE"
 
-    os.environ["MWAA_VERSION"] = "2.8.1"
+    os.environ["MWAA_VERSION"] = "2.10.1"
     os.environ["MWAA_UPDATE_EXECUTION_ROLE"] = "YES"
     os.environ["MWAA_NOTIFICATION_EMAILS"] = '["abc@example.com"]'
     os.environ["MWAA_SIMULATE_DR"] = "YES"
@@ -98,7 +98,7 @@ def backup_restore_env_vars():
     os.environ["HEALTH_CHECK_ENABLED"] = "YES"
 
     os.environ["PRIMARY_REGION"] = "us-east-1"
-    os.environ["PRIMARY_MWAA_ENVIRONMENT_NAME"] = "mwaa-2-8-1-public-primary"
+    os.environ["PRIMARY_MWAA_ENVIRONMENT_NAME"] = "mwaa-2-10-1-public-primary"
     os.environ["PRIMARY_MWAA_ROLE_ARN"] = (
         "arn:aws:iam::123456789999:role/mwaa-dr-primary-role"
     )
@@ -111,7 +111,7 @@ def backup_restore_env_vars():
     os.environ["PRIMARY_BACKUP_SCHEDULE"] = "0 * * * *"
 
     os.environ["SECONDARY_REGION"] = "us-east-2"
-    os.environ["SECONDARY_MWAA_ENVIRONMENT_NAME"] = "mwaa-2-8-1-public-secondary"
+    os.environ["SECONDARY_MWAA_ENVIRONMENT_NAME"] = "mwaa-2-10-1-public-secondary"
     os.environ["SECONDARY_MWAA_ROLE_ARN"] = (
         "arn:aws:iam::123456789999:role/mwaa-dr-secondary-role"
     )

@@ -42,7 +42,7 @@ class TestAirflowCliClient:
         """Test constructor"""
 
         env_name = "test-env"
-        env_version = "2.8.1"
+        env_version = "2.10.1"
         client = AirflowCliClient(
             environment_name=env_name, environment_version=env_version
         )
@@ -56,7 +56,7 @@ class TestAirflowCliClient:
         """Test constructor with config"""
 
         env_name = "test-env"
-        env_version = "2.8.1"
+        env_version = "2.10.1"
         config = AwsConfig(region_name="us-east-1")
         client = AirflowCliClient(
             environment_name=env_name, environment_version=env_version, config=config
@@ -85,7 +85,7 @@ class TestAirflowCliClient:
         from tests.unit.mocks.mock_setup import mwaa_cli_token
 
         client = AirflowCliClient(
-            environment_name="an-env", environment_version="2.8.1"
+            environment_name="an-env", environment_version="2.10.1"
         )
         expect(client.setup()).to.equal(mwaa_cli_token)
 
@@ -96,7 +96,7 @@ class TestAirflowCliClient:
         import json
 
         client = AirflowCliClient(
-            environment_name="an-env", environment_version="2.8.1"
+            environment_name="an-env", environment_version="2.10.1"
         )
         config = {
             "bucket": "my-bucket",
@@ -154,7 +154,7 @@ class TestAirflowCliClient:
         import json
 
         client = AirflowCliClient(
-            environment_name="an-env", environment_version="2.8.1"
+            environment_name="an-env", environment_version="2.10.1"
         )
         config = {
             "bucket": "my-bucket",
@@ -214,7 +214,7 @@ class TestAirflowCliClient:
         import json
 
         client = AirflowCliClient(
-            environment_name="an-env", environment_version="2.8.1"
+            environment_name="an-env", environment_version="2.10.1"
         )
         config = {
             "bucket": "my-bucket",
@@ -271,7 +271,7 @@ class TestAirflowCliClient:
         from tests.unit.mocks.mock_setup import mwaa_cli_token, mwaa_web_server_hostname
 
         client = AirflowCliClient(
-            environment_name="an-env", environment_version="2.8.1"
+            environment_name="an-env", environment_version="2.10.1"
         )
         command = AirflowCliCommand(
             command="dags unpause restore_metadata", result_check="paused: False"
@@ -289,7 +289,7 @@ class TestAirflowCliClient:
     @mock_aws
     def test_execute_all_empty(self, aws_mwaa):
         client = AirflowCliClient(
-            environment_name="an-env", environment_version="2.8.1"
+            environment_name="an-env", environment_version="2.10.1"
         )
 
         command1 = AirflowCliCommand("dags unpause a-dag")
@@ -317,7 +317,7 @@ class TestAirflowCliClient:
     @mock_aws
     def test_unpause_dag(self, aws_mwaa):
         client = AirflowCliClient(
-            environment_name="an-env", environment_version="2.8.1"
+            environment_name="an-env", environment_version="2.10.1"
         )
 
         command = AirflowCliCommand("dags unpause a-dag")
@@ -337,7 +337,7 @@ class TestAirflowCliClient:
     @mock_aws
     def test_unpause_dag_error(self, aws_mwaa):
         client = AirflowCliClient(
-            environment_name="an-env", environment_version="2.8.1"
+            environment_name="an-env", environment_version="2.10.1"
         )
 
         command = AirflowCliCommand("dags unpause a-dag")
@@ -387,7 +387,7 @@ class TestAirflowCliClient:
     @mock_aws
     def test_trigger_dag_v_greater_than_2_5_1(self, aws_mwaa):
         client = AirflowCliClient(
-            environment_name="an-env", environment_version="2.8.1"
+            environment_name="an-env", environment_version="2.10.1"
         )
 
         conf = {

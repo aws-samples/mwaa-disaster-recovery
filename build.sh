@@ -17,13 +17,14 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 '
 
-versions=("2_4" "2_5" "2_6" "2_7" "2_8")
+versions=("2_4" "2_5" "2_6" "2_7" "2_8" "2_10")
 
 v_2_4="2.4.3"
 v_2_5="2.5.1"
 v_2_6="2.6.3"
 v_2_7="2.7.2"
 v_2_8="2.8.1"
+v_2_10="2.10.1"
 
 previous_branch=""
 current_branch=""

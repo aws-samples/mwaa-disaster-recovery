@@ -20,8 +20,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 mwaa_environment_without_tags = {
     "AirflowConfigurationOptions": {},
-    "AirflowVersion": "2.8.1",
-    "Arn": "arn:aws:airflow:us-east-1:123456789999:environment/mwaa-2-8-1-public-primary",
+    "AirflowVersion": "2.10.1",
+    "Arn": "arn:aws:airflow:us-east-1:123456789999:environment/mwaa-2-10-1-public-primary",
     "CeleryExecutorQueue": "arn:aws:sqs:us-east-1:123456789888:airflow-celery-aaaaaaa-bbbb-1111-aa11-1112223334445",
     "CreatedAt": "2024-04-29 00:11:43+00:00",
     "DagS3Path": "dags",
@@ -32,34 +32,34 @@ mwaa_environment_without_tags = {
     "LastUpdate": {"CreatedAt": "2024-04-29 18:09:22+00:00", "Status": "SUCCESS"},
     "LoggingConfiguration": {
         "DagProcessingLogs": {
-            "CloudWatchLogGroupArn": "arn:aws:logs:us-east-1:123456789999:log-group:airflow-mwaa-2-8-1-public-primary-DAGProcessing",
+            "CloudWatchLogGroupArn": "arn:aws:logs:us-east-1:123456789999:log-group:airflow-mwaa-2-10-1-public-primary-DAGProcessing",
             "Enabled": True,
             "LogLevel": "WARNING",
         },
         "SchedulerLogs": {
-            "CloudWatchLogGroupArn": "arn:aws:logs:us-east-1:123456789999:log-group:airflow-mwaa-2-8-1-public-primary-Scheduler",
+            "CloudWatchLogGroupArn": "arn:aws:logs:us-east-1:123456789999:log-group:airflow-mwaa-2-10-1-public-primary-Scheduler",
             "Enabled": True,
             "LogLevel": "WARNING",
         },
         "TaskLogs": {
-            "CloudWatchLogGroupArn": "arn:aws:logs:us-east-1:123456789999:log-group:airflow-mwaa-2-8-1-public-primary-Task",
+            "CloudWatchLogGroupArn": "arn:aws:logs:us-east-1:123456789999:log-group:airflow-mwaa-2-10-1-public-primary-Task",
             "Enabled": True,
             "LogLevel": "INFO",
         },
         "WebserverLogs": {
-            "CloudWatchLogGroupArn": "arn:aws:logs:us-east-1:123456789999:log-group:airflow-mwaa-2-8-1-public-primary-WebServer",
+            "CloudWatchLogGroupArn": "arn:aws:logs:us-east-1:123456789999:log-group:airflow-mwaa-2-10-1-public-primary-WebServer",
             "Enabled": True,
             "LogLevel": "WARNING",
         },
         "WorkerLogs": {
-            "CloudWatchLogGroupArn": "arn:aws:logs:us-east-1:123456789999:log-group:airflow-mwaa-2-8-1-public-primary-Worker",
+            "CloudWatchLogGroupArn": "arn:aws:logs:us-east-1:123456789999:log-group:airflow-mwaa-2-10-1-public-primary-Worker",
             "Enabled": True,
             "LogLevel": "WARNING",
         },
     },
     "MaxWorkers": 10,
     "MinWorkers": 1,
-    "Name": "mwaa-2-8-1-public-primary",
+    "Name": "mwaa-2-10-1-public-primary",
     "NetworkConfiguration": {
         "SecurityGroupIds": ["sg-xxxxxxxxxxxxxxxxxxx", "sg-xxxxxxxxxxxxxxxxxxx"],
         "SubnetIds": ["subnet-xxxxxxxxxxxxxxxxxxx", "subnet-xxxxxxxxxxxxxxxxxxx"],
@@ -78,8 +78,8 @@ mwaa_environment_without_tags = {
 
 mwaa_environment_with_tags = {
     "AirflowConfigurationOptions": {},
-    "AirflowVersion": "2.8.1",
-    "Arn": "arn:aws:airflow:us-east-1:123456789999:environment/mwaa-2-8-1-public-primary",
+    "AirflowVersion": "2.10.1",
+    "Arn": "arn:aws:airflow:us-east-1:123456789999:environment/mwaa-2-10-1-public-primary",
     "CeleryExecutorQueue": "arn:aws:sqs:us-east-1:123456789888:airflow-celery-aaaaaaa-bbbb-1111-aa11-1112223334445",
     "CreatedAt": "2024-04-29 00:11:43+00:00",
     "DagS3Path": "dags",
@@ -90,34 +90,34 @@ mwaa_environment_with_tags = {
     "LastUpdate": {"CreatedAt": "2024-04-29 18:09:22+00:00", "Status": "SUCCESS"},
     "LoggingConfiguration": {
         "DagProcessingLogs": {
-            "CloudWatchLogGroupArn": "arn:aws:logs:us-east-1:123456789999:log-group:airflow-mwaa-2-8-1-public-primary-DAGProcessing",
+            "CloudWatchLogGroupArn": "arn:aws:logs:us-east-1:123456789999:log-group:airflow-mwaa-2-10-1-public-primary-DAGProcessing",
             "Enabled": True,
             "LogLevel": "WARNING",
         },
         "SchedulerLogs": {
-            "CloudWatchLogGroupArn": "arn:aws:logs:us-east-1:123456789999:log-group:airflow-mwaa-2-8-1-public-primary-Scheduler",
+            "CloudWatchLogGroupArn": "arn:aws:logs:us-east-1:123456789999:log-group:airflow-mwaa-2-10-1-public-primary-Scheduler",
             "Enabled": True,
             "LogLevel": "WARNING",
         },
         "TaskLogs": {
-            "CloudWatchLogGroupArn": "arn:aws:logs:us-east-1:123456789999:log-group:airflow-mwaa-2-8-1-public-primary-Task",
+            "CloudWatchLogGroupArn": "arn:aws:logs:us-east-1:123456789999:log-group:airflow-mwaa-2-10-1-public-primary-Task",
             "Enabled": True,
             "LogLevel": "INFO",
         },
         "WebserverLogs": {
-            "CloudWatchLogGroupArn": "arn:aws:logs:us-east-1:123456789999:log-group:airflow-mwaa-2-8-1-public-primary-WebServer",
+            "CloudWatchLogGroupArn": "arn:aws:logs:us-east-1:123456789999:log-group:airflow-mwaa-2-10-1-public-primary-WebServer",
             "Enabled": True,
             "LogLevel": "WARNING",
         },
         "WorkerLogs": {
-            "CloudWatchLogGroupArn": "arn:aws:logs:us-east-1:123456789999:log-group:airflow-mwaa-2-8-1-public-primary-Worker",
+            "CloudWatchLogGroupArn": "arn:aws:logs:us-east-1:123456789999:log-group:airflow-mwaa-2-10-1-public-primary-Worker",
             "Enabled": True,
             "LogLevel": "WARNING",
         },
     },
     "MaxWorkers": 10,
     "MinWorkers": 1,
-    "Name": "mwaa-2-8-1-public-primary",
+    "Name": "mwaa-2-10-1-public-primary",
     "NetworkConfiguration": {
         "SecurityGroupIds": ["sg-xxxxxxxxxxxxxxxxxxx", "sg-xxxxxxxxxxxxxxxxxxx"],
         "SubnetIds": ["subnet-xxxxxxxxxxxxxxxxxxx", "subnet-xxxxxxxxxxxxxxxxxxx"],
@@ -150,7 +150,7 @@ create_environment_response = {
         },
         "RetryAttempts": 0,
     },
-    "Arn": "arn:aws:airflow:us-east-2:123456789999:environment/mwaa-2-8-1-public-secondary",
+    "Arn": "arn:aws:airflow:us-east-2:123456789999:environment/mwaa-2-10-1-public-secondary",
 }
 
 get_environment_response = {

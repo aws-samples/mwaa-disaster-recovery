@@ -34,7 +34,7 @@ from airflow_dag_trigger_function import handler
 def test_handler(aws_mwaa):
     event = {
         "mwaa_env_name": "test-env",
-        "mwaa_env_version": "2.8.1",
+        "mwaa_env_version": "2.10.1",
         "dag": "test-dag",
         "bucket": "test-bucket",
         "task_token": "test-sfn-token",
