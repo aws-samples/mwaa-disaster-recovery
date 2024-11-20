@@ -182,7 +182,7 @@ class DRFactory_2_4(BaseDRFactory):
                 "start_date",
                 "state",
             ],
-            export_filter="dag_id != 'backup_metadata'"
+            export_filter="dag_id != 'backup_metadata'",
             export_mappings={"conf": "'\\x' || encode(conf,'hex') as conf"},
             storage_type=self.storage_type,
             path_prefix=self.path_prefix,
