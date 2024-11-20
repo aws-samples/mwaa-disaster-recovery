@@ -355,11 +355,27 @@ class BaseTable:
         print(f"Restore SQL: {restore_sql}")
 
         conn = settings.engine.raw_connection()
+        cursor = None
         try:
             cursor = conn.cursor()
-            cursor.copy_expert(restore_sql, backup_file)
-            conn.commit()
+            insert_counter = 0
+            with backup_file as file:
+                batch = []
+                for line in file:
+                    batch.append(line)
+                    if len(batch) == self.batch_size:
+                        cursor.copy_expert(restore_sql, StringIO("".join(batch)))
+                        conn.commit()
+                        insert_counter += self.batch_size
+                        batch = []
+                if batch:
+                    insert_counter += len(batch)
+                    cursor.copy_expert(restore_sql, StringIO("".join(batch)))
+                    conn.commit()
+            print(f"Inserted {insert_counter} records")
         finally:
+            if cursor:
+                cursor.close()
             conn.close()
             backup_file.close()
 
