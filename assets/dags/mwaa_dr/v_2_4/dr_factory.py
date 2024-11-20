@@ -312,7 +312,7 @@ class DRFactory_2_4(BaseDRFactory):
                 "start_date",
                 "task_id",
             ],
-            export_filter="dag_id != 'backup_metadata'"
+            export_filter="dag_id != 'backup_metadata'",
             storage_type=self.storage_type,
             path_prefix=self.path_prefix,
             batch_size=self.batch_size,
@@ -371,7 +371,7 @@ class DRFactory_2_4(BaseDRFactory):
                 "state",
                 "unixname",
             ],
-            export_filter="dag_id != 'backup_metadata'"
+            export_filter="dag_id != 'backup_metadata'",
             storage_type=self.storage_type,
             path_prefix=self.path_prefix,
             batch_size=self.batch_size,
