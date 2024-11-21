@@ -347,7 +347,6 @@ class BaseTable:
         """
         backup_file = self.read(context)
 
-        restore_sql = ""
         if self.columns:
             restore_sql = f"COPY {self.name} ({', '.join(self.columns)}) FROM STDIN WITH (FORMAT CSV, HEADER FALSE, DELIMITER '|')"
         else:
