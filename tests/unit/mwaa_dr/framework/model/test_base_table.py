@@ -459,6 +459,32 @@ class TestBaseTable:
         with patch.object(table_for_local_fs, "read_from_local", return_value=buffer):
             expect(table_for_local_fs.read(dict())).to.be(buffer)
 
+    def test_restore_cursor_exception(self, mock_context, mock_sql_raw_connection):
+        task_instance = BaseTable(
+            name="task_instance", model=DependencyModel(), columns=["dag_id", "state"]
+        )
+
+        # Create sample data
+        sample_data = "test|running\r\n"
+
+        with (
+            io.StringIO(sample_data) as store,
+            patch.object(task_instance, "read", return_value=store),
+            patch(
+                "mwaa_dr.framework.model.base_table.settings.engine.raw_connection"
+            ) as mock_raw_connection,
+        ):
+            mock_conn = mock_raw_connection.return_value
+            mock_conn.cursor.side_effect = Exception("Cursor creation failed")
+
+            with pytest.raises(Exception, match="Cursor creation failed"):
+                task_instance.restore(**mock_context)
+
+            # Ensure cursor was never created
+            assert mock_conn.cursor.call_count == 1
+            assert mock_conn.commit.call_count == 0
+            assert mock_conn.close.call_count == 1
+
     def test_restore_multi_columns(self, mock_context, mock_sql_raw_connection):
         task_instance = BaseTable(
             name="task_instance", model=DependencyModel(), columns=["dag_id", "state"]
@@ -481,6 +507,37 @@ class TestBaseTable:
             mock_sql_raw_connection.return_value.close.assert_called_once()
 
     def test_restore_batch_size(self, mock_context, mock_sql_raw_connection):
+        task_instance = BaseTable(
+            name="task_instance", model=DependencyModel(), columns=["dag_id", "state"]
+        )
+
+        # Create a large amount of sample data
+        sample_data = (
+            "\r\n".join(
+                [f"dag_id_{i}|state_{i}" for i in range(task_instance.batch_size)]
+            )
+            + "\r\n"
+        )
+
+        with (
+            io.StringIO(sample_data) as store,
+            patch.object(task_instance, "read", return_value=store),
+        ):
+            task_instance.restore(**mock_context)
+            expect(task_instance.read.call_count).to.equal(1)
+            expect(task_instance.read.call_args[0][0]).to.equal(mock_context)
+            call_list_args = (
+                mock_sql_raw_connection.return_value.cursor.return_value.copy_expert.call_args_list
+            )
+            restore_sql_1, string_io_1 = call_list_args[0].args
+            expected_sql = "COPY task_instance (dag_id, state) FROM STDIN WITH (FORMAT CSV, HEADER FALSE, DELIMITER '|')"
+            expect(restore_sql_1).equal(expected_sql)
+            expect(string_io_1.getvalue()).equal(sample_data)
+            mock_sql_raw_connection.return_value.commit.assert_called()
+            expect(mock_sql_raw_connection.return_value.commit.call_count).to.equal(1)
+            mock_sql_raw_connection.return_value.close.assert_called_once()
+
+    def test_restore_more_than_batch_size(self, mock_context, mock_sql_raw_connection):
         task_instance = BaseTable(
             name="task_instance", model=DependencyModel(), columns=["dag_id", "state"]
         )
