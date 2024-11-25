@@ -23,6 +23,7 @@ from typing import Optional
 
 from airflow import settings
 from mwaa_dr.framework.model.dependency_model import DependencyModel
+import itertools
 
 S3 = "S3"
 
@@ -351,7 +352,7 @@ class BaseTable:
             restore_sql = f"COPY {self.name} ({', '.join(self.columns)}) FROM STDIN WITH (FORMAT CSV, HEADER FALSE, DELIMITER '|')"
         else:
             restore_sql = f"COPY {self.name} FROM STDIN WITH (FORMAT CSV, HEADER FALSE, DELIMITER '|')"
-        print(f"Restore SQL: {restore_sql}")
+        print(f"Restoreiter SQL: {restore_sql}")
 
         conn = settings.engine.raw_connection()
         cursor = None
@@ -359,18 +360,13 @@ class BaseTable:
             cursor = conn.cursor()
             insert_counter = 0
             with backup_file as file:
-                batch = []
-                for line in file:
-                    batch.append(line)
-                    if len(batch) == self.batch_size:
-                        cursor.copy_expert(restore_sql, StringIO("".join(batch)))
-                        conn.commit()
-                        insert_counter += self.batch_size
-                        batch = []
-                if batch:
-                    insert_counter += len(batch)
+                while True:
+                    batch = list(itertools.islice(file, self.batch_size))
+                    if not batch:
+                        break
                     cursor.copy_expert(restore_sql, StringIO("".join(batch)))
                     conn.commit()
+                    insert_counter += len(batch)
             print(f"Inserted {insert_counter} records")
         finally:
             if cursor:
