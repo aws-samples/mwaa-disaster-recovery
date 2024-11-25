@@ -352,7 +352,7 @@ class BaseTable:
             restore_sql = f"COPY {self.name} ({', '.join(self.columns)}) FROM STDIN WITH (FORMAT CSV, HEADER FALSE, DELIMITER '|')"
         else:
             restore_sql = f"COPY {self.name} FROM STDIN WITH (FORMAT CSV, HEADER FALSE, DELIMITER '|')"
-        print(f"Restoreiter SQL: {restore_sql}")
+        print(f"Restore SQL: {restore_sql}")
 
         conn = settings.engine.raw_connection()
         cursor = None
