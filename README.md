@@ -2,7 +2,7 @@
 <!-- TOC ignore:true -->
 # MWAA Disaster Recovery
 
-![MWAA](https://img.shields.io/badge/MWAA-2.8.1_|_2.7.2_|_2.6.3_|_2.5.1_|_2.4.3-blue)
+![MWAA](https://img.shields.io/badge/MWAA-2.9.2_|_2.8.1_|_2.7.2_|_2.6.3_|_2.5.1_|_2.4.3-blue)
 ![CDK](https://img.shields.io/badge/CDK-Python-orange)
 ![Python](https://img.shields.io/badge/Python-3.7+-blue)
 [![Black](https://img.shields.io/badge/Code%20Style-Black-000000.svg)](https://github.com/psf/black)
@@ -77,6 +77,7 @@ This solution is a part of an AWS blog series on MWAA Disaster Recovery. Please 
 
 > [!NOTE]
 > The project currently supports the following versions of MWAA:
+> - **2.9.2**
 > - **2.8.1**
 > - **2.7.2**
 > - **2.6.3**
@@ -324,7 +325,7 @@ Here are the required parameters that applies to both primary and secondary regi
 | `AWS_ACCOUNT_ID` | `111222333444` | Your AWS account id. |
 | `DR_TYPE` | `BACKUP_RESTORE`, `WARM_STANDBY` | The disaster recovery strategy to be deployed. |
 | `MWAA_UPDATE_EXECUTION_ROLE` | `YES` or `NO` | Flag to denote whether to update the existing MWAA execution role with new policies for allowing task token return calls from the StepFunctions workflow in the secondary stack. See the [Automated Updates to the Execution Role](#automated-updates-to-the-execution-role) for details. |
-| `MWAA_VERSION` | `2.4.3`, `2.5.1`, `2.6.3`, `2.7.2`, `2.8.1` | The deployed version of MWAA. |
+| `MWAA_VERSION` | `2.4.3`, `2.5.1`, `2.6.3`, `2.7.2`, `2.8.1`, `2.9.2` | The deployed version of MWAA. |
 | `PRIMARY_DAGS_BUCKET_NAME` | `mwaa-2-5-1-primary-bucket` | The name of the DAGs S3 bucket used by the environment in the primary region. |
 | `PRIMARY_MWAA_ENVIRONMENT_NAME` | `mwaa-2-5-1-primary` | The name of the MWAA environment in the primary region. |
 | `PRIMARY_MWAA_ROLE_ARN` | `arn:aws:...:role/service-role/primary-role` | The ARN of the execution role used by the primary MWAA environment. |
