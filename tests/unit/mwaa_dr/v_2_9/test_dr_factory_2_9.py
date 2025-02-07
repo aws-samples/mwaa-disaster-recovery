@@ -41,7 +41,7 @@ class TestDRFactory_2_9:
                 "map_index",
                 "owner",
                 "owner_display_name",
-                "run_id", # New Field 
+                "run_id",  # New Field
                 "task_id",
             ],
         )
@@ -75,10 +75,10 @@ class TestDRFactory_2_9:
                 "queue",
                 "queued_by_job_id",
                 "queued_dttm",
-                "rendered_map_index", # New Field
+                "rendered_map_index",  # New Field
                 "start_date",
                 "state",
-                "task_display_name", # New Field
+                "task_display_name",  # New Field
                 "trigger_id",
                 "trigger_timeout",
                 "try_number",
