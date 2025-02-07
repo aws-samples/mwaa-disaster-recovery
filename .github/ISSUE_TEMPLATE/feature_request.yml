@@ -21,6 +21,7 @@ body:
         - 2.7.2
         - 2.8.1
         - 2.9.2
+        - 2.10.1
   - type: textarea
     attributes:
       label: Is your feature request related to a problem? Please describe.
