@@ -361,14 +361,13 @@ class BaseTable:
         try:
             cursor = conn.cursor()
             insert_counter = 0
-            with backup_file as file:
-                while True:
-                    batch = list(itertools.islice(file, self.batch_size))
-                    if not batch:
-                        break
-                    cursor.copy_expert(restore_sql, StringIO("".join(batch)))
-                    conn.commit()
-                    insert_counter += len(batch)
+            while True:
+                batch = list(itertools.islice(backup_file, self.batch_size))
+                if not batch:
+                    break
+                cursor.copy_expert(restore_sql, StringIO("".join(batch)))
+                conn.commit()
+                insert_counter += len(batch)
             print(f"Inserted {insert_counter} records")
         finally:
             if cursor:
