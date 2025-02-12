@@ -20,6 +20,7 @@ import os
 from io import StringIO
 from copy import deepcopy
 from typing import Optional
+from sqlalchemy import text
 
 from airflow import settings
 from mwaa_dr.framework.model.dependency_model import DependencyModel
@@ -72,7 +73,7 @@ class BaseTable:
         export_filter: str = None,
         storage_type: str = None,
         path_prefix: str = None,
-        batch_size=5000,
+        batch_size=1000,
     ):
         self.name = name
         self.model = model
@@ -324,7 +325,8 @@ class BaseTable:
 
         try:
             with settings.Session() as session:
-                result = session.execute(sql)
+                stmt = text(sql).execution_options(yield_per=self.batch_size)
+                result = session.execute(stmt)
                 chunk = result.fetchmany(self.batch_size)
                 while chunk:
                     buffer = StringIO("")

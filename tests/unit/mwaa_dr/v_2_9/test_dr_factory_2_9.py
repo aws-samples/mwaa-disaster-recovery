@@ -84,5 +84,6 @@ class TestDRFactory_2_9:
                 "try_number",
                 "unixname",
             ],
-            expected_mappings={"conf": "'\\x' || encode(conf,'hex') as conf"},
+            expected_mappings={ "executor_config": "'\\x' || encode(executor_config,'hex') as executor_config" },
+            expected_export_filter="state NOT IN ('running','restarting','queued','scheduled', 'up_for_retry','up_for_reschedule')"
         )
