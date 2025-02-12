@@ -182,6 +182,7 @@ class DRFactory_2_4(BaseDRFactory):
                 "start_date",
                 "state",
             ],
+            export_filter="dag_id != 'backup_metadata'",
             export_mappings={"conf": "'\\x' || encode(conf,'hex') as conf"},
             storage_type=self.storage_type,
             path_prefix=self.path_prefix,
@@ -234,7 +235,7 @@ class DRFactory_2_4(BaseDRFactory):
             export_mappings={
                 "executor_config": "'\\x' || encode(executor_config,'hex') as executor_config"
             },
-            export_filter="state NOT IN ('running','restarting','queued','scheduled', 'up_for_retry','up_for_reschedule')",
+            export_filter="state NOT IN ('running','restarting','queued','scheduled', 'up_for_retry','up_for_reschedule') AND dag_id != 'backup_metadata'",
             storage_type=self.storage_type,
             path_prefix=self.path_prefix,
             batch_size=self.batch_size,
@@ -311,6 +312,7 @@ class DRFactory_2_4(BaseDRFactory):
                 "start_date",
                 "task_id",
             ],
+            export_filter="dag_id != 'backup_metadata'",
             storage_type=self.storage_type,
             path_prefix=self.path_prefix,
             batch_size=self.batch_size,
@@ -369,6 +371,7 @@ class DRFactory_2_4(BaseDRFactory):
                 "state",
                 "unixname",
             ],
+            export_filter="dag_id != 'backup_metadata'",
             storage_type=self.storage_type,
             path_prefix=self.path_prefix,
             batch_size=self.batch_size,
