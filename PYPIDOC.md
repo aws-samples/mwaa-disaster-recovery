@@ -18,15 +18,15 @@ Let's look at creating a metadata backup and restore dags, respectively, as foll
 
 ### Metadata Backup DAG
 
-Let's assume your environment version is `2.9.2`. You can create a metadata backup dag by creating a python file in your MWAA `dags` folder as follows:
+Let's assume your environment version is `2.10.1`. You can create a metadata backup dag by creating a python file in your MWAA `dags` folder as follows:
 
 **backup_metadata.py**:
 ```python
 # Importing DAG is necessary for DAG detection
 from airflow import DAG
-from mwaa_dr.v_2_9.dr_factory import DRFactory_2_9
+from mwaa_dr.v_2_10.dr_factory import DRFactory_2_10
 
-factory = DRFactory_2_9(
+factory = DRFactory_2_10(
     dag_id='backup',
     path_prefix='data',
     storage_type='S3'
@@ -56,9 +56,9 @@ You can create a metadata restore dag by creating a python file in your MWAA `da
 **restore_metadata.py**:
 ```python
 from airflow import DAG
-from mwaa_dr.v_2_9.dr_factory import DRFactory_2_9
+from mwaa_dr.v_2_10.dr_factory import DRFactory_2_10
 
-factory = DRFactory_2_9(
+factory = DRFactory_2_10(
     dag_id='restore',
     path_prefix='data',
     storage_type='S3'
@@ -90,9 +90,9 @@ You can create a metadata cleanup dag by creating a python file in your MWAA `da
 **cleanup_metadata.py**:
 ```python
 from airflow import DAG
-from mwaa_dr.v_2_9.dr_factory import DRFactory_2_9
+from mwaa_dr.v_2_10.dr_factory import DRFactory_2_10
 
-factory = DRFactory_2_9(
+factory = DRFactory_2_10(
     dag_id='cleanup',
     path_prefix='data',
     storage_type='S3'
