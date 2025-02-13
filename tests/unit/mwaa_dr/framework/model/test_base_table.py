@@ -25,6 +25,7 @@ from copy import copy, deepcopy
 from sure import expect
 from unittest.mock import patch, DEFAULT
 import pytest
+from sqlalchemy import text
 
 import io
 import boto3
@@ -51,7 +52,7 @@ class TestBaseTable:
         expect(table.export_filter).to.equal("")
         expect(table.storage_type).to.equal("S3")
         expect(table.path_prefix).to.be.falsy
-        expect(table.batch_size).to.equal(5000)
+        expect(table.batch_size).to.equal(1000)
         expect(model.nodes).to.contain(table)
 
     def test_construction_with_params(self):
@@ -375,10 +376,10 @@ class TestBaseTable:
     ):
         mock_table_for_s3.backup(**mock_context)
 
+        expected_stmt = "SELECT dag_id, '\\x' || encode(executor_config,'hex') as executor_config, state FROM task_instance WHERE state NOT IN ('running', 'restarting')"
+        
         expect(mock_session_execution.call_count).to.equal(1)
-        expect(mock_session_execution.call_args[0][0]).to.equal(
-            "SELECT dag_id, '\\x' || encode(executor_config,'hex') as executor_config, state FROM task_instance WHERE state NOT IN ('running', 'restarting')"
-        )
+        expect(str(mock_session_execution.call_args[0][0].compile())).to.equal(expected_stmt)
 
         expect(mock_smart_open.call_count).to.equal(1)
 
@@ -394,10 +395,10 @@ class TestBaseTable:
         context = dict()
         mock_table_for_local_fs.backup(**context)
 
+        expected_stmt = "SELECT dag_id, '\\x' || encode(executor_config,'hex') as executor_config, state FROM task_instance WHERE state NOT IN ('running', 'restarting')"
+
         expect(mock_session_execution.call_count).to.equal(1)
-        expect(mock_session_execution.call_args[0][0]).to.equal(
-            "SELECT dag_id, '\\x' || encode(executor_config,'hex') as executor_config, state FROM task_instance WHERE state NOT IN ('running', 'restarting')"
-        )
+        expect(str(mock_session_execution.call_args[0][0].compile())).to.equal(expected_stmt)
 
         expect(mock_builtins_open.call_count).to.equal(1)
 
