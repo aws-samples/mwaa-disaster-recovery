@@ -1,6 +1,6 @@
 # MWAA Disaster Recovery
 
-![MWAA](https://img.shields.io/badge/MWAA-2.9.2_|_2.8.1_|_2.7.2_|_2.6.3_|_2.5.1_|_2.4.3-blue)
+![MWAA](https://img.shields.io/badge/MWAA-2.10.3_|_2.10.1_|_2.9.2_|_2.8.1_|_2.7.2_|_2.6.3_|_2.5.1_|_2.4.3-blue)
 ![Python](https://img.shields.io/badge/Python-3.7+-blue)
 [![Black](https://img.shields.io/badge/Code%20Style-Black-000000.svg)](https://github.com/psf/black)
 [![CodeCoverage](https://raw.githubusercontent.com/aws-samples/mwaa-disaster-recovery/python-coverage-comment-action-data/badge.svg)](https://htmlpreview.github.io/?https://github.com/aws-samples/mwaa-disaster-recovery/blob/python-coverage-comment-action-data/htmlcov/index.html)
@@ -18,7 +18,7 @@ Let's look at creating a metadata backup and restore dags, respectively, as foll
 
 ### Metadata Backup DAG
 
-Let's assume your environment version is `2.10.1`. You can create a metadata backup dag by creating a python file in your MWAA `dags` folder as follows:
+Let's assume your environment version is `2.10.3`. You can create a metadata backup dag by creating a python file in your MWAA `dags` folder as follows:
 
 **backup_metadata.py**:
 ```python

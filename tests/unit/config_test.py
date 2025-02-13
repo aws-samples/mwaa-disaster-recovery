@@ -147,7 +147,15 @@ class TestConfig:
             config.dr_connection_restore_strategy
 
     def test_mwaa_version_supported(backup_restore_env_vars):
-        for version in ["2.5.1", "2.6.3", "2.7.2", "2.8.1", "2.9.2", "2.10.1"]:
+        for version in [
+            "2.5.1",
+            "2.6.3",
+            "2.7.2",
+            "2.8.1",
+            "2.9.2",
+            "2.10.1",
+            "2.10.3",
+        ]:
             os.environ["MWAA_VERSION"] = version
             config = Config()
 

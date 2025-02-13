@@ -377,9 +377,11 @@ class TestBaseTable:
         mock_table_for_s3.backup(**mock_context)
 
         expected_stmt = "SELECT dag_id, '\\x' || encode(executor_config,'hex') as executor_config, state FROM task_instance WHERE state NOT IN ('running', 'restarting')"
-        
+
         expect(mock_session_execution.call_count).to.equal(1)
-        expect(str(mock_session_execution.call_args[0][0].compile())).to.equal(expected_stmt)
+        expect(str(mock_session_execution.call_args[0][0].compile())).to.equal(
+            expected_stmt
+        )
 
         expect(mock_smart_open.call_count).to.equal(1)
 
@@ -398,7 +400,9 @@ class TestBaseTable:
         expected_stmt = "SELECT dag_id, '\\x' || encode(executor_config,'hex') as executor_config, state FROM task_instance WHERE state NOT IN ('running', 'restarting')"
 
         expect(mock_session_execution.call_count).to.equal(1)
-        expect(str(mock_session_execution.call_args[0][0].compile())).to.equal(expected_stmt)
+        expect(str(mock_session_execution.call_args[0][0].compile())).to.equal(
+            expected_stmt
+        )
 
         expect(mock_builtins_open.call_count).to.equal(1)
 

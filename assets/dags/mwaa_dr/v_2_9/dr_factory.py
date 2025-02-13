@@ -54,7 +54,7 @@ class DRFactory_2_9(DRFactory_2_8):
                 "map_index",
                 "run_id",
                 "task_id",
-                "custom_operator_name", # New Field
+                "custom_operator_name",  # New Field
                 "duration",
                 "end_date",
                 "executor_config",
@@ -80,8 +80,7 @@ class DRFactory_2_9(DRFactory_2_8):
                 "trigger_timeout",
                 "try_number",
                 "unixname",
-                "updated_at", # New Field
-
+                "updated_at",  # New Field
             ],
             export_mappings={
                 "executor_config": "'\\x' || encode(executor_config,'hex') as executor_config"

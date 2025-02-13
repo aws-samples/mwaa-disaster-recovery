@@ -59,9 +59,10 @@ class TestDRFactory_2_10:
                 "map_index",
                 "run_id",
                 "task_id",
+                "custom_operator_name",
                 "duration",
                 "end_date",
-                "executor",
+                "executor",  # New Field
                 "executor_config",
                 "external_executor_id",
                 "hostname",
@@ -85,6 +86,10 @@ class TestDRFactory_2_10:
                 "trigger_timeout",
                 "try_number",
                 "unixname",
+                "updated_at",
             ],
-            expected_mappings={"conf": "'\\x' || encode(conf,'hex') as conf"},
+            expected_mappings={
+                "executor_config": "'\\x' || encode(executor_config,'hex') as executor_config"
+            },
+            expected_export_filter="state NOT IN ('running','restarting','queued','scheduled', 'up_for_retry','up_for_reschedule')",
         )
