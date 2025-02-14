@@ -7,14 +7,14 @@
 | assets/dags/mwaa\_dr/\_\_init\_\_.py                            |        0 |        0 |        0 |        0 |     100% |           |
 | assets/dags/mwaa\_dr/framework/\_\_init\_\_.py                  |        0 |        0 |        0 |        0 |     100% |           |
 | assets/dags/mwaa\_dr/framework/factory/\_\_init\_\_.py          |        0 |        0 |        0 |        0 |     100% |           |
-| assets/dags/mwaa\_dr/framework/factory/base\_dr\_factory.py     |      178 |        0 |       46 |        0 |     100% |           |
-| assets/dags/mwaa\_dr/framework/factory/default\_dag\_factory.py |       23 |        0 |        2 |        0 |     100% |           |
+| assets/dags/mwaa\_dr/framework/factory/base\_dr\_factory.py     |      178 |        0 |       42 |        0 |     100% |           |
+| assets/dags/mwaa\_dr/framework/factory/default\_dag\_factory.py |       23 |        0 |        0 |        0 |     100% |           |
 | assets/dags/mwaa\_dr/framework/model/\_\_init\_\_.py            |        0 |        0 |        0 |        0 |     100% |           |
-| assets/dags/mwaa\_dr/framework/model/active\_dag\_table.py      |       32 |        0 |        8 |        0 |     100% |           |
-| assets/dags/mwaa\_dr/framework/model/base\_table.py             |      154 |        0 |       42 |        0 |     100% |           |
-| assets/dags/mwaa\_dr/framework/model/connection\_table.py       |       50 |        0 |       22 |        0 |     100% |           |
+| assets/dags/mwaa\_dr/framework/model/active\_dag\_table.py      |       32 |        0 |        4 |        0 |     100% |           |
+| assets/dags/mwaa\_dr/framework/model/base\_table.py             |      166 |        0 |       38 |        0 |     100% |           |
+| assets/dags/mwaa\_dr/framework/model/connection\_table.py       |       50 |        0 |       18 |        0 |     100% |           |
 | assets/dags/mwaa\_dr/framework/model/dependency\_model.py       |       61 |        0 |       28 |        0 |     100% |           |
-| assets/dags/mwaa\_dr/framework/model/variable\_table.py         |       44 |        0 |       18 |        0 |     100% |           |
+| assets/dags/mwaa\_dr/framework/model/variable\_table.py         |       44 |        0 |       14 |        0 |     100% |           |
 | assets/dags/mwaa\_dr/v\_2\_4/\_\_init\_\_.py                    |        0 |        0 |        0 |        0 |     100% |           |
 | assets/dags/mwaa\_dr/v\_2\_4/dr\_factory.py                     |       46 |        0 |        0 |        0 |     100% |           |
 | assets/dags/mwaa\_dr/v\_2\_5/\_\_init\_\_.py                    |        0 |        0 |        0 |        0 |     100% |           |
@@ -25,13 +25,17 @@
 | assets/dags/mwaa\_dr/v\_2\_7/dr\_factory.py                     |        8 |        0 |        0 |        0 |     100% |           |
 | assets/dags/mwaa\_dr/v\_2\_8/\_\_init\_\_.py                    |        0 |        0 |        0 |        0 |     100% |           |
 | assets/dags/mwaa\_dr/v\_2\_8/dr\_factory.py                     |        8 |        0 |        0 |        0 |     100% |           |
-| config.py                                                       |      205 |        0 |       94 |        0 |     100% |           |
+| assets/dags/mwaa\_dr/v\_2\_9/\_\_init\_\_.py                    |        0 |        0 |        0 |        0 |     100% |           |
+| assets/dags/mwaa\_dr/v\_2\_9/dr\_factory.py                     |        8 |        0 |        0 |        0 |     100% |           |
+| assets/dags/mwaa\_dr/v\_2\_10/\_\_init\_\_.py                   |        0 |        0 |        0 |        0 |     100% |           |
+| assets/dags/mwaa\_dr/v\_2\_10/dr\_factory.py                    |        8 |        0 |        0 |        0 |     100% |           |
+| config.py                                                       |      205 |        0 |       14 |        0 |     100% |           |
 | lib/\_\_init\_\_.py                                             |        0 |        0 |        0 |        0 |     100% |           |
 | lib/dr\_constructs/\_\_init\_\_.py                              |        0 |        0 |        0 |        0 |     100% |           |
-| lib/dr\_constructs/airflow\_cli.py                              |       35 |        0 |        5 |        0 |     100% |           |
+| lib/dr\_constructs/airflow\_cli.py                              |       35 |        0 |        0 |        0 |     100% |           |
 | lib/functions/\_\_init\_\_.py                                   |        0 |        0 |        0 |        0 |     100% |           |
-| lib/functions/airflow\_cli\_client.py                           |      101 |        0 |       33 |        0 |     100% |           |
-| lib/functions/airflow\_cli\_function.py                         |       41 |        0 |        8 |        0 |     100% |           |
+| lib/functions/airflow\_cli\_client.py                           |      101 |        0 |       18 |        0 |     100% |           |
+| lib/functions/airflow\_cli\_function.py                         |       41 |        0 |        6 |        0 |     100% |           |
 | lib/functions/airflow\_dag\_trigger\_function.py                |       21 |        0 |        0 |        0 |     100% |           |
 | lib/functions/cloudwatch\_health\_check\_function.py            |       33 |        0 |        4 |        0 |     100% |           |
 | lib/functions/create\_environment\_function.py                  |       32 |        0 |        6 |        0 |     100% |           |
@@ -39,10 +43,10 @@
 | lib/functions/get\_environment\_function.py                     |       14 |        0 |        0 |        0 |     100% |           |
 | lib/functions/replication\_job\_function.py                     |       19 |        0 |        2 |        0 |     100% |           |
 | lib/stacks/\_\_init\_\_.py                                      |        0 |        0 |        0 |        0 |     100% |           |
-| lib/stacks/mwaa\_base\_stack.py                                 |       39 |        0 |       10 |        0 |     100% |           |
-| lib/stacks/mwaa\_primary\_stack.py                              |      144 |        0 |       12 |        0 |     100% |           |
-| lib/stacks/mwaa\_secondary\_stack.py                            |      163 |        0 |       14 |        0 |     100% |           |
-|                                                       **TOTAL** | **1478** |    **0** |  **356** |    **0** | **100%** |           |
+| lib/stacks/mwaa\_base\_stack.py                                 |       39 |        0 |        2 |        0 |     100% |           |
+| lib/stacks/mwaa\_primary\_stack.py                              |      144 |        0 |        0 |        0 |     100% |           |
+| lib/stacks/mwaa\_secondary\_stack.py                            |      163 |        0 |        6 |        0 |     100% |           |
+|                                                       **TOTAL** | **1506** |    **0** |  **204** |    **0** | **100%** |           |
 
 
 ## Setup coverage badge
