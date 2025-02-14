@@ -25,7 +25,8 @@ class DRFactory_2_10(DRFactory_2_9):
     Factory class for creating database models for Apache Airflow 2.10.1.
 
     This class inherits from DRFactory_2_9 and extends it to support the new
-    features and schema changes introduced in Apache Airflow 2.10.1: https://airflow.apache.org/docs/apache-airflow/2.10.1/database-erd-ref.html
+    features and schema changes introduced in Apache Airflow 2.10.1/2.10.3:
+    https://airflow.apache.org/docs/apache-airflow/2.10.1/database-erd-ref.html
 
     Args:
         dag_id (str): The ID of the DAG.

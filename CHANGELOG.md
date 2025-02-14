@@ -7,9 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2.0.2] - 2024-08-21
-### Changed
-- Use batch import
+## [2.1.0] - 2025-02-13
+### Added
+- Support for MWAA v2.9.2, due to gracious contribution of [holly-evans](https://github.com/holly-evans) 🙏 🚀
+- Support for MWAA v2.10.1 and v2.10.3, due to gracious contributions of [pyrr](https://github.com/pyrr) and [holly-evans](https://github.com/holly-evans) 🙏 🚀
+- Performance enhancement for large metadata export to S3 using [server-side cursor](https://docs.sqlalchemy.org/en/20/orm/queryguide/api.html#orm-queryguide-yield-per)
+- Performance enhancement for large metadata import using batched copy into meta-database, thanks to the gracious contribution of [mathiasflorin](https://github.com/mathiasflorin) 🙏 🚀
+
 
 ## [2.0.1] - 2024-08-21
 ### Changed
@@ -124,7 +128,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial commit with sample readme, code of conduct, and license
 
 
-[unreleased]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v2.0.1...HEAD
+[unreleased]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v2.1.0...HEAD
+[2.1.0]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v2.0.1...v2.1.0
 [2.0.1]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v1.0.1...v2.0.0
 [1.0.1]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v1.0.0...v1.0.1
