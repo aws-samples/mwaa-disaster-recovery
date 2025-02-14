@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.1] - 2025-02-13
+### Changed
+- Updating sigstore Github Action for PyPI publishing
+
+
 ## [2.1.0] - 2025-02-13
 ### Added
 - Support for MWAA v2.9.2, due to gracious contribution of [holly-evans](https://github.com/holly-evans) 🙏 🚀
@@ -130,7 +135,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial commit with sample readme, code of conduct, and license
 
 
-[unreleased]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v2.1.0...HEAD
+[unreleased]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v2.1.1...HEAD
+[2.1.1]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v2.1.0...v2.1.1
 [2.1.0]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v2.0.1...v2.1.0
 [2.0.1]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v1.0.1...v2.0.0
