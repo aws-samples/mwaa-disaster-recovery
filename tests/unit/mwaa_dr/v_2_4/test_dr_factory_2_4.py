@@ -114,6 +114,7 @@ class TestDRFactory_2_4:
                 "state",
             ],
             expected_mappings={"conf": "'\\x' || encode(conf,'hex') as conf"},
+            expected_export_filter="dag_id != 'backup_metadata'",
         )
 
     def test_task_instance_creation(self):
@@ -154,7 +155,7 @@ class TestDRFactory_2_4:
             expected_mappings={
                 "executor_config": "'\\x' || encode(executor_config,'hex') as executor_config"
             },
-            expected_export_filter="state NOT IN ('running','restarting','queued','scheduled', 'up_for_retry','up_for_reschedule')",
+            expected_export_filter="state NOT IN ('running','restarting','queued','scheduled', 'up_for_retry','up_for_reschedule') AND dag_id != 'backup_metadata'",
         )
 
     def test_slot_pool(self):
@@ -204,6 +205,7 @@ class TestDRFactory_2_4:
                 "start_date",
                 "task_id",
             ],
+            expected_export_filter="dag_id != 'backup_metadata'",
         )
 
     def test_job(self):
@@ -223,6 +225,7 @@ class TestDRFactory_2_4:
                 "state",
                 "unixname",
             ],
+            expected_export_filter="dag_id != 'backup_metadata'",
         )
 
     def test_trigger(self):

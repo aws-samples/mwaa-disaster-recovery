@@ -20,9 +20,11 @@ import os
 from io import StringIO
 from copy import deepcopy
 from typing import Optional
+from sqlalchemy import text
 
 from airflow import settings
 from mwaa_dr.framework.model.dependency_model import DependencyModel
+import itertools
 
 S3 = "S3"
 
@@ -72,7 +74,7 @@ class BaseTable:
         export_filter: str = None,
         storage_type: str = None,
         path_prefix: str = None,
-        batch_size=5000,
+        batch_size=1000,
     ):
         self.name = name
         self.model = model
@@ -324,7 +326,8 @@ class BaseTable:
 
         try:
             with settings.Session() as session:
-                result = session.execute(sql)
+                stmt = text(sql).execution_options(yield_per=self.batch_size)
+                result = session.execute(stmt)
                 chunk = result.fetchmany(self.batch_size)
                 while chunk:
                     buffer = StringIO("")
@@ -347,7 +350,6 @@ class BaseTable:
         """
         backup_file = self.read(context)
 
-        restore_sql = ""
         if self.columns:
             restore_sql = f"COPY {self.name} ({', '.join(self.columns)}) FROM STDIN WITH (FORMAT CSV, HEADER FALSE, DELIMITER '|')"
         else:
@@ -355,11 +357,21 @@ class BaseTable:
         print(f"Restore SQL: {restore_sql}")
 
         conn = settings.engine.raw_connection()
+        cursor = None
         try:
             cursor = conn.cursor()
-            cursor.copy_expert(restore_sql, backup_file)
-            conn.commit()
+            insert_counter = 0
+            while True:
+                batch = list(itertools.islice(backup_file, self.batch_size))
+                if not batch:
+                    break
+                cursor.copy_expert(restore_sql, StringIO("".join(batch)))
+                conn.commit()
+                insert_counter += len(batch)
+            print(f"Inserted {insert_counter} records")
         finally:
+            if cursor:
+                cursor.close()
             conn.close()
             backup_file.close()
 

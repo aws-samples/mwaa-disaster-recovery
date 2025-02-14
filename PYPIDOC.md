@@ -1,6 +1,6 @@
 # MWAA Disaster Recovery
 
-![MWAA](https://img.shields.io/badge/MWAA-2.8.1_|_2.7.2_|_2.6.3_|_2.5.1_|_2.4.3-blue)
+![MWAA](https://img.shields.io/badge/MWAA-2.10.3_|_2.10.1_|_2.9.2_|_2.8.1_|_2.7.2_|_2.6.3_|_2.5.1_|_2.4.3-blue)
 ![Python](https://img.shields.io/badge/Python-3.7+-blue)
 [![Black](https://img.shields.io/badge/Code%20Style-Black-000000.svg)](https://github.com/psf/black)
 [![CodeCoverage](https://raw.githubusercontent.com/aws-samples/mwaa-disaster-recovery/python-coverage-comment-action-data/badge.svg)](https://htmlpreview.github.io/?https://github.com/aws-samples/mwaa-disaster-recovery/blob/python-coverage-comment-action-data/htmlcov/index.html)
@@ -18,15 +18,15 @@ Let's look at creating a metadata backup and restore dags, respectively, as foll
 
 ### Metadata Backup DAG
 
-Let's assume your environment version is `2.8.1`. You can create a metadata backup dag by creating a python file in your MWAA `dags` folder as follows:
+Let's assume your environment version is `2.10.3`. You can create a metadata backup dag by creating a python file in your MWAA `dags` folder as follows:
 
 **backup_metadata.py**:
 ```python
 # Importing DAG is necessary for DAG detection
 from airflow import DAG
-from mwaa_dr.v_2_8.dr_factory import DRFactory_2_8
+from mwaa_dr.v_2_10.dr_factory import DRFactory_2_10
 
-factory = DRFactory_2_8(
+factory = DRFactory_2_10(
     dag_id='backup',
     path_prefix='data',
     storage_type='S3'
@@ -56,9 +56,9 @@ You can create a metadata restore dag by creating a python file in your MWAA `da
 **restore_metadata.py**:
 ```python
 from airflow import DAG
-from mwaa_dr.v_2_8.dr_factory import DRFactory_2_8
+from mwaa_dr.v_2_10.dr_factory import DRFactory_2_10
 
-factory = DRFactory_2_8(
+factory = DRFactory_2_10(
     dag_id='restore',
     path_prefix='data',
     storage_type='S3'
@@ -90,9 +90,9 @@ You can create a metadata cleanup dag by creating a python file in your MWAA `da
 **cleanup_metadata.py**:
 ```python
 from airflow import DAG
-from mwaa_dr.v_2_8.dr_factory import DRFactory_2_8
+from mwaa_dr.v_2_10.dr_factory import DRFactory_2_10
 
-factory = DRFactory_2_8(
+factory = DRFactory_2_10(
     dag_id='cleanup',
     path_prefix='data',
     storage_type='S3'

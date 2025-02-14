@@ -25,6 +25,7 @@ from copy import copy, deepcopy
 from sure import expect
 from unittest.mock import patch, DEFAULT
 import pytest
+from sqlalchemy import text
 
 import io
 import boto3
@@ -51,7 +52,7 @@ class TestBaseTable:
         expect(table.export_filter).to.equal("")
         expect(table.storage_type).to.equal("S3")
         expect(table.path_prefix).to.be.falsy
-        expect(table.batch_size).to.equal(5000)
+        expect(table.batch_size).to.equal(1000)
         expect(model.nodes).to.contain(table)
 
     def test_construction_with_params(self):
@@ -375,9 +376,11 @@ class TestBaseTable:
     ):
         mock_table_for_s3.backup(**mock_context)
 
+        expected_stmt = "SELECT dag_id, '\\x' || encode(executor_config,'hex') as executor_config, state FROM task_instance WHERE state NOT IN ('running', 'restarting')"
+
         expect(mock_session_execution.call_count).to.equal(1)
-        expect(mock_session_execution.call_args[0][0]).to.equal(
-            "SELECT dag_id, '\\x' || encode(executor_config,'hex') as executor_config, state FROM task_instance WHERE state NOT IN ('running', 'restarting')"
+        expect(str(mock_session_execution.call_args[0][0].compile())).to.equal(
+            expected_stmt
         )
 
         expect(mock_smart_open.call_count).to.equal(1)
@@ -394,9 +397,11 @@ class TestBaseTable:
         context = dict()
         mock_table_for_local_fs.backup(**context)
 
+        expected_stmt = "SELECT dag_id, '\\x' || encode(executor_config,'hex') as executor_config, state FROM task_instance WHERE state NOT IN ('running', 'restarting')"
+
         expect(mock_session_execution.call_count).to.equal(1)
-        expect(mock_session_execution.call_args[0][0]).to.equal(
-            "SELECT dag_id, '\\x' || encode(executor_config,'hex') as executor_config, state FROM task_instance WHERE state NOT IN ('running', 'restarting')"
+        expect(str(mock_session_execution.call_args[0][0].compile())).to.equal(
+            expected_stmt
         )
 
         expect(mock_builtins_open.call_count).to.equal(1)
@@ -459,39 +464,136 @@ class TestBaseTable:
         with patch.object(table_for_local_fs, "read_from_local", return_value=buffer):
             expect(table_for_local_fs.read(dict())).to.be(buffer)
 
+    def test_restore_cursor_exception(self, mock_context, mock_sql_raw_connection):
+        task_instance = BaseTable(
+            name="task_instance", model=DependencyModel(), columns=["dag_id", "state"]
+        )
+
+        # Create sample data
+        sample_data = "test|running\r\n"
+
+        with (
+            io.StringIO(sample_data) as store,
+            patch.object(task_instance, "read", return_value=store),
+            patch(
+                "mwaa_dr.framework.model.base_table.settings.engine.raw_connection"
+            ) as mock_raw_connection,
+        ):
+            mock_conn = mock_raw_connection.return_value
+            mock_conn.cursor.side_effect = Exception("Cursor creation failed")
+
+            with pytest.raises(Exception, match="Cursor creation failed"):
+                task_instance.restore(**mock_context)
+
+            # Ensure cursor was never created
+            assert mock_conn.cursor.call_count == 1
+            assert mock_conn.commit.call_count == 0
+            assert mock_conn.close.call_count == 1
+
     def test_restore_multi_columns(self, mock_context, mock_sql_raw_connection):
         task_instance = BaseTable(
             name="task_instance", model=DependencyModel(), columns=["dag_id", "state"]
         )
 
         with (
-            io.BytesIO(b"test,running\r\n") as store,
+            io.StringIO("test|running\r\n") as store,
             patch.object(task_instance, "read", return_value=store),
         ):
             task_instance.restore(**mock_context)
             expect(task_instance.read.call_count).to.equal(1)
             expect(task_instance.read.call_args[0][0]).to.equal(mock_context)
-            mock_sql_raw_connection.return_value.cursor.return_value.copy_expert.assert_called_with(
-                "COPY task_instance (dag_id, state) FROM STDIN WITH (FORMAT CSV, HEADER FALSE, DELIMITER '|')",
-                store,
+            restore_sql, string_io = (
+                mock_sql_raw_connection.return_value.cursor.return_value.copy_expert.call_args.args
             )
+            expected_sql = "COPY task_instance (dag_id, state) FROM STDIN WITH (FORMAT CSV, HEADER FALSE, DELIMITER '|')"
+            expect(restore_sql).equal(expected_sql)
+            expect(string_io.getvalue()).equal("test|running\r\n")
             mock_sql_raw_connection.return_value.commit.assert_called_once()
+            mock_sql_raw_connection.return_value.close.assert_called_once()
+
+    def test_restore_batch_size(self, mock_context, mock_sql_raw_connection):
+        task_instance = BaseTable(
+            name="task_instance", model=DependencyModel(), columns=["dag_id", "state"]
+        )
+
+        # Create a large amount of sample data
+        sample_data = (
+            "\r\n".join(
+                [f"dag_id_{i}|state_{i}" for i in range(task_instance.batch_size)]
+            )
+            + "\r\n"
+        )
+
+        with (
+            io.StringIO(sample_data) as store,
+            patch.object(task_instance, "read", return_value=store),
+        ):
+            task_instance.restore(**mock_context)
+            expect(task_instance.read.call_count).to.equal(1)
+            expect(task_instance.read.call_args[0][0]).to.equal(mock_context)
+            call_list_args = (
+                mock_sql_raw_connection.return_value.cursor.return_value.copy_expert.call_args_list
+            )
+            restore_sql_1, string_io_1 = call_list_args[0].args
+            expected_sql = "COPY task_instance (dag_id, state) FROM STDIN WITH (FORMAT CSV, HEADER FALSE, DELIMITER '|')"
+            expect(restore_sql_1).equal(expected_sql)
+            expect(string_io_1.getvalue()).equal(sample_data)
+            mock_sql_raw_connection.return_value.commit.assert_called()
+            expect(mock_sql_raw_connection.return_value.commit.call_count).to.equal(1)
+            mock_sql_raw_connection.return_value.close.assert_called_once()
+
+    def test_restore_more_than_batch_size(self, mock_context, mock_sql_raw_connection):
+        task_instance = BaseTable(
+            name="task_instance", model=DependencyModel(), columns=["dag_id", "state"]
+        )
+
+        # Create a large amount of sample data
+        first_batch = (
+            "\r\n".join(
+                [f"dag_id_{i}|state_{i}" for i in range(task_instance.batch_size)]
+            )
+            + "\r\n"
+        )
+        second_batch = "\r\n".join([f"dag_id_{i}|state_{i}" for i in range(2)]) + "\r\n"
+        sample_data = first_batch + second_batch
+
+        with (
+            io.StringIO(sample_data) as store,
+            patch.object(task_instance, "read", return_value=store),
+        ):
+            task_instance.restore(**mock_context)
+            expect(task_instance.read.call_count).to.equal(1)
+            expect(task_instance.read.call_args[0][0]).to.equal(mock_context)
+            call_list_args = (
+                mock_sql_raw_connection.return_value.cursor.return_value.copy_expert.call_args_list
+            )
+            restore_sql_1, string_io_1 = call_list_args[0].args
+            expected_sql = "COPY task_instance (dag_id, state) FROM STDIN WITH (FORMAT CSV, HEADER FALSE, DELIMITER '|')"
+            expect(restore_sql_1).equal(expected_sql)
+            expect(string_io_1.getvalue()).equal(first_batch)
+            restore_sql_2, string_io_2 = call_list_args[1].args
+            expect(restore_sql_2).equal(expected_sql)
+            expect(string_io_2.getvalue()).equal(second_batch)
+            mock_sql_raw_connection.return_value.commit.assert_called()
+            expect(mock_sql_raw_connection.return_value.commit.call_count).to.equal(2)
             mock_sql_raw_connection.return_value.close.assert_called_once()
 
     def test_restore_no_columns(self, mock_context, mock_sql_raw_connection):
         task_instance = BaseTable(name="task_instance", model=DependencyModel())
 
         with (
-            io.BytesIO(b"test,running\r\n") as store,
+            io.StringIO("test,running\r\n") as store,
             patch.object(task_instance, "read", return_value=store),
         ):
             task_instance.restore(**mock_context)
             expect(task_instance.read.call_count).to.equal(1)
             expect(task_instance.read.call_args[0][0]).to.equal(mock_context)
-            mock_sql_raw_connection.return_value.cursor.return_value.copy_expert.assert_called_with(
-                "COPY task_instance FROM STDIN WITH (FORMAT CSV, HEADER FALSE, DELIMITER '|')",
-                store,
+            restore_sql, string_io = (
+                mock_sql_raw_connection.return_value.cursor.return_value.copy_expert.call_args.args
             )
+            expected_sql = "COPY task_instance FROM STDIN WITH (FORMAT CSV, HEADER FALSE, DELIMITER '|')"
+            expect(restore_sql).equal(expected_sql)
+            expect(string_io.getvalue()).equal("test,running\r\n")
             mock_sql_raw_connection.return_value.commit.assert_called_once()
             mock_sql_raw_connection.return_value.close.assert_called_once()
 

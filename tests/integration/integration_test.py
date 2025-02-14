@@ -25,6 +25,8 @@ V_2_5 = "2_5"
 V_2_6 = "2_6"
 V_2_7 = "2_7"
 V_2_8 = "2_8"
+V_2_9 = "2_9"
+V_2_10 = "2_10"
 
 
 def setup(version: str):
@@ -59,6 +61,6 @@ def mwaa_local_runner(request):
     # teardown(request.param)
 
 
-@pytest.mark.parametrize("mwaa_local_runner", [V_2_8], indirect=True)
+@pytest.mark.parametrize("mwaa_local_runner", [V_2_10], indirect=True)
 def test_import_export(mwaa_local_runner):
     print(f"{mwaa_local_runner} test dummy done!")

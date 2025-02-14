@@ -26,7 +26,16 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Suported MWAA versions
-SUPPORTED_MWAA_VERSIONS = ["2.4.3", "2.5.1", "2.6.3", "2.7.2", "2.8.1"]
+SUPPORTED_MWAA_VERSIONS = [
+    "2.4.3",
+    "2.5.1",
+    "2.6.3",
+    "2.7.2",
+    "2.8.1",
+    "2.9.2",
+    "2.10.1",
+    "2.10.3",
+]
 
 # DR Option
 DR_BACKUP_RESTORE = "BACKUP_RESTORE"
