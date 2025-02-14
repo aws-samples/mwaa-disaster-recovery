@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Performance enhancement for large metadata export to S3 using [server-side cursor](https://docs.sqlalchemy.org/en/20/orm/queryguide/api.html#orm-queryguide-yield-per)
 - Performance enhancement for large metadata import using batched copy into meta-database, thanks to the gracious contribution of [mathiasflorin](https://github.com/mathiasflorin) 🙏 🚀
 
+### Changed
+- v3 to v4 for upload and download artifacts github actions
 
 ## [2.0.1] - 2024-08-21
 ### Changed
