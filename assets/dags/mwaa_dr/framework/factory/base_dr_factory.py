@@ -345,7 +345,7 @@ class BaseDRFactory(ABC):
 
             try:
                 export_tasks["xcom"] >> export_tasks["task_instance"]
-            except KeyError: # Missing xcom or task instance task
+            except KeyError:  # Missing xcom or task instance task
                 pass
 
         teardown_t = PythonOperator(
