@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- Added `dr_factory.py` under [mwaa_dr](assets/dags/mwaa_dr/) to consolidate and expose the version-determined DRFactory class.
 
 ## [2.1.1] - 2025-02-13
 ### Changed
