@@ -35,6 +35,7 @@ from moto import mock_aws
 
 from mwaa_dr.framework.model.base_table import BaseTable, S3
 from mwaa_dr.framework.model.dependency_model import DependencyModel
+from mwaa_dr.v_2_10.dr_factory import DRFactory_2_10
 
 
 class TestBaseTable:
@@ -594,6 +595,64 @@ class TestBaseTable:
             expected_sql = "COPY task_instance FROM STDIN WITH (FORMAT CSV, HEADER FALSE, DELIMITER '|')"
             expect(restore_sql).equal(expected_sql)
             expect(string_io.getvalue()).equal("test,running\r\n")
+            mock_sql_raw_connection.return_value.commit.assert_called_once()
+            mock_sql_raw_connection.return_value.close.assert_called_once()
+
+    def test_restore_deferred_tasks_no_embedded_quotes(
+        self, mock_context, mock_sql_raw_connection
+    ):
+        task_instance = BaseTable(
+            name="task_instance",
+            model=DependencyModel(),
+            columns=["dag_id", "state", "next_kwargs", "next_method"],
+        )
+
+        with (
+            io.StringIO(
+                "test|running|{'__var': {}, '__type': 'dict'}|{'__var': 'hello world', '__type': 'dict'}\r\n"
+            ) as store,
+            patch.object(task_instance, "read", return_value=store),
+        ):
+            task_instance.restore(**mock_context)
+            expect(task_instance.read.call_count).to.equal(1)
+            expect(task_instance.read.call_args[0][0]).to.equal(mock_context)
+            restore_sql, string_io = (
+                mock_sql_raw_connection.return_value.cursor.return_value.copy_expert.call_args.args
+            )
+            expected_sql = "COPY task_instance (dag_id, state, next_kwargs, next_method) FROM STDIN WITH (FORMAT CSV, HEADER FALSE, DELIMITER '|')"
+            expect(restore_sql).equal(expected_sql)
+            expect(string_io.getvalue()).equal(
+                'test|running|"{""__var"": {}, ""__type"": ""dict""}"|"{""__var"": ""hello world"", ""__type"": ""dict""}"\r\n'
+            )
+            mock_sql_raw_connection.return_value.commit.assert_called_once()
+            mock_sql_raw_connection.return_value.close.assert_called_once()
+
+    def test_restore_deferred_tasks_embedded_quotes(
+        self, mock_context, mock_sql_raw_connection
+    ):
+        task_instance = BaseTable(
+            name="task_instance",
+            model=DependencyModel(),
+            columns=["dag_id", "state", "next_kwargs", "next_method"],
+        )
+
+        with (
+            io.StringIO(
+                "test|running|{'__var': {}, '__type': 'dict'}|{'__var': '\\'hello world\\'', '__type': 'dict'}\r\n"
+            ) as store,
+            patch.object(task_instance, "read", return_value=store),
+        ):
+            task_instance.restore(**mock_context)
+            expect(task_instance.read.call_count).to.equal(1)
+            expect(task_instance.read.call_args[0][0]).to.equal(mock_context)
+            restore_sql, string_io = (
+                mock_sql_raw_connection.return_value.cursor.return_value.copy_expert.call_args.args
+            )
+            expected_sql = "COPY task_instance (dag_id, state, next_kwargs, next_method) FROM STDIN WITH (FORMAT CSV, HEADER FALSE, DELIMITER '|')"
+            expect(restore_sql).equal(expected_sql)
+            expect(string_io.getvalue()).equal(
+                'test|running|"{""__var"": {}, ""__type"": ""dict""}"|"{""__var"": ""\'hello world\'"", ""__type"": ""dict""}"\r\n'
+            )
             mock_sql_raw_connection.return_value.commit.assert_called_once()
             mock_sql_raw_connection.return_value.close.assert_called_once()
 

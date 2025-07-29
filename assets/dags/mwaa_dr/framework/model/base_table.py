@@ -21,6 +21,8 @@ from io import StringIO
 from copy import deepcopy
 from typing import Optional
 from sqlalchemy import text
+import json
+import re
 
 from airflow import settings
 from mwaa_dr.framework.model.dependency_model import DependencyModel
@@ -348,6 +350,44 @@ class BaseTable:
         The restore process reads the backup file and copies the data into the table using the `COPY` command.
         If the `columns` attribute is provided, it specifies the column names in the `COPY` command.
         """
+
+        def preprocess_for_bad_json(batch, columns):
+            """
+            Preprocesses the input batch of CSV data by replacing any single-quote not preceded
+            by a backslash with a double-quote in the `next_kwargs` and/or `next_method` columns,
+            if the columns are present.
+
+            Intended to fix invalid single-quoted JSON objects due to Airflow encoding `next_kwargs`
+            and `next_method` as stringified dictionaries when logging deferred tasks (#43).
+
+            Args:
+                batch: Required, Iterable[str] of comma-delimited CSV rows
+                columns: Optional, Iterable[str] of CSV column names
+
+            Returns:
+                StringIO: String buffer containing preprocessed CSV data
+            """
+            process_next_kwargs = columns and "next_kwargs" in columns
+            process_next_method = columns and "next_method" in columns
+            if process_next_kwargs or process_next_method:
+                buf = StringIO()
+                reader = csv.DictReader(
+                    StringIO("".join(batch)), columns, delimiter="|"
+                )
+                writer = csv.DictWriter(buf, columns, delimiter="|")
+                sanitize_data = lambda data: json.dumps(
+                    json.loads(re.sub(r"([^\\])'", r'\1"', data).replace("\\'", "'"))
+                )
+                for row in reader:
+                    if process_next_kwargs and row["next_kwargs"]:
+                        row["next_kwargs"] = sanitize_data(row["next_kwargs"])
+                    if process_next_method and row["next_method"]:
+                        row["next_method"] = sanitize_data(row["next_method"])
+                    writer.writerow(row)
+            else:
+                buf = StringIO("".join(batch))
+            return buf
+
         backup_file = self.read(context)
 
         if self.columns:
@@ -365,7 +405,9 @@ class BaseTable:
                 batch = list(itertools.islice(backup_file, self.batch_size))
                 if not batch:
                     break
-                cursor.copy_expert(restore_sql, StringIO("".join(batch)))
+                cursor.copy_expert(
+                    restore_sql, preprocess_for_bad_json(batch, self.columns)
+                )
                 conn.commit()
                 insert_counter += len(batch)
             print(f"Inserted {insert_counter} records")
