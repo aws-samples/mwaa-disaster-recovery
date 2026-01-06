@@ -743,7 +743,10 @@ For both modes, please make sure of the following:
 1. Ensure you have an S3 bucket created to store the backup.
 2. Ensure that your MWAA execution role has read and write permissions on the bucket.
 3. Create an Airflow variable with the key named `DR_BACKUP_BUCKET` and the value containing the **name** (not ARN) of the S3 bucket.
-4. You are all set to manually trigger the backup and restore DAGs at any point. The metadata backup will be stored in `<backup S3 bucket>/<path_prefix>`.
+4. (Optional) To enable S3 encryption for metadata backups, create Airflow variables:
+   - `DR_S3_ENCRYPTION_TYPE`: Set to `AES256` for SSE-S3 encryption or `aws:kms` for SSE-KMS encryption. If not set, S3 PUT operations will use the bucket's default encryption settings (if configured).
+   - `DR_S3_KMS_KEY_ID`: Required only when using `aws:kms` encryption. Set to the KMS key ID or ARN (e.g., `arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012`). If not set when using `aws:kms`, AWS will use the default KMS key for the account.
+5. You are all set to manually trigger the backup and restore DAGs at any point. The metadata backup will be stored in `<backup S3 bucket>/<path_prefix>`.
 
 For testing the `mwaa_dr` library itself, you can run [aws-mwaa-local-runner](https://github.com/aws/aws-mwaa-local-runner) container locally by simply copying the [assets/dags/mwaa_dr](assets/dags/mwaa_dr/) folder into the `dags` folder of the local runner codebase. Also, copy the contents of [requirements.txt](assets/requirements.txt) to the local runner's requirements file. Finally, export an Airflow variable in the `startup_script/startup.sh` file of the local runner as follows:
 ```bash
