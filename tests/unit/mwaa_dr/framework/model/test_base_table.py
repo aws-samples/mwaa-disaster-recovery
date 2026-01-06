@@ -617,6 +617,217 @@ class TestBaseTable:
 
             expect(data).to.equal("data")
 
+    def test_write_to_s3_without_encryption(self, mock_table_for_s3, mock_context):
+        """Test write_to_s3 does not add encryption when no variables are set (backward compatible)."""
+        with mock_aws():
+            with patch("boto3.client") as mock_boto_client:
+                mock_s3_client_instance = mock_boto_client.return_value
+                mock_table_for_s3.write_to_s3("data", "task_instance", mock_context)
+
+                # Verify put_object was called without encryption parameters (backward compatible)
+                mock_s3_client_instance.put_object.assert_called_once()
+                call_args = mock_s3_client_instance.put_object.call_args
+                expect(call_args[1]["Bucket"]).to.equal("backup-bucket")
+                expect(call_args[1]["Key"]).to.equal("data/task_instance.csv")
+                expect(call_args[1]["Body"]).to.equal("data")
+                expect("ServerSideEncryption" in call_args[1]).to.be.false
+                expect("SSEKMSKeyId" in call_args[1]).to.be.false
+
+    @patch("airflow.models.Variable.get")
+    def test_write_to_s3_with_aes256_variable(self, mock_var_get, mock_table_for_s3, mock_context):
+        """Test write_to_s3 uses AES256 when DR_S3_ENCRYPTION_TYPE is set to AES256."""
+        def var_get_side_effect(key, default_var=None):
+            if key == "DR_BACKUP_BUCKET":
+                return "backup-bucket"
+            elif key == "DR_S3_ENCRYPTION_TYPE":
+                return "AES256"
+            return default_var
+
+        mock_var_get.side_effect = var_get_side_effect
+
+        with mock_aws():
+            with patch("boto3.client") as mock_boto_client:
+                mock_s3_client_instance = mock_boto_client.return_value
+                mock_table_for_s3.write_to_s3("data", "task_instance", mock_context)
+
+                # Verify put_object was called with AES256 encryption
+                mock_s3_client_instance.put_object.assert_called_once()
+                call_args = mock_s3_client_instance.put_object.call_args
+                expect(call_args[1]["ServerSideEncryption"]).to.equal("AES256")
+                expect("SSEKMSKeyId" in call_args[1]).to.be.false
+
+    def test_write_to_s3_with_aes256_context(self, mock_table_for_s3):
+        """Test write_to_s3 uses AES256 when set via dag_run context."""
+        conf = dict()
+        conf["bucket"] = "backup-bucket"
+        conf["s3_encryption_type"] = "AES256"
+        dag_run = types.SimpleNamespace()
+        dag_run.conf = conf
+        context = dict()
+        context["dag_run"] = dag_run
+
+        with mock_aws():
+            with patch("boto3.client") as mock_boto_client:
+                mock_s3_client_instance = mock_boto_client.return_value
+                mock_table_for_s3.write_to_s3("data", "task_instance", context)
+
+                # Verify put_object was called with AES256 encryption
+                mock_s3_client_instance.put_object.assert_called_once()
+                call_args = mock_s3_client_instance.put_object.call_args
+                expect(call_args[1]["ServerSideEncryption"]).to.equal("AES256")
+                expect("SSEKMSKeyId" in call_args[1]).to.be.false
+
+    @patch("airflow.models.Variable.get")
+    def test_write_to_s3_with_kms_encryption_and_key_id(self, mock_var_get, mock_table_for_s3, mock_context):
+        """Test write_to_s3 uses KMS encryption with specified key ID."""
+        kms_key_id = "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012"
+
+        def var_get_side_effect(key, default_var=None):
+            if key == "DR_BACKUP_BUCKET":
+                return "backup-bucket"
+            elif key == "DR_S3_ENCRYPTION_TYPE":
+                return "aws:kms"
+            elif key == "DR_S3_KMS_KEY_ID":
+                return kms_key_id
+            return default_var
+
+        mock_var_get.side_effect = var_get_side_effect
+
+        with mock_aws():
+            with patch("boto3.client") as mock_boto_client:
+                mock_s3_client_instance = mock_boto_client.return_value
+                mock_table_for_s3.write_to_s3("data", "task_instance", mock_context)
+
+                # Verify put_object was called with KMS encryption and key ID
+                mock_s3_client_instance.put_object.assert_called_once()
+                call_args = mock_s3_client_instance.put_object.call_args
+                expect(call_args[1]["ServerSideEncryption"]).to.equal("aws:kms")
+                expect(call_args[1]["SSEKMSKeyId"]).to.equal(kms_key_id)
+
+    def test_write_to_s3_with_kms_encryption_and_key_id_context(self, mock_table_for_s3):
+        """Test write_to_s3 uses KMS encryption with key ID set via dag_run context."""
+        kms_key_id = "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012"
+        conf = dict()
+        conf["bucket"] = "backup-bucket"
+        conf["s3_encryption_type"] = "aws:kms"
+        conf["s3_kms_key_id"] = kms_key_id
+        dag_run = types.SimpleNamespace()
+        dag_run.conf = conf
+        context = dict()
+        context["dag_run"] = dag_run
+
+        with mock_aws():
+            with patch("boto3.client") as mock_boto_client:
+                mock_s3_client_instance = mock_boto_client.return_value
+                mock_table_for_s3.write_to_s3("data", "task_instance", context)
+
+                # Verify put_object was called with KMS encryption and key ID
+                mock_s3_client_instance.put_object.assert_called_once()
+                call_args = mock_s3_client_instance.put_object.call_args
+                expect(call_args[1]["ServerSideEncryption"]).to.equal("aws:kms")
+                expect(call_args[1]["SSEKMSKeyId"]).to.equal(kms_key_id)
+
+    @patch("airflow.models.Variable.get")
+    def test_write_to_s3_with_kms_encryption_without_key_id(self, mock_var_get, mock_table_for_s3, mock_context):
+        """Test write_to_s3 uses KMS encryption without key ID (uses default KMS key)."""
+        def var_get_side_effect(key, default_var=None):
+            if key == "DR_BACKUP_BUCKET":
+                return "backup-bucket"
+            elif key == "DR_S3_ENCRYPTION_TYPE":
+                return "aws:kms"
+            elif key == "DR_S3_KMS_KEY_ID":
+                return None
+            return default_var
+
+        mock_var_get.side_effect = var_get_side_effect
+
+        with mock_aws():
+            with patch("boto3.client") as mock_boto_client:
+                mock_s3_client_instance = mock_boto_client.return_value
+                with patch("builtins.print") as mock_print:
+                    mock_table_for_s3.write_to_s3("data", "task_instance", mock_context)
+
+                    # Verify put_object was called with KMS encryption but no key ID
+                    mock_s3_client_instance.put_object.assert_called_once()
+                    call_args = mock_s3_client_instance.put_object.call_args
+                    expect(call_args[1]["ServerSideEncryption"]).to.equal("aws:kms")
+                    expect("SSEKMSKeyId" in call_args[1]).to.be.false
+
+                    # Verify warning was printed
+                    print_calls = [str(call_args) for call_args in mock_print.call_args_list]
+                    warning_found = any(
+                        "Warning" in call_str and "DR_S3_KMS_KEY_ID" in call_str
+                        for call_str in print_calls
+                    )
+                    expect(warning_found).to.be.true
+
+    @pytest.mark.parametrize("invalid_value", ["None", "", "none", "NONE"])
+    @patch("airflow.models.Variable.get")
+    def test_write_to_s3_with_invalid_encryption_values(
+        self, mock_var_get, mock_table_for_s3, mock_context, invalid_value
+    ):
+        """Test write_to_s3 handles invalid encryption values (None, empty string) as no encryption (backward compatible)."""
+        def var_get_side_effect(key, default_var=None):
+            if key == "DR_BACKUP_BUCKET":
+                return "backup-bucket"
+            elif key == "DR_S3_ENCRYPTION_TYPE":
+                return invalid_value
+            return default_var
+
+        mock_var_get.side_effect = var_get_side_effect
+
+        with mock_aws():
+            with patch("boto3.client") as mock_boto_client:
+                mock_s3_client_instance = mock_boto_client.return_value
+                mock_table_for_s3.write_to_s3("data", "task_instance", mock_context)
+
+                # Verify put_object was called without encryption parameters
+                mock_s3_client_instance.put_object.assert_called_once()
+                call_args = mock_s3_client_instance.put_object.call_args
+                expect("ServerSideEncryption" in call_args[1]).to.be.false
+                expect("SSEKMSKeyId" in call_args[1]).to.be.false
+
+    @patch("airflow.models.Variable.get")
+    def test_write_to_s3_with_invalid_encryption_type(self, mock_var_get, mock_table_for_s3, mock_context):
+        """Test write_to_s3 raises ValueError for invalid encryption type."""
+        def var_get_side_effect(key, default_var=None):
+            if key == "DR_BACKUP_BUCKET":
+                return "backup-bucket"
+            elif key == "DR_S3_ENCRYPTION_TYPE":
+                return "INVALID_TYPE"  # Invalid encryption type
+            return default_var
+
+        mock_var_get.side_effect = var_get_side_effect
+
+        with mock_aws():
+            with patch("boto3.client") as mock_boto_client:
+                with pytest.raises(ValueError, match="Invalid encryption type"):
+                    mock_table_for_s3.write_to_s3("data", "task_instance", mock_context)
+
+    def test_write_to_s3_with_only_keyid_no_encryption_type(self, mock_table_for_s3):
+        """Test write_to_s3 ignores KMS key ID when encryption type is not set."""
+        kms_key_id = "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012"
+        conf = dict()
+        conf["bucket"] = "backup-bucket"
+        # Only set key ID, not encryption type
+        conf["s3_kms_key_id"] = kms_key_id
+        dag_run = types.SimpleNamespace()
+        dag_run.conf = conf
+        context = dict()
+        context["dag_run"] = dag_run
+
+        with mock_aws():
+            with patch("boto3.client") as mock_boto_client:
+                mock_s3_client_instance = mock_boto_client.return_value
+                mock_table_for_s3.write_to_s3("data", "task_instance", context)
+
+                # Verify put_object was called without encryption parameters
+                # (Key ID is ignored when encryption type is not set)
+                mock_s3_client_instance.put_object.assert_called_once()
+                call_args = mock_s3_client_instance.put_object.call_args
+                expect("ServerSideEncryption" in call_args[1]).to.be.false
+                expect("SSEKMSKeyId" in call_args[1]).to.be.false
+
     def test_write_to_local(self, mock_table_for_local_fs):
         os.environ["AIRFLOW_HOME"] = "/tmp"
         try:
