@@ -634,8 +634,11 @@ class TestBaseTable:
                 expect("SSEKMSKeyId" in call_args[1]).to.be.false
 
     @patch("airflow.models.Variable.get")
-    def test_write_to_s3_with_aes256_variable(self, mock_var_get, mock_table_for_s3, mock_context):
+    def test_write_to_s3_with_aes256_variable(
+        self, mock_var_get, mock_table_for_s3, mock_context
+    ):
         """Test write_to_s3 uses AES256 when DR_S3_ENCRYPTION_TYPE is set to AES256."""
+
         def var_get_side_effect(key, default_var=None):
             if key == "DR_BACKUP_BUCKET":
                 return "backup-bucket"
@@ -678,7 +681,9 @@ class TestBaseTable:
                 expect("SSEKMSKeyId" in call_args[1]).to.be.false
 
     @patch("airflow.models.Variable.get")
-    def test_write_to_s3_with_kms_encryption_and_key_id(self, mock_var_get, mock_table_for_s3, mock_context):
+    def test_write_to_s3_with_kms_encryption_and_key_id(
+        self, mock_var_get, mock_table_for_s3, mock_context
+    ):
         """Test write_to_s3 uses KMS encryption with specified key ID."""
         kms_key_id = "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012"
 
@@ -704,7 +709,9 @@ class TestBaseTable:
                 expect(call_args[1]["ServerSideEncryption"]).to.equal("aws:kms")
                 expect(call_args[1]["SSEKMSKeyId"]).to.equal(kms_key_id)
 
-    def test_write_to_s3_with_kms_encryption_and_key_id_context(self, mock_table_for_s3):
+    def test_write_to_s3_with_kms_encryption_and_key_id_context(
+        self, mock_table_for_s3
+    ):
         """Test write_to_s3 uses KMS encryption with key ID set via dag_run context."""
         kms_key_id = "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012"
         conf = dict()
@@ -728,8 +735,11 @@ class TestBaseTable:
                 expect(call_args[1]["SSEKMSKeyId"]).to.equal(kms_key_id)
 
     @patch("airflow.models.Variable.get")
-    def test_write_to_s3_with_kms_encryption_without_key_id(self, mock_var_get, mock_table_for_s3, mock_context):
+    def test_write_to_s3_with_kms_encryption_without_key_id(
+        self, mock_var_get, mock_table_for_s3, mock_context
+    ):
         """Test write_to_s3 uses KMS encryption without key ID (uses default KMS key)."""
+
         def var_get_side_effect(key, default_var=None):
             if key == "DR_BACKUP_BUCKET":
                 return "backup-bucket"
@@ -754,7 +764,9 @@ class TestBaseTable:
                     expect("SSEKMSKeyId" in call_args[1]).to.be.false
 
                     # Verify warning was printed
-                    print_calls = [str(call_args) for call_args in mock_print.call_args_list]
+                    print_calls = [
+                        str(call_args) for call_args in mock_print.call_args_list
+                    ]
                     warning_found = any(
                         "Warning" in call_str and "DR_S3_KMS_KEY_ID" in call_str
                         for call_str in print_calls
@@ -767,6 +779,7 @@ class TestBaseTable:
         self, mock_var_get, mock_table_for_s3, mock_context, invalid_value
     ):
         """Test write_to_s3 handles invalid encryption values (None, empty string) as no encryption (backward compatible)."""
+
         def var_get_side_effect(key, default_var=None):
             if key == "DR_BACKUP_BUCKET":
                 return "backup-bucket"
@@ -788,8 +801,11 @@ class TestBaseTable:
                 expect("SSEKMSKeyId" in call_args[1]).to.be.false
 
     @patch("airflow.models.Variable.get")
-    def test_write_to_s3_with_invalid_encryption_type(self, mock_var_get, mock_table_for_s3, mock_context):
+    def test_write_to_s3_with_invalid_encryption_type(
+        self, mock_var_get, mock_table_for_s3, mock_context
+    ):
         """Test write_to_s3 raises ValueError for invalid encryption type."""
+
         def var_get_side_effect(key, default_var=None):
             if key == "DR_BACKUP_BUCKET":
                 return "backup-bucket"
