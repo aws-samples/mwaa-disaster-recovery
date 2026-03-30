@@ -9,8 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.2.0] - 2026-03-30
 ### Added
-- Support for MWAA v2.11.0
-- New v_2_11 DR factory (inherits from v_2_10 as no schema changes)
+- Support for MWAA v2.11.0 due to gracious contribution of [Kamen Sharlandjiev](https://github.com/ksharlandjiev)
 - Spec-Driven Development steering files for Kiro
 
 ### Fixed
