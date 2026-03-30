@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- Optional S3 encryption support for PUT operations in mwaa_dr framework via `DR_S3_ENCRYPTION_TYPE` and `DR_S3_KMS_KEY_ID` Airflow variables
+- Support for AES256 (SSE-S3) and aws:kms (SSE-KMS) encryption types
+- Validation and edge case handling for encryption configuration (None, empty string, invalid values)
 
 ## [2.2.0] - 2026-03-30
 ### Added

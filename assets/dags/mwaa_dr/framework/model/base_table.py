@@ -407,11 +407,92 @@ class BaseTable:
             self.write_to_local(body, self.name)
 
     def write_to_s3(self, body: str, file_name, context):
+        """
+        Writes the provided string content to an S3 bucket with optional encryption.
+
+        Encryption is optional and only applied if explicitly configured via Airflow variables:
+        - DR_S3_ENCRYPTION_TYPE: Encryption type ("AES256" for SSE-S3 or "aws:kms" for SSE-KMS).
+          If not set, no encryption parameter is added (uses bucket default encryption if configured).
+        - DR_S3_KMS_KEY_ID: KMS key ID (required only when using "aws:kms" encryption type).
+
+        Args:
+            body (str): The string content to be written to the file.
+            file_name (str): The name of the file (without extension).
+            context (dict, optional): The context dictionary containing the 'dag_run' information.
+        """
         import boto3
 
         s3_client = boto3.client("s3")
         key = f"{self.path_prefix}/{file_name}.csv"
-        s3_client.put_object(Bucket=self.bucket(context), Key=key, Body=body)
+        bucket_name = self.bucket(context)
+
+        # Build put_object parameters
+        put_params = {
+            "Bucket": bucket_name,
+            "Key": key,
+            "Body": body,
+        }
+
+        # Get encryption configuration from Airflow variables or context
+        # Only add encryption if explicitly configured (backward compatible)
+        encryption_type = BaseTable.config(
+            "s3_encryption_type",
+            "DR_S3_ENCRYPTION_TYPE",
+            default_val=None,
+            context=context,
+        )
+
+        # Valid S3 encryption types
+        VALID_ENCRYPTION_TYPES = ["AES256", "aws:kms"]
+
+        # Normalize and validate encryption_type
+        if encryption_type is not None:
+            # Handle string values (from Airflow variables, they come as strings)
+            if isinstance(encryption_type, str):
+                encryption_type = encryption_type.strip()
+                # Treat string "None", "none", "NONE", or empty string as None
+                if encryption_type.upper() in ["NONE", ""]:
+                    encryption_type = None
+                # Validate encryption type
+                elif encryption_type not in VALID_ENCRYPTION_TYPES:
+                    raise ValueError(
+                        f"Invalid encryption type: '{encryption_type}'. "
+                        f"Must be one of {VALID_ENCRYPTION_TYPES} or not set."
+                    )
+
+        # Add encryption parameters only if encryption is explicitly configured and valid
+        if encryption_type:
+            put_params["ServerSideEncryption"] = encryption_type
+
+            # Add KMS key ID if using KMS encryption
+            if encryption_type == "aws:kms":
+                kms_key_id = BaseTable.config(
+                    "s3_kms_key_id",
+                    "DR_S3_KMS_KEY_ID",
+                    default_val=None,
+                    context=context,
+                )
+                # Normalize KMS key ID (handle string "None" or empty string)
+                if kms_key_id is not None and isinstance(kms_key_id, str):
+                    kms_key_id = kms_key_id.strip()
+                    if kms_key_id.upper() in ["NONE", ""]:
+                        kms_key_id = None
+
+                if kms_key_id:
+                    put_params["SSEKMSKeyId"] = kms_key_id
+                else:
+                    print(
+                        "Warning: Using aws:kms encryption but DR_S3_KMS_KEY_ID is not set. "
+                        "AWS will use the default KMS key for the account."
+                    )
+
+        s3_client.put_object(**put_params)
+        if encryption_type:
+            print(
+                f"Successfully wrote {key} to {bucket_name} with encryption: {encryption_type}"
+            )
+        else:
+            print(f"Successfully wrote {key} to {bucket_name}")
 
     def write_to_local(self, body: str, file_name):
         AIRFLOW_HOME = os.getenv("AIRFLOW_HOME")
