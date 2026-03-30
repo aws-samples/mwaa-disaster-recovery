@@ -7,9 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-03-30
 ### Added
 - Support for MWAA v2.11.0
 - New v_2_11 DR factory (inherits from v_2_10 as no schema changes)
+- Spec-Driven Development steering files for Kiro
 
 ### Fixed
 - Fix MWAA DR restore errors for Airflow 2.11 compatibility
@@ -147,7 +149,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial commit with sample readme, code of conduct, and license
 
 
-[unreleased]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v2.1.1...HEAD
+[unreleased]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v2.2.0...HEAD
+[2.2.0]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v2.1.1...v2.2.0
 [2.1.1]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v2.1.0...v2.1.1
 [2.1.0]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v2.0.1...v2.1.0
 [2.0.1]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v2.0.0...v2.0.1

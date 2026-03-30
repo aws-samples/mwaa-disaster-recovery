@@ -3,5 +3,6 @@
         "./assets/dags",
         "./lib/functions"
     ],
-    "python.envFile": "${workspaceFolder}/.env.none"
+    "python.envFile": "${workspaceFolder}/.env.none",
+    "kiroAgent.configureMCP": "Enabled"
 }
