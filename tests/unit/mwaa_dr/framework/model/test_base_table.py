@@ -597,6 +597,105 @@ class TestBaseTable:
             mock_sql_raw_connection.return_value.commit.assert_called_once()
             mock_sql_raw_connection.return_value.close.assert_called_once()
 
+    def test_restore_duplicate_key_skips_batch(
+        self, mock_context, mock_sql_raw_connection
+    ):
+        task_instance = BaseTable(
+            name="task_instance", model=DependencyModel(), columns=["dag_id", "state"]
+        )
+
+        sample_data = "test|running\r\n"
+
+        with (
+            io.StringIO(sample_data) as store,
+            patch.object(task_instance, "read", return_value=store),
+        ):
+            mock_cursor = mock_sql_raw_connection.return_value.cursor.return_value
+            mock_cursor.copy_expert.side_effect = Exception(
+                "duplicate key value violates unique constraint"
+            )
+
+            task_instance.restore(**mock_context)
+
+            mock_sql_raw_connection.return_value.rollback.assert_called_once()
+            mock_sql_raw_connection.return_value.commit.assert_not_called()
+            mock_sql_raw_connection.return_value.close.assert_called_once()
+
+    def test_restore_unique_violation_skips_batch(
+        self, mock_context, mock_sql_raw_connection
+    ):
+        task_instance = BaseTable(
+            name="task_instance", model=DependencyModel(), columns=["dag_id", "state"]
+        )
+
+        sample_data = "test|running\r\n"
+
+        with (
+            io.StringIO(sample_data) as store,
+            patch.object(task_instance, "read", return_value=store),
+        ):
+            mock_cursor = mock_sql_raw_connection.return_value.cursor.return_value
+            mock_cursor.copy_expert.side_effect = Exception(
+                "UniqueViolation: could not insert"
+            )
+
+            task_instance.restore(**mock_context)
+
+            mock_sql_raw_connection.return_value.rollback.assert_called_once()
+            mock_sql_raw_connection.return_value.commit.assert_not_called()
+            mock_sql_raw_connection.return_value.close.assert_called_once()
+
+    def test_restore_non_duplicate_error_raises(
+        self, mock_context, mock_sql_raw_connection
+    ):
+        task_instance = BaseTable(
+            name="task_instance", model=DependencyModel(), columns=["dag_id", "state"]
+        )
+
+        sample_data = "test|running\r\n"
+
+        with (
+            io.StringIO(sample_data) as store,
+            patch.object(task_instance, "read", return_value=store),
+        ):
+            mock_cursor = mock_sql_raw_connection.return_value.cursor.return_value
+            mock_cursor.copy_expert.side_effect = Exception("connection refused")
+
+            with pytest.raises(Exception, match="connection refused"):
+                task_instance.restore(**mock_context)
+
+            mock_sql_raw_connection.return_value.rollback.assert_called_once()
+            mock_sql_raw_connection.return_value.close.assert_called_once()
+
+    def test_restore_mixed_duplicate_and_success(
+        self, mock_context, mock_sql_raw_connection
+    ):
+        task_instance = BaseTable(
+            name="task_instance",
+            model=DependencyModel(),
+            columns=["dag_id", "state"],
+            batch_size=1,
+        )
+
+        sample_data = "dag1|running\r\ndag2|success\r\n"
+
+        with (
+            io.StringIO(sample_data) as store,
+            patch.object(task_instance, "read", return_value=store),
+        ):
+            mock_cursor = mock_sql_raw_connection.return_value.cursor.return_value
+            mock_cursor.copy_expert.side_effect = [
+                Exception("duplicate key value violates unique constraint"),
+                None,
+            ]
+
+            task_instance.restore(**mock_context)
+
+            expect(mock_cursor.copy_expert.call_count).to.equal(2)
+            mock_sql_raw_connection.return_value.rollback.assert_called_once()
+            mock_sql_raw_connection.return_value.commit.assert_called_once()
+            mock_sql_raw_connection.return_value.close.assert_called_once()
+
     @pytest.fixture(scope="function")
     def mock_s3_client(self):
         with mock_aws():

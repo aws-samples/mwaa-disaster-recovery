@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Support for MWAA v2.11.0
+- New v_2_11 DR factory (inherits from v_2_10 as no schema changes)
+
+### Fixed
+- Fix MWAA DR restore errors for Airflow 2.11 compatibility
+- `variable_table.py`: Handle CSV rows with 2 or 3 columns gracefully in restore. The backup writes 3 columns (key, val, description), but older backups or variables without descriptions produce rows with only 2 columns. Accessing `row[2]` unconditionally caused an `IndexError`. Now defaults description to `None` when the column is absent.
+- `base_table.py`: Catch `UniqueViolation` errors during COPY restore and skip duplicate batches instead of crashing. This handles restoring into a DB that already contains some of the backed-up data (e.g. `dag_run` rows from example DAGs).
+
+### Changed
+- `requirements.txt`: Update constraints URL from 2.10.3 to 2.11.1 and bump provider versions to match. The old 2.10.3 constraints were downgrading `typing_extensions` at runtime, breaking `pydantic_core` imports.
+
 ## [2.1.1] - 2025-02-13
 ### Changed
 - Updating sigstore Github Action for PyPI publishing

@@ -127,7 +127,7 @@ class VariableTable(BaseTable):
                     Variable.set(
                         key=row[0],
                         value=row[1],
-                        description=row[2],
+                        description=row[2] if len(row) > 2 else None,
                         session=session,
                     )
 

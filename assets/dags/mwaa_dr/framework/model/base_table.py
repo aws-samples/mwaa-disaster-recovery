@@ -361,14 +361,28 @@ class BaseTable:
         try:
             cursor = conn.cursor()
             insert_counter = 0
+            skip_counter = 0
             while True:
                 batch = list(itertools.islice(backup_file, self.batch_size))
                 if not batch:
                     break
-                cursor.copy_expert(restore_sql, StringIO("".join(batch)))
-                conn.commit()
-                insert_counter += len(batch)
-            print(f"Inserted {insert_counter} records")
+                try:
+                    cursor.copy_expert(restore_sql, StringIO("".join(batch)))
+                    conn.commit()
+                    insert_counter += len(batch)
+                except Exception as e:
+                    conn.rollback()
+                    error_msg = str(e)
+                    if "duplicate key" in error_msg or "UniqueViolation" in error_msg:
+                        print(
+                            f"Skipping batch of {len(batch)} rows due to duplicate key conflict: {error_msg.splitlines()[0]}"
+                        )
+                        skip_counter += len(batch)
+                    else:
+                        raise
+            print(
+                f"Inserted {insert_counter} records, skipped {skip_counter} duplicates"
+            )
         finally:
             if cursor:
                 cursor.close()

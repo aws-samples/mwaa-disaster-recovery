@@ -35,6 +35,7 @@ SUPPORTED_MWAA_VERSIONS = [
     "2.9.2",
     "2.10.1",
     "2.10.3",
+    "2.11.0",
 ]
 
 # DR Option

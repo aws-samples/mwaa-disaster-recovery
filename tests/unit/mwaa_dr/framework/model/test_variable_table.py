@@ -236,3 +236,103 @@ class TestVariableTable:
 
             var_set.assert_not_called()
             session.return_value.commit.assert_not_called()
+
+    def test_restore_variable_with_two_columns(self):
+        model = DependencyModel()
+        table = VariableTable(
+            model=model,
+            storage_type="LOCAL_FS",
+            path_prefix="data",
+        )
+        context = {}
+        buffer = StringIO("key1,val1\r\n")
+
+        def mock_variable_get_call(key, default_var):
+            if default_var:
+                return default_var
+            raise KeyError(f"Key [{key}] not found!")
+
+        with (
+            patch.object(table, "read", return_value=buffer),
+            patch("sqlalchemy.orm.Session.__enter__") as session,
+            patch("airflow.models.Variable.get", new=mock_variable_get_call),
+            patch("airflow.models.Variable.set") as var_set,
+        ):
+            table.restore(**context)
+
+            var_set.assert_called_once_with(
+                key="key1",
+                value="val1",
+                description=None,
+                session=session.return_value,
+            )
+            session.return_value.commit.assert_called_once()
+
+    def test_restore_variable_with_three_columns(self):
+        model = DependencyModel()
+        table = VariableTable(
+            model=model,
+            storage_type="LOCAL_FS",
+            path_prefix="data",
+        )
+        context = {}
+        buffer = StringIO("key1,val1,my description\r\n")
+
+        def mock_variable_get_call(key, default_var):
+            if default_var:
+                return default_var
+            raise KeyError(f"Key [{key}] not found!")
+
+        with (
+            patch.object(table, "read", return_value=buffer),
+            patch("sqlalchemy.orm.Session.__enter__") as session,
+            patch("airflow.models.Variable.get", new=mock_variable_get_call),
+            patch("airflow.models.Variable.set") as var_set,
+        ):
+            table.restore(**context)
+
+            var_set.assert_called_once_with(
+                key="key1",
+                value="val1",
+                description="my description",
+                session=session.return_value,
+            )
+            session.return_value.commit.assert_called_once()
+
+    def test_restore_mixed_two_and_three_column_rows(self):
+        model = DependencyModel()
+        table = VariableTable(
+            model=model,
+            storage_type="LOCAL_FS",
+            path_prefix="data",
+        )
+        context = {}
+        buffer = StringIO("key1,val1,desc1\r\nkey2,val2\r\n")
+
+        def mock_variable_get_call(key, default_var):
+            if default_var:
+                return default_var
+            raise KeyError(f"Key [{key}] not found!")
+
+        with (
+            patch.object(table, "read", return_value=buffer),
+            patch("sqlalchemy.orm.Session.__enter__") as session,
+            patch("airflow.models.Variable.get", new=mock_variable_get_call),
+            patch("airflow.models.Variable.set") as var_set,
+        ):
+            table.restore(**context)
+
+            expect(var_set.call_count).to.equal(2)
+            var_set.assert_any_call(
+                key="key1",
+                value="val1",
+                description="desc1",
+                session=session.return_value,
+            )
+            var_set.assert_any_call(
+                key="key2",
+                value="val2",
+                description=None,
+                session=session.return_value,
+            )
+            session.return_value.commit.assert_called_once()
