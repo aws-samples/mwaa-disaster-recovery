@@ -23,7 +23,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 import csv
 import os
 from io import StringIO
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 
 from hypothesis import given, settings, assume
 from hypothesis.strategies import (
@@ -42,6 +42,7 @@ from mwaa_dr.framework.model.dependency_model import DependencyModel
 # ---------------------------------------------------------------------------
 # Shared concrete factory for testing
 # ---------------------------------------------------------------------------
+
 
 class ConcreteGlueDRFactory(GlueDRFactory):
     """Concrete subclass for testing since GlueDRFactory needs setup_tables."""
@@ -78,25 +79,30 @@ class ConcreteGlueDRFactory(GlueDRFactory):
 # Strategies
 # ---------------------------------------------------------------------------
 
+
 @composite
 def mwaa_env_names(draw):
     """Generate valid MWAA environment name strings (alphanumeric + hyphens)."""
-    name = draw(text(
-        alphabet="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_",
-        min_size=1,
-        max_size=64,
-    ))
+    name = draw(
+        text(
+            alphabet="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_",
+            min_size=1,
+            max_size=64,
+        )
+    )
     return name
 
 
 @composite
 def s3_bucket_names(draw):
     """Generate valid S3 bucket name strings."""
-    name = draw(text(
-        alphabet="abcdefghijklmnopqrstuvwxyz0123456789-.",
-        min_size=3,
-        max_size=63,
-    ))
+    name = draw(
+        text(
+            alphabet="abcdefghijklmnopqrstuvwxyz0123456789-.",
+            min_size=3,
+            max_size=63,
+        )
+    )
     assume(not name.startswith("-"))
     assume(not name.startswith("."))
     assume(not name.endswith("-"))
@@ -108,28 +114,33 @@ def s3_bucket_names(draw):
 @composite
 def script_names(draw):
     """Generate valid Glue script base names (no extension)."""
-    name = draw(text(
-        alphabet="abcdefghijklmnopqrstuvwxyz0123456789_",
-        min_size=1,
-        max_size=50,
-    ))
+    name = draw(
+        text(
+            alphabet="abcdefghijklmnopqrstuvwxyz0123456789_",
+            min_size=1,
+            max_size=50,
+        )
+    )
     return name
 
 
 @composite
 def variable_keys(draw):
     """Generate valid Airflow variable key strings."""
-    key = draw(text(
-        alphabet="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-",
-        min_size=1,
-        max_size=30,
-    ))
+    key = draw(
+        text(
+            alphabet="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-",
+            min_size=1,
+            max_size=30,
+        )
+    )
     return key
 
 
 # ---------------------------------------------------------------------------
 # Property 13: Glue connection naming follows environment pattern
 # ---------------------------------------------------------------------------
+
 
 class TestGlueConnectionNamingProperty:
     """
@@ -162,6 +173,7 @@ class TestGlueConnectionNamingProperty:
 # ---------------------------------------------------------------------------
 # Property 3: S3 path construction follows naming conventions
 # ---------------------------------------------------------------------------
+
 
 class TestS3PathConstructionProperty:
     """
@@ -200,6 +212,7 @@ class TestS3PathConstructionProperty:
 # Property 11: Restore strategy determines correct API behavior
 # ---------------------------------------------------------------------------
 
+
 class TestRestoreStrategyBehaviorProperty:
     """
     **Validates: Requirements 11.5, 11.6, 11.7**
@@ -219,7 +232,9 @@ class TestRestoreStrategyBehaviorProperty:
         strategy=sampled_from(["APPEND", "REPLACE", "DO_NOTHING"]),
     )
     @settings(max_examples=100)
-    def test_restore_variables_strategy_behavior(self, backup_keys, existing_keys, strategy):
+    def test_restore_variables_strategy_behavior(
+        self, backup_keys, existing_keys, strategy
+    ):
         """
         **Validates: Requirements 11.5, 11.6, 11.7**
 
@@ -240,7 +255,9 @@ class TestRestoreStrategyBehaviorProperty:
 
         # Mock the REST API client
         mock_client = MagicMock()
-        existing_vars = [{"key": k, "value": f"existing_{k}"} for k in sorted(existing_keys)]
+        existing_vars = [
+            {"key": k, "value": f"existing_{k}"} for k in sorted(existing_keys)
+        ]
         mock_client.list_variables.return_value = existing_vars
 
         # Mock S3 to return our CSV
@@ -249,9 +266,13 @@ class TestRestoreStrategyBehaviorProperty:
             "Body": MagicMock(read=MagicMock(return_value=csv_content.encode("utf-8")))
         }
 
-        with patch.object(factory, "get_mwaa_rest_api_client", return_value=mock_client), \
-             patch("mwaa_dr.framework.factory.glue_dr_factory.Variable") as mock_variable, \
-             patch("mwaa_dr.framework.factory.glue_dr_factory.boto3") as mock_boto3:
+        with patch.object(
+            factory, "get_mwaa_rest_api_client", return_value=mock_client
+        ), patch(
+            "mwaa_dr.framework.factory.glue_dr_factory.Variable"
+        ) as mock_variable, patch(
+            "mwaa_dr.framework.factory.glue_dr_factory.boto3"
+        ) as mock_boto3:
 
             mock_variable.get.return_value = strategy
             mock_boto3.client.return_value = mock_s3
@@ -267,12 +288,16 @@ class TestRestoreStrategyBehaviorProperty:
         elif strategy == "REPLACE":
             # All existing should be deleted
             assert mock_client.delete_variable.call_count == len(existing_keys)
-            deleted_keys = {c.args[0] for c in mock_client.delete_variable.call_args_list}
+            deleted_keys = {
+                c.args[0] for c in mock_client.delete_variable.call_args_list
+            }
             assert deleted_keys == existing_keys
 
             # All backup entries should be created
             assert mock_client.create_variable.call_count == len(backup_keys)
-            created_keys = {c.kwargs["key"] for c in mock_client.create_variable.call_args_list}
+            created_keys = {
+                c.kwargs["key"] for c in mock_client.create_variable.call_args_list
+            }
             assert created_keys == backup_keys
 
         elif strategy == "APPEND":
@@ -280,7 +305,9 @@ class TestRestoreStrategyBehaviorProperty:
             expected_new = backup_keys - existing_keys
             assert mock_client.create_variable.call_count == len(expected_new)
             if expected_new:
-                created_keys = {c.kwargs["key"] for c in mock_client.create_variable.call_args_list}
+                created_keys = {
+                    c.kwargs["key"] for c in mock_client.create_variable.call_args_list
+                }
                 assert created_keys == expected_new
 
             # No deletions in APPEND mode
@@ -292,7 +319,9 @@ class TestRestoreStrategyBehaviorProperty:
         strategy=sampled_from(["APPEND", "REPLACE", "DO_NOTHING"]),
     )
     @settings(max_examples=100)
-    def test_restore_connections_strategy_behavior(self, backup_ids, existing_ids, strategy):
+    def test_restore_connections_strategy_behavior(
+        self, backup_ids, existing_ids, strategy
+    ):
         """
         **Validates: Requirements 11.5, 11.6, 11.7**
 
@@ -306,29 +335,40 @@ class TestRestoreStrategyBehaviorProperty:
         writer = csv.DictWriter(
             buffer,
             fieldnames=[
-                "conn_id", "conn_type", "description", "extra",
-                "host", "login", "password", "port", "schema",
+                "conn_id",
+                "conn_type",
+                "description",
+                "extra",
+                "host",
+                "login",
+                "password",
+                "port",
+                "schema",
             ],
             delimiter="|",
         )
         backup_list = sorted(backup_ids)
         for conn_id in backup_list:
-            writer.writerow({
-                "conn_id": conn_id,
-                "conn_type": "http",
-                "description": "",
-                "extra": "",
-                "host": "localhost",
-                "login": "",
-                "password": "",
-                "port": "8080",
-                "schema": "",
-            })
+            writer.writerow(
+                {
+                    "conn_id": conn_id,
+                    "conn_type": "http",
+                    "description": "",
+                    "extra": "",
+                    "host": "localhost",
+                    "login": "",
+                    "password": "",
+                    "port": "8080",
+                    "schema": "",
+                }
+            )
         csv_content = buffer.getvalue()
 
         # Mock the REST API client
         mock_client = MagicMock()
-        existing_conns = [{"connection_id": cid, "conn_type": "http"} for cid in sorted(existing_ids)]
+        existing_conns = [
+            {"connection_id": cid, "conn_type": "http"} for cid in sorted(existing_ids)
+        ]
         mock_client.list_connections.return_value = existing_conns
 
         # Mock S3 to return our CSV
@@ -337,9 +377,13 @@ class TestRestoreStrategyBehaviorProperty:
             "Body": MagicMock(read=MagicMock(return_value=csv_content.encode("utf-8")))
         }
 
-        with patch.object(factory, "get_mwaa_rest_api_client", return_value=mock_client), \
-             patch("mwaa_dr.framework.factory.glue_dr_factory.Variable") as mock_variable, \
-             patch("mwaa_dr.framework.factory.glue_dr_factory.boto3") as mock_boto3:
+        with patch.object(
+            factory, "get_mwaa_rest_api_client", return_value=mock_client
+        ), patch(
+            "mwaa_dr.framework.factory.glue_dr_factory.Variable"
+        ) as mock_variable, patch(
+            "mwaa_dr.framework.factory.glue_dr_factory.boto3"
+        ) as mock_boto3:
 
             mock_variable.get.return_value = strategy
             mock_boto3.client.return_value = mock_s3
@@ -355,7 +399,9 @@ class TestRestoreStrategyBehaviorProperty:
         elif strategy == "REPLACE":
             # All existing should be deleted
             assert mock_client.delete_connection.call_count == len(existing_ids)
-            deleted_ids = {c.args[0] for c in mock_client.delete_connection.call_args_list}
+            deleted_ids = {
+                c.args[0] for c in mock_client.delete_connection.call_args_list
+            }
             assert deleted_ids == existing_ids
 
             # All backup entries should be created

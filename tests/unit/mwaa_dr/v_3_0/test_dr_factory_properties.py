@@ -38,14 +38,17 @@ from mwaa_dr.v_3_0.dr_factory import DRFactory_3_0
 
 # --- Strategies ---
 
+
 @composite
 def valid_table_names(draw):
     """Generate valid table name strings."""
-    name = draw(text(
-        alphabet="abcdefghijklmnopqrstuvwxyz_",
-        min_size=1,
-        max_size=30,
-    ))
+    name = draw(
+        text(
+            alphabet="abcdefghijklmnopqrstuvwxyz_",
+            min_size=1,
+            max_size=30,
+        )
+    )
     assume(name[0].isalpha())
     return name
 
@@ -109,6 +112,7 @@ def build_model_from_spec(table_names, edges):
 
 # --- Property Tests ---
 
+
 class TestDependencyOrderingProperties:
     """
     **Validates: Requirements 3.7, 4.7, 5.2, 6.5**
@@ -143,9 +147,9 @@ class TestDependencyOrderingProperties:
         # Verify all tables are present
         all_table_names = {t.name for t in factory.tables()}
         all_ordered_names = set(table_to_level.keys())
-        assert all_table_names == all_ordered_names, (
-            f"Missing tables in ordering: {all_table_names - all_ordered_names}"
-        )
+        assert (
+            all_table_names == all_ordered_names
+        ), f"Missing tables in ordering: {all_table_names - all_ordered_names}"
 
         # For every dependency edge, parent must be at an earlier or equal level
         model = factory.model
@@ -282,7 +286,7 @@ class TestDependencyOrderingProperties:
         # Verify: no two tables at the same level have a direct dependency
         for level_tables in levels:
             for i, t1 in enumerate(level_tables):
-                for t2 in level_tables[i + 1:]:
+                for t2 in level_tables[i + 1 :]:
                     assert (t1, t2) not in edge_set and (t2, t1) not in edge_set, (
                         f"Tables {t1} and {t2} are at the same level but have "
                         f"a direct dependency between them"

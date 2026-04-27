@@ -296,7 +296,9 @@ class GlueDRFactory(BaseDRFactory):
         - ``REPLACE``: Delete all existing variables, then create from backup.
         - ``DO_NOTHING``: Skip variable restore entirely.
         """
-        strategy = Variable.get("DR_VARIABLE_RESTORE_STRATEGY", default_var="APPEND").upper()
+        strategy = Variable.get(
+            "DR_VARIABLE_RESTORE_STRATEGY", default_var="APPEND"
+        ).upper()
         logger.info("Variable restore strategy: %s", strategy)
 
         if strategy == "DO_NOTHING":
@@ -390,7 +392,9 @@ class GlueDRFactory(BaseDRFactory):
         - ``REPLACE``: Delete all existing connections, then create from backup.
         - ``DO_NOTHING``: Skip connection restore entirely.
         """
-        strategy = Variable.get("DR_CONNECTION_RESTORE_STRATEGY", default_var="APPEND").upper()
+        strategy = Variable.get(
+            "DR_CONNECTION_RESTORE_STRATEGY", default_var="APPEND"
+        ).upper()
         logger.info("Connection restore strategy: %s", strategy)
 
         if strategy == "DO_NOTHING":
@@ -443,9 +447,7 @@ class GlueDRFactory(BaseDRFactory):
                     client.delete_connection(conn_id)
                     logger.info("Deleted existing connection '%s'.", conn_id)
                 except Exception as e:
-                    logger.warning(
-                        "Failed to delete connection '%s': %s", conn_id, e
-                    )
+                    logger.warning("Failed to delete connection '%s': %s", conn_id, e)
 
             # Create all from backup
             for conn in backup_conns:
@@ -601,9 +603,7 @@ class GlueDRFactory(BaseDRFactory):
 
                 # Get availability zone for the first subnet
                 ec2_client = boto3.client("ec2", region_name=region)
-                subnet_response = ec2_client.describe_subnets(
-                    SubnetIds=[subnet_ids[0]]
-                )
+                subnet_response = ec2_client.describe_subnets(SubnetIds=[subnet_ids[0]])
                 availability_zone = subnet_response["Subnets"][0]["AvailabilityZone"]
 
                 # Create the Glue connection
@@ -759,9 +759,7 @@ class GlueDRFactory(BaseDRFactory):
 
                 # Get availability zone for the first subnet
                 ec2_client = boto3.client("ec2", region_name=region)
-                subnet_response = ec2_client.describe_subnets(
-                    SubnetIds=[subnet_ids[0]]
-                )
+                subnet_response = ec2_client.describe_subnets(SubnetIds=[subnet_ids[0]])
                 availability_zone = subnet_response["Subnets"][0]["AvailabilityZone"]
 
                 # Create the Glue connection
@@ -798,7 +796,9 @@ class GlueDRFactory(BaseDRFactory):
             def notify_success_to_sfn(**context):
                 """Send success callback to StepFunctions."""
                 dag_run = context.get("dag_run")
-                task_token = dag_run.conf.get("task_token") if dag_run and dag_run.conf else None
+                task_token = (
+                    dag_run.conf.get("task_token") if dag_run and dag_run.conf else None
+                )
 
                 if not task_token:
                     logger.warning(
@@ -807,9 +807,7 @@ class GlueDRFactory(BaseDRFactory):
                     return
 
                 task_instances = dag_run.get_task_instances()
-                task_states = [
-                    f"{ti.task_id} => {ti.state}" for ti in task_instances
-                ]
+                task_states = [f"{ti.task_id} => {ti.state}" for ti in task_instances]
                 result = {
                     "dag": dag_run.dag_id,
                     "dag_run": dag_run.run_id,
@@ -819,16 +817,16 @@ class GlueDRFactory(BaseDRFactory):
                 }
 
                 sfn = boto3.client("stepfunctions")
-                sfn.send_task_success(
-                    taskToken=task_token, output=json.dumps(result)
-                )
+                sfn.send_task_success(taskToken=task_token, output=json.dumps(result))
                 logger.info("Sent task success to StepFunctions.")
 
             @task(trigger_rule="one_failed")
             def notify_failure_to_sfn(**context):
                 """Send failure callback to StepFunctions on any upstream failure."""
                 dag_run = context.get("dag_run")
-                task_token = dag_run.conf.get("task_token") if dag_run and dag_run.conf else None
+                task_token = (
+                    dag_run.conf.get("task_token") if dag_run and dag_run.conf else None
+                )
 
                 if not task_token:
                     logger.warning(
@@ -837,9 +835,7 @@ class GlueDRFactory(BaseDRFactory):
                     return
 
                 task_instances = dag_run.get_task_instances()
-                task_states = [
-                    f"{ti.task_id} => {ti.state}" for ti in task_instances
-                ]
+                task_states = [f"{ti.task_id} => {ti.state}" for ti in task_instances]
                 result = {
                     "dag": dag_run.dag_id,
                     "dag_run": dag_run.run_id,
@@ -982,9 +978,7 @@ class GlueDRFactory(BaseDRFactory):
 
                 # Get availability zone for the first subnet
                 ec2_client = boto3.client("ec2", region_name=region)
-                subnet_response = ec2_client.describe_subnets(
-                    SubnetIds=[subnet_ids[0]]
-                )
+                subnet_response = ec2_client.describe_subnets(SubnetIds=[subnet_ids[0]])
                 availability_zone = subnet_response["Subnets"][0]["AvailabilityZone"]
 
                 # Create the Glue connection
@@ -1011,7 +1005,9 @@ class GlueDRFactory(BaseDRFactory):
             def notify_success_to_sfn(**context):
                 """Send success callback to StepFunctions."""
                 dag_run = context.get("dag_run")
-                task_token = dag_run.conf.get("task_token") if dag_run and dag_run.conf else None
+                task_token = (
+                    dag_run.conf.get("task_token") if dag_run and dag_run.conf else None
+                )
 
                 if not task_token:
                     logger.warning(
@@ -1020,9 +1016,7 @@ class GlueDRFactory(BaseDRFactory):
                     return
 
                 task_instances = dag_run.get_task_instances()
-                task_states = [
-                    f"{ti.task_id} => {ti.state}" for ti in task_instances
-                ]
+                task_states = [f"{ti.task_id} => {ti.state}" for ti in task_instances]
                 result = {
                     "dag": dag_run.dag_id,
                     "dag_run": dag_run.run_id,
@@ -1031,16 +1025,16 @@ class GlueDRFactory(BaseDRFactory):
                 }
 
                 sfn = boto3.client("stepfunctions")
-                sfn.send_task_success(
-                    taskToken=task_token, output=json.dumps(result)
-                )
+                sfn.send_task_success(taskToken=task_token, output=json.dumps(result))
                 logger.info("Sent task success to StepFunctions.")
 
             @task(trigger_rule="one_failed")
             def notify_failure_to_sfn(**context):
                 """Send failure callback to StepFunctions on any upstream failure."""
                 dag_run = context.get("dag_run")
-                task_token = dag_run.conf.get("task_token") if dag_run and dag_run.conf else None
+                task_token = (
+                    dag_run.conf.get("task_token") if dag_run and dag_run.conf else None
+                )
 
                 if not task_token:
                     logger.warning(
@@ -1049,9 +1043,7 @@ class GlueDRFactory(BaseDRFactory):
                     return
 
                 task_instances = dag_run.get_task_instances()
-                task_states = [
-                    f"{ti.task_id} => {ti.state}" for ti in task_instances
-                ]
+                task_states = [f"{ti.task_id} => {ti.state}" for ti in task_instances]
                 result = {
                     "dag": dag_run.dag_id,
                     "dag_run": dag_run.run_id,

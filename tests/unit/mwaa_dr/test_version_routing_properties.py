@@ -122,7 +122,9 @@ def airflow_3x_versions(draw):
 @composite
 def airflow_2x_versions_with_factory(draw):
     """Generate Airflow 2.x version strings with their expected factory."""
-    prefix = draw(sampled_from(["2.4", "2.5", "2.6", "2.7", "2.8", "2.9", "2.10", "2.11"]))
+    prefix = draw(
+        sampled_from(["2.4", "2.5", "2.6", "2.7", "2.8", "2.9", "2.10", "2.11"])
+    )
     patch = draw(integers(min_value=0, max_value=20))
     version_str = f"{prefix}.{patch}"
     expected_class = resolve_factory_class(version_str)
@@ -132,20 +134,25 @@ def airflow_2x_versions_with_factory(draw):
 @composite
 def unsupported_versions(draw):
     """Generate version strings that don't match any supported prefix."""
-    version_str = draw(sampled_from([
-        "1.10.15",
-        "1.9.0",
-        "4.0.0",
-        "0.1.0",
-        "2.3.4",
-        "2.2.5",
-        "2.1.0",
-        "2.0.2",
-    ]))
+    version_str = draw(
+        sampled_from(
+            [
+                "1.10.15",
+                "1.9.0",
+                "4.0.0",
+                "0.1.0",
+                "2.3.4",
+                "2.2.5",
+                "2.1.0",
+                "2.0.2",
+            ]
+        )
+    )
     return version_str
 
 
 # --- Property Tests ---
+
 
 class TestVersionRoutingProperties:
     """

@@ -134,7 +134,9 @@ def build_jdbc_query(table_def, max_age_days):
 
     where_str = f" WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
 
-    return f"(SELECT {select_clause} FROM {table_name}{where_str}) AS {table_name}_export"
+    return (
+        f"(SELECT {select_clause} FROM {table_name}{where_str}) AS {table_name}_export"
+    )
 
 
 def export_table(spark, jdbc_url, conn_props, table_def, s3_output_path, max_age_days):
@@ -196,12 +198,21 @@ def export_table(spark, jdbc_url, conn_props, table_def, s3_output_path, max_age
         .csv(output_path)
     )
 
-    logger.info("Exported %d rows from table '%s' to %s.", row_count, table_name, output_path)
+    logger.info(
+        "Exported %d rows from table '%s' to %s.", row_count, table_name, output_path
+    )
     return {"table": table_name, "rows": row_count}
 
 
-def export_tables_by_level(spark, jdbc_url, conn_props, table_defs, dependency_order,
-                           s3_output_path, max_age_days):
+def export_tables_by_level(
+    spark,
+    jdbc_url,
+    conn_props,
+    table_defs,
+    dependency_order,
+    s3_output_path,
+    max_age_days,
+):
     """Export tables in reverse dependency order, parallelizing within each level.
 
     Tables at the same dependency level have no relationships between them and
@@ -237,8 +248,13 @@ def export_tables_by_level(spark, jdbc_url, conn_props, table_defs, dependency_o
                     continue
                 table_def = table_lookup[table_name]
                 future = executor.submit(
-                    export_table, spark, jdbc_url, conn_props,
-                    table_def, s3_output_path, max_age_days,
+                    export_table,
+                    spark,
+                    jdbc_url,
+                    conn_props,
+                    table_def,
+                    s3_output_path,
+                    max_age_days,
                 )
                 futures[future] = table_name
 
@@ -325,8 +341,13 @@ def main():
     jdbc_url, conn_props = get_jdbc_url(glue_context, connection_name)
 
     results = export_tables_by_level(
-        spark, jdbc_url, conn_props, table_defs, dependency_order,
-        s3_output_path, max_age_days,
+        spark,
+        jdbc_url,
+        conn_props,
+        table_defs,
+        dependency_order,
+        s3_output_path,
+        max_age_days,
     )
 
     write_summary(spark, s3_output_path, results)

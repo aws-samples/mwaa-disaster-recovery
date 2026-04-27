@@ -613,9 +613,7 @@ class MwaaPrimaryStack(MwaaBaseStack):
         )
         return replication_job_fn
 
-    def setup_glue_resources(
-        self, conf: config.Config, mwaa_role: iam.IRole
-    ) -> None:
+    def setup_glue_resources(self, conf: config.Config, mwaa_role: iam.IRole) -> None:
         """Provision Glue IAM role, MWAA role policies, and script deployment for Airflow 3.x."""
 
         # Create Glue IAM role with trust policy for glue.amazonaws.com

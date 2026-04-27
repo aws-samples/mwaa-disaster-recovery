@@ -23,24 +23,29 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 import json
 import os
 from unittest.mock import patch
-from urllib.parse import quote
 
 from hypothesis import given, settings, assume
 from hypothesis.strategies import text, integers, composite, sampled_from
 
-from mwaa_dr.framework.credential_extractor import CredentialExtractor, DatabaseCredentials
+from mwaa_dr.framework.credential_extractor import (
+    CredentialExtractor,
+    DatabaseCredentials,
+)
 
 
 # --- Strategies ---
 
+
 @composite
 def valid_hostnames(draw):
     """Generate valid hostname-like strings (non-empty, no whitespace)."""
-    hostname = draw(text(
-        alphabet="abcdefghijklmnopqrstuvwxyz0123456789-.",
-        min_size=1,
-        max_size=63,
-    ))
+    hostname = draw(
+        text(
+            alphabet="abcdefghijklmnopqrstuvwxyz0123456789-.",
+            min_size=1,
+            max_size=63,
+        )
+    )
     assume(not hostname.startswith("-"))
     assume(not hostname.endswith("-"))
     assume(".." not in hostname)
@@ -57,11 +62,13 @@ def valid_ports(draw):
 @composite
 def valid_db_names(draw):
     """Generate valid PostgreSQL database names."""
-    name = draw(text(
-        alphabet="abcdefghijklmnopqrstuvwxyz0123456789_",
-        min_size=1,
-        max_size=63,
-    ))
+    name = draw(
+        text(
+            alphabet="abcdefghijklmnopqrstuvwxyz0123456789_",
+            min_size=1,
+            max_size=63,
+        )
+    )
     assume(name[0].isalpha() or name[0] == "_")
     return name
 
@@ -75,6 +82,7 @@ def valid_credentials(draw):
 
 
 # --- Property Tests ---
+
 
 class TestCredentialExtractorProperties:
     """
@@ -137,16 +145,20 @@ SQLALCHEMY_SCHEMES = [
 @composite
 def alphanumeric_credentials(draw):
     """Generate alphanumeric username/password pairs safe for URL embedding."""
-    username = draw(text(
-        alphabet="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
-        min_size=1,
-        max_size=50,
-    ))
-    password = draw(text(
-        alphabet="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
-        min_size=1,
-        max_size=50,
-    ))
+    username = draw(
+        text(
+            alphabet="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
+            min_size=1,
+            max_size=50,
+        )
+    )
+    password = draw(
+        text(
+            alphabet="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
+            min_size=1,
+            max_size=50,
+        )
+    )
     return username, password
 
 
@@ -165,6 +177,7 @@ def valid_sqlalchemy_conn_strings(draw):
 
 
 # --- Property 2 Tests ---
+
 
 class TestSQLAlchemyCredentialExtractorProperties:
     """
