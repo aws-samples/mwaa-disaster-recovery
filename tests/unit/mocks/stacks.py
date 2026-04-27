@@ -23,6 +23,7 @@ from tests.unit.mocks.mock_setup import (
     aws_credentials,
     backup_restore_env_vars,
     warm_standby_env_vars,
+    warm_standby_v3_env_vars,
 )
 
 import config
@@ -40,6 +41,13 @@ def backup_restore_stacks(aws_credentials, backup_restore_env_vars):
 
 @pytest.fixture(scope="function")
 def warm_standby_stacks(aws_credentials, warm_standby_env_vars):
+    conf = config.Config()
+    app = cdk.App()
+    return create_stacks(conf, app)
+
+
+@pytest.fixture(scope="function")
+def warm_standby_v3_stacks(aws_credentials, warm_standby_v3_env_vars):
     conf = config.Config()
     app = cdk.App()
     return create_stacks(conf, app)

@@ -440,3 +440,28 @@ class TestConfig:
         config = Config()
 
         expect(config.secondary_cleanup_cool_off_secs).to.equal(30)
+
+    def test_supported_mwaa_versions_includes_3_0_2(backup_restore_env_vars):
+        from config import SUPPORTED_MWAA_VERSIONS
+
+        expect(SUPPORTED_MWAA_VERSIONS).to.contain("3.0.2")
+
+    def test_mwaa_version_accepts_3_0_2(backup_restore_env_vars):
+        os.environ["MWAA_VERSION"] = "3.0.2"
+        config = Config()
+
+        expect(config.mwaa_version).to.equal("3.0.2")
+
+    def test_glue_role_arn(backup_restore_env_vars):
+        os.environ["GLUE_ROLE_ARN"] = "arn:aws:iam::123456789999:role/glue-role"
+        config = Config()
+
+        expect(config.glue_role_arn).to.equal(
+            "arn:aws:iam::123456789999:role/glue-role"
+        )
+
+    def test_glue_role_arn_default(backup_restore_env_vars):
+        os.environ.pop("GLUE_ROLE_ARN", None)
+        config = Config()
+
+        expect(config.glue_role_arn).to.equal("")
