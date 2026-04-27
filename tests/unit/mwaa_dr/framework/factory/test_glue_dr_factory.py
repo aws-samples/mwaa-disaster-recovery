@@ -1163,3 +1163,391 @@ class TestGlueDRFactory:
         # Optional empty fields should not be included
         expect(result).to_not.have.key("host")
         expect(result).to_not.have.key("port")
+
+    def test_build_connection_payload_non_numeric_port(self):
+        """Test _build_connection_payload with a non-numeric port value."""
+        conn = {
+            "conn_id": "my_conn",
+            "conn_type": "http",
+            "description": "",
+            "extra": "",
+            "host": "localhost",
+            "login": "",
+            "password": "",
+            "port": "not-a-number",
+            "schema": "",
+        }
+        result = GlueDRFactory._build_connection_payload(conn)
+        expect(result["port"]).to.equal("not-a-number")
+
+    @patch("mwaa_dr.framework.factory.glue_dr_factory.boto3")
+    @patch("mwaa_dr.framework.factory.glue_dr_factory.Variable")
+    def test_restore_connections_via_api_replace_strategy(
+        self, mock_variable, mock_boto3
+    ):
+        """Test restore_connections_via_api with REPLACE strategy.
+        Validates: Requirements 11.7
+        """
+        mock_variable.get.side_effect = lambda key, **kwargs: {
+            "DR_CONNECTION_RESTORE_STRATEGY": "REPLACE",
+            "DR_BACKUP_BUCKET": "backup-bucket",
+        }.get(key, kwargs.get("default_var", ""))
+
+        csv_content = "conn1|postgres|desc1|{}|host1|user1|pass1|5432|public\n"
+        mock_s3 = MagicMock()
+        mock_s3.get_object.return_value = {
+            "Body": MagicMock(read=MagicMock(return_value=csv_content.encode("utf-8")))
+        }
+        mock_boto3.client.return_value = mock_s3
+
+        mock_rest_client = MagicMock()
+        mock_rest_client.list_connections.return_value = [
+            {"connection_id": "old_conn", "conn_type": "mysql"},
+        ]
+
+        factory = ConcreteGlueDRFactory("test_dag")
+
+        with patch.object(
+            factory, "get_mwaa_rest_api_client", return_value=mock_rest_client
+        ):
+            factory.restore_connections_via_api()
+
+        # Old connection should be deleted
+        mock_rest_client.delete_connection.assert_called_once_with("old_conn")
+        # New connection should be created
+        mock_rest_client.create_connection.assert_called_once()
+        created_conn = mock_rest_client.create_connection.call_args[0][0]
+        expect(created_conn["connection_id"]).to.equal("conn1")
+
+    @patch("mwaa_dr.framework.factory.glue_dr_factory.boto3")
+    @patch("mwaa_dr.framework.factory.glue_dr_factory.Variable")
+    def test_restore_variables_via_api_s3_read_failure(self, mock_variable, mock_boto3):
+        """Test restore_variables_via_api handles S3 read failure gracefully."""
+        mock_variable.get.side_effect = lambda key, **kwargs: {
+            "DR_VARIABLE_RESTORE_STRATEGY": "APPEND",
+            "DR_BACKUP_BUCKET": "backup-bucket",
+        }.get(key, kwargs.get("default_var", ""))
+
+        mock_s3 = MagicMock()
+        mock_s3.get_object.side_effect = Exception("NoSuchKey")
+        mock_boto3.client.return_value = mock_s3
+
+        mock_rest_client = MagicMock()
+        factory = ConcreteGlueDRFactory("test_dag")
+
+        with patch.object(
+            factory, "get_mwaa_rest_api_client", return_value=mock_rest_client
+        ):
+            # Should not raise — logs warning and returns
+            factory.restore_variables_via_api()
+
+        mock_rest_client.create_variable.assert_not_called()
+
+    @patch("mwaa_dr.framework.factory.glue_dr_factory.boto3")
+    @patch("mwaa_dr.framework.factory.glue_dr_factory.Variable")
+    def test_restore_connections_via_api_s3_read_failure(
+        self, mock_variable, mock_boto3
+    ):
+        """Test restore_connections_via_api handles S3 read failure gracefully."""
+        mock_variable.get.side_effect = lambda key, **kwargs: {
+            "DR_CONNECTION_RESTORE_STRATEGY": "REPLACE",
+            "DR_BACKUP_BUCKET": "backup-bucket",
+        }.get(key, kwargs.get("default_var", ""))
+
+        mock_s3 = MagicMock()
+        mock_s3.get_object.side_effect = Exception("NoSuchKey")
+        mock_boto3.client.return_value = mock_s3
+
+        mock_rest_client = MagicMock()
+        factory = ConcreteGlueDRFactory("test_dag")
+
+        with patch.object(
+            factory, "get_mwaa_rest_api_client", return_value=mock_rest_client
+        ):
+            factory.restore_connections_via_api()
+
+        mock_rest_client.create_connection.assert_not_called()
+
+    @patch("mwaa_dr.framework.factory.glue_dr_factory.boto3")
+    @patch("mwaa_dr.framework.factory.glue_dr_factory.Variable")
+    def test_restore_variables_replace_delete_failure_continues(
+        self, mock_variable, mock_boto3
+    ):
+        """Test that REPLACE strategy continues if deleting an existing variable fails."""
+        mock_variable.get.side_effect = lambda key, **kwargs: {
+            "DR_VARIABLE_RESTORE_STRATEGY": "REPLACE",
+            "DR_BACKUP_BUCKET": "backup-bucket",
+        }.get(key, kwargs.get("default_var", ""))
+
+        csv_content = "var1|val1|desc1\n"
+        mock_s3 = MagicMock()
+        mock_s3.get_object.return_value = {
+            "Body": MagicMock(read=MagicMock(return_value=csv_content.encode("utf-8")))
+        }
+        mock_boto3.client.return_value = mock_s3
+
+        mock_rest_client = MagicMock()
+        mock_rest_client.list_variables.return_value = [
+            {"key": "old_var", "value": "old_val"},
+        ]
+        mock_rest_client.delete_variable.side_effect = Exception("API error")
+
+        factory = ConcreteGlueDRFactory("test_dag")
+
+        with patch.object(
+            factory, "get_mwaa_rest_api_client", return_value=mock_rest_client
+        ):
+            factory.restore_variables_via_api()
+
+        # Should still attempt to create the new variable
+        mock_rest_client.create_variable.assert_called_once()
+
+    @patch("mwaa_dr.framework.factory.glue_dr_factory.boto3")
+    @patch("mwaa_dr.framework.factory.glue_dr_factory.Variable")
+    def test_restore_variables_replace_create_failure_continues(
+        self, mock_variable, mock_boto3
+    ):
+        """Test that REPLACE strategy continues if creating a variable fails."""
+        mock_variable.get.side_effect = lambda key, **kwargs: {
+            "DR_VARIABLE_RESTORE_STRATEGY": "REPLACE",
+            "DR_BACKUP_BUCKET": "backup-bucket",
+        }.get(key, kwargs.get("default_var", ""))
+
+        csv_content = "var1|val1|desc1\nvar2|val2|desc2\n"
+        mock_s3 = MagicMock()
+        mock_s3.get_object.return_value = {
+            "Body": MagicMock(read=MagicMock(return_value=csv_content.encode("utf-8")))
+        }
+        mock_boto3.client.return_value = mock_s3
+
+        mock_rest_client = MagicMock()
+        mock_rest_client.list_variables.return_value = []
+        mock_rest_client.create_variable.side_effect = [
+            Exception("API error"),
+            None,
+        ]
+
+        factory = ConcreteGlueDRFactory("test_dag")
+
+        with patch.object(
+            factory, "get_mwaa_rest_api_client", return_value=mock_rest_client
+        ):
+            factory.restore_variables_via_api()
+
+        # Both should be attempted despite first failure
+        assert mock_rest_client.create_variable.call_count == 2
+
+    @patch("mwaa_dr.framework.factory.glue_dr_factory.boto3")
+    @patch("mwaa_dr.framework.factory.glue_dr_factory.Variable")
+    def test_restore_variables_append_create_failure_continues(
+        self, mock_variable, mock_boto3
+    ):
+        """Test that APPEND strategy continues if creating a variable fails."""
+        mock_variable.get.side_effect = lambda key, **kwargs: {
+            "DR_VARIABLE_RESTORE_STRATEGY": "APPEND",
+            "DR_BACKUP_BUCKET": "backup-bucket",
+        }.get(key, kwargs.get("default_var", ""))
+
+        csv_content = "var1|val1|desc1\nvar2|val2|desc2\n"
+        mock_s3 = MagicMock()
+        mock_s3.get_object.return_value = {
+            "Body": MagicMock(read=MagicMock(return_value=csv_content.encode("utf-8")))
+        }
+        mock_boto3.client.return_value = mock_s3
+
+        mock_rest_client = MagicMock()
+        mock_rest_client.list_variables.return_value = []
+        mock_rest_client.create_variable.side_effect = [
+            Exception("API error"),
+            None,
+        ]
+
+        factory = ConcreteGlueDRFactory("test_dag")
+
+        with patch.object(
+            factory, "get_mwaa_rest_api_client", return_value=mock_rest_client
+        ):
+            factory.restore_variables_via_api()
+
+        assert mock_rest_client.create_variable.call_count == 2
+
+    @patch("mwaa_dr.framework.factory.glue_dr_factory.boto3")
+    @patch("mwaa_dr.framework.factory.glue_dr_factory.Variable")
+    def test_restore_connections_replace_delete_failure_continues(
+        self, mock_variable, mock_boto3
+    ):
+        """Test that REPLACE strategy continues if deleting a connection fails."""
+        mock_variable.get.side_effect = lambda key, **kwargs: {
+            "DR_CONNECTION_RESTORE_STRATEGY": "REPLACE",
+            "DR_BACKUP_BUCKET": "backup-bucket",
+        }.get(key, kwargs.get("default_var", ""))
+
+        csv_content = "conn1|postgres|desc|{}|host|user|pass|5432|public\n"
+        mock_s3 = MagicMock()
+        mock_s3.get_object.return_value = {
+            "Body": MagicMock(read=MagicMock(return_value=csv_content.encode("utf-8")))
+        }
+        mock_boto3.client.return_value = mock_s3
+
+        mock_rest_client = MagicMock()
+        mock_rest_client.list_connections.return_value = [
+            {"connection_id": "old_conn"},
+        ]
+        mock_rest_client.delete_connection.side_effect = Exception("API error")
+
+        factory = ConcreteGlueDRFactory("test_dag")
+
+        with patch.object(
+            factory, "get_mwaa_rest_api_client", return_value=mock_rest_client
+        ):
+            factory.restore_connections_via_api()
+
+        mock_rest_client.create_connection.assert_called_once()
+
+    @patch("mwaa_dr.framework.factory.glue_dr_factory.boto3")
+    @patch("mwaa_dr.framework.factory.glue_dr_factory.Variable")
+    def test_restore_connections_replace_create_failure_continues(
+        self, mock_variable, mock_boto3
+    ):
+        """Test that REPLACE strategy continues if creating a connection fails."""
+        mock_variable.get.side_effect = lambda key, **kwargs: {
+            "DR_CONNECTION_RESTORE_STRATEGY": "REPLACE",
+            "DR_BACKUP_BUCKET": "backup-bucket",
+        }.get(key, kwargs.get("default_var", ""))
+
+        csv_content = (
+            "conn1|postgres|d|{}|h|u|p|5432|s\nconn2|mysql|d|{}|h|u|p|3306|s\n"
+        )
+        mock_s3 = MagicMock()
+        mock_s3.get_object.return_value = {
+            "Body": MagicMock(read=MagicMock(return_value=csv_content.encode("utf-8")))
+        }
+        mock_boto3.client.return_value = mock_s3
+
+        mock_rest_client = MagicMock()
+        mock_rest_client.list_connections.return_value = []
+        mock_rest_client.create_connection.side_effect = [
+            Exception("API error"),
+            None,
+        ]
+
+        factory = ConcreteGlueDRFactory("test_dag")
+
+        with patch.object(
+            factory, "get_mwaa_rest_api_client", return_value=mock_rest_client
+        ):
+            factory.restore_connections_via_api()
+
+        assert mock_rest_client.create_connection.call_count == 2
+
+    @patch("mwaa_dr.framework.factory.glue_dr_factory.boto3")
+    @patch("mwaa_dr.framework.factory.glue_dr_factory.Variable")
+    def test_restore_connections_append_create_failure_continues(
+        self, mock_variable, mock_boto3
+    ):
+        """Test that APPEND strategy continues if creating a connection fails."""
+        mock_variable.get.side_effect = lambda key, **kwargs: {
+            "DR_CONNECTION_RESTORE_STRATEGY": "APPEND",
+            "DR_BACKUP_BUCKET": "backup-bucket",
+        }.get(key, kwargs.get("default_var", ""))
+
+        csv_content = (
+            "conn1|postgres|d|{}|h|u|p|5432|s\nconn2|mysql|d|{}|h|u|p|3306|s\n"
+        )
+        mock_s3 = MagicMock()
+        mock_s3.get_object.return_value = {
+            "Body": MagicMock(read=MagicMock(return_value=csv_content.encode("utf-8")))
+        }
+        mock_boto3.client.return_value = mock_s3
+
+        mock_rest_client = MagicMock()
+        mock_rest_client.list_connections.return_value = []
+        mock_rest_client.create_connection.side_effect = [
+            Exception("API error"),
+            None,
+        ]
+
+        factory = ConcreteGlueDRFactory("test_dag")
+
+        with patch.object(
+            factory, "get_mwaa_rest_api_client", return_value=mock_rest_client
+        ):
+            factory.restore_connections_via_api()
+
+        assert mock_rest_client.create_connection.call_count == 2
+
+    @patch("mwaa_dr.framework.factory.glue_dr_factory.boto3")
+    def test_backup_variables_via_api_empty_list(self, mock_boto3):
+        """Test backup_variables_via_api with no variables."""
+        mock_s3 = MagicMock()
+        mock_boto3.client.return_value = mock_s3
+
+        mock_rest_client = MagicMock()
+        mock_rest_client.list_variables.return_value = []
+
+        factory = ConcreteGlueDRFactory("test_dag")
+
+        with (
+            patch.object(
+                factory, "get_mwaa_rest_api_client", return_value=mock_rest_client
+            ),
+            patch.object(factory, "bucket", return_value="backup-bucket"),
+        ):
+            factory.backup_variables_via_api()
+
+        mock_s3.put_object.assert_called_once()
+        call_kwargs = mock_s3.put_object.call_args.kwargs
+        expect(call_kwargs["Body"]).to.equal(b"")
+
+    @patch("mwaa_dr.framework.factory.glue_dr_factory.boto3")
+    def test_backup_connections_via_api_empty_list(self, mock_boto3):
+        """Test backup_connections_via_api with no connections."""
+        mock_s3 = MagicMock()
+        mock_boto3.client.return_value = mock_s3
+
+        mock_rest_client = MagicMock()
+        mock_rest_client.list_connections.return_value = []
+
+        factory = ConcreteGlueDRFactory("test_dag")
+
+        with (
+            patch.object(
+                factory, "get_mwaa_rest_api_client", return_value=mock_rest_client
+            ),
+            patch.object(factory, "bucket", return_value="backup-bucket"),
+        ):
+            factory.backup_connections_via_api()
+
+        mock_s3.put_object.assert_called_once()
+        call_kwargs = mock_s3.put_object.call_args.kwargs
+        expect(call_kwargs["Body"]).to.equal(b"")
+
+    @patch("mwaa_dr.framework.factory.glue_dr_factory.boto3")
+    @patch("mwaa_dr.framework.factory.glue_dr_factory.Variable")
+    def test_restore_variables_via_api_no_description(self, mock_variable, mock_boto3):
+        """Test restore with variables that have empty descriptions."""
+        mock_variable.get.side_effect = lambda key, **kwargs: {
+            "DR_VARIABLE_RESTORE_STRATEGY": "APPEND",
+            "DR_BACKUP_BUCKET": "backup-bucket",
+        }.get(key, kwargs.get("default_var", ""))
+
+        csv_content = "var1|val1|\n"
+        mock_s3 = MagicMock()
+        mock_s3.get_object.return_value = {
+            "Body": MagicMock(read=MagicMock(return_value=csv_content.encode("utf-8")))
+        }
+        mock_boto3.client.return_value = mock_s3
+
+        mock_rest_client = MagicMock()
+        mock_rest_client.list_variables.return_value = []
+
+        factory = ConcreteGlueDRFactory("test_dag")
+
+        with patch.object(
+            factory, "get_mwaa_rest_api_client", return_value=mock_rest_client
+        ):
+            factory.restore_variables_via_api()
+
+        mock_rest_client.create_variable.assert_called_once_with(
+            key="var1", value="val1", description=None
+        )

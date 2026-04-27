@@ -388,3 +388,56 @@ class TestMwaaRestApiClientRetry:
 
         assert result == success_response
         assert mock_session.request.call_count == 2
+
+
+class TestMwaaRestApiClientGetMethods:
+    """Tests for get_variable and get_connection methods."""
+
+    def _make_client_with_mock_session(self):
+        client = MwaaRestApiClient("my-env", "us-east-1")
+        mock_session = MagicMock()
+        mock_session.base_url = "https://host.airflow.amazonaws.com/api/v2"
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_session.request.return_value = mock_response
+
+        return client, mock_session, mock_response
+
+    @patch.object(MwaaRestApiClient, "_get_session")
+    def test_get_variable_sends_get_request(self, mock_get_session):
+        client, mock_session, mock_response = self._make_client_with_mock_session()
+        mock_get_session.return_value = mock_session
+        mock_response.json.return_value = {
+            "key": "my_var",
+            "value": "my_val",
+            "description": "desc",
+        }
+
+        result = client.get_variable("my_var")
+
+        mock_session.request.assert_called_once_with(
+            "GET",
+            "https://host.airflow.amazonaws.com/api/v2/variables/my_var",
+        )
+        assert result["key"] == "my_var"
+        assert result["value"] == "my_val"
+
+    @patch.object(MwaaRestApiClient, "_get_session")
+    def test_get_connection_sends_get_request(self, mock_get_session):
+        client, mock_session, mock_response = self._make_client_with_mock_session()
+        mock_get_session.return_value = mock_session
+        mock_response.json.return_value = {
+            "connection_id": "my_conn",
+            "conn_type": "postgres",
+            "host": "db.example.com",
+        }
+
+        result = client.get_connection("my_conn")
+
+        mock_session.request.assert_called_once_with(
+            "GET",
+            "https://host.airflow.amazonaws.com/api/v2/connections/my_conn",
+        )
+        assert result["connection_id"] == "my_conn"
+        assert result["conn_type"] == "postgres"

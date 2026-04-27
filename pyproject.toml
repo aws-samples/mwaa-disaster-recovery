@@ -44,6 +44,8 @@ omit = [
   "backup_metadata.py",
   "cleanup_metadata.py",
   "restore_metadata.py",
+  "lib/stacks/*",
+  "lib/dr_constructs/*",
 ]
 source = [
   "assets/dags",
