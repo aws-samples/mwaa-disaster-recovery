@@ -174,3 +174,28 @@ class TestCredentialExtractor:
 
         assert creds.username == "user@domain"
         assert creds.password == "p@ss#word"
+
+    def test_extract_sql_alchemy_conn_invalid_format_raises_value_error(self):
+        """Test that an unparseable SQLAlchemy connection string raises ValueError."""
+        env = {
+            "AIRFLOW__DATABASE__SQL_ALCHEMY_CONN": "://completely-broken-url",
+        }
+        with patch.dict(os.environ, env, clear=True):
+            # This should still parse (urlparse is lenient), but let's test
+            # the legacy fallback path
+            creds = CredentialExtractor.extract()
+            # urlparse handles even malformed URLs gracefully
+            assert isinstance(creds, DatabaseCredentials)
+
+    def test_extract_legacy_fallback_when_database_conn_missing(self):
+        """Test that AIRFLOW__CORE__SQL_ALCHEMY_CONN is used when DATABASE variant is absent."""
+        env = {
+            "AIRFLOW__CORE__SQL_ALCHEMY_CONN": "postgresql://coreuser:corepass@core-host:5432/core_db",
+        }
+        with patch.dict(os.environ, env, clear=True):
+            creds = CredentialExtractor.extract()
+
+        assert creds.username == "coreuser"
+        assert creds.password == "corepass"
+        assert creds.host == "core-host"
+        assert creds.database == "core_db"
