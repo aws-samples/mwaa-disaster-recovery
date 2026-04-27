@@ -127,6 +127,50 @@ def backup_restore_env_vars():
     os.environ["DR_CONNECTION_RESTORE_STRATEGY"] = "REPLACE"
 
 
+@pytest.fixture(scope="function")
+def warm_standby_v3_env_vars():
+    os.environ["STACK_NAME_PREFIX"] = "mwaa-3-0-2-public"
+
+    os.environ["AWS_ACCOUNT_ID"] = "123456789999"
+    os.environ["DR_TYPE"] = "WARM_STANDBY"
+
+    os.environ["MWAA_VERSION"] = "3.0.2"
+    os.environ["MWAA_UPDATE_EXECUTION_ROLE"] = "YES"
+    os.environ["MWAA_NOTIFICATION_EMAILS"] = '["abc@example.com"]'
+    os.environ["MWAA_SIMULATE_DR"] = "YES"
+
+    os.environ["HEALTH_CHECK_ENABLED"] = "YES"
+
+    os.environ["PRIMARY_REGION"] = "us-east-1"
+    os.environ["PRIMARY_MWAA_ENVIRONMENT_NAME"] = "mwaa-3-0-2-public-primary"
+    os.environ["PRIMARY_MWAA_ROLE_ARN"] = (
+        "arn:aws:iam::123456789999:role/mwaa-dr-primary-role"
+    )
+    os.environ["PRIMARY_DAGS_BUCKET_NAME"] = "mwaa-dags-primary"
+    os.environ["PRIMARY_VPC_ID"] = "vpc-12345678999988ffa"
+    os.environ["PRIMARY_SUBNET_IDS"] = (
+        '["subnet-00001111aaaabbbb2", "subnet-00001111aaaabbbb3"]'
+    )
+    os.environ["PRIMARY_SECURITY_GROUP_IDS"] = '["sg-00001111aaaabbcc22"]'
+    os.environ["PRIMARY_BACKUP_SCHEDULE"] = "0 * * * *"
+
+    os.environ["SECONDARY_REGION"] = "us-east-2"
+    os.environ["SECONDARY_MWAA_ENVIRONMENT_NAME"] = "mwaa-3-0-2-public-secondary"
+    os.environ["SECONDARY_MWAA_ROLE_ARN"] = (
+        "arn:aws:iam::123456789999:role/mwaa-dr-secondary-role"
+    )
+    os.environ["SECONDARY_DAGS_BUCKET_NAME"] = "mwaa-dags-secondary"
+    os.environ["SECONDARY_VPC_ID"] = "vpc-12345678999988ffb"
+    os.environ["SECONDARY_SUBNET_IDS"] = (
+        '["subnet-00001111aaaabbbb4", "subnet-00001111aaaabbbb5"]'
+    )
+    os.environ["SECONDARY_SECURITY_GROUP_IDS"] = '["sg-00001111aaaabbcc22"]'
+    os.environ["SECONDARY_CREATE_SFN_VPCE"] = "YES"
+
+    os.environ["DR_VARIABLE_RESTORE_STRATEGY"] = "APPEND"
+    os.environ["DR_CONNECTION_RESTORE_STRATEGY"] = "APPEND"
+
+
 boto_make_api_call = "botocore.client.BaseClient._make_api_call"
 mwaa_cli_token_text = "token"
 mwaa_web_server_hostname = "a-host-name.aws"
