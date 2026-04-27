@@ -129,12 +129,11 @@ def import_table_jdbc(spark, jdbc_url, conn_props, df, table_name):
     # Get the count of existing rows before import for skip calculation
     try:
         existing_query = f"(SELECT COUNT(*) as cnt FROM {table_name}) AS cnt_tbl"
-        existing_count_before = (
-            spark.read.jdbc(url=jdbc_url, table=existing_query, properties=conn_props)
-            .collect()[0]["cnt"]
-        )
+        existing_count_before = spark.read.jdbc(
+            url=jdbc_url, table=existing_query, properties=conn_props
+        ).collect()[0]["cnt"]
     except Exception:
-        existing_count_before = 0
+        pass
 
     # Write using JDBC append mode with batching
     write_props = dict(conn_props)
@@ -166,7 +165,9 @@ def import_table_jdbc(spark, jdbc_url, conn_props, df, table_name):
 
     logger.info(
         "Table '%s': imported %d rows, skipped %d rows.",
-        table_name, rows_imported, rows_skipped,
+        table_name,
+        rows_imported,
+        rows_skipped,
     )
     return rows_imported, rows_skipped
 
@@ -238,9 +239,7 @@ def _insert_with_conflict_handling(spark, jdbc_url, conn_props, df, table_name):
                 if "duplicate" in error_msg.lower() or "unique" in error_msg.lower():
                     rows_skipped += 1
                 else:
-                    logger.error(
-                        "Error inserting row into '%s': %s", table_name, e
-                    )
+                    logger.error("Error inserting row into '%s': %s", table_name, e)
                     rows_skipped += 1
 
         connection.commit()
@@ -282,7 +281,8 @@ def import_table(spark, jdbc_url, conn_props, table_def, s3_input_path):
     if not backup_file_exists(spark, backup_path):
         logger.warning(
             "Backup file not found for table '%s' at %s, skipping.",
-            table_name, backup_path,
+            table_name,
+            backup_path,
         )
         return None
 
@@ -296,6 +296,7 @@ def import_table(spark, jdbc_url, conn_props, table_def, s3_input_path):
 
     if columns:
         from pyspark.sql.types import StructType, StructField, StringType
+
         schema = StructType([StructField(col, StringType(), True) for col in columns])
         df = reader.schema(schema).csv(backup_path)
     else:
@@ -317,8 +318,9 @@ def import_table(spark, jdbc_url, conn_props, table_def, s3_input_path):
     }
 
 
-def import_tables_by_level(spark, jdbc_url, conn_props, table_defs, dependency_order,
-                           s3_input_path):
+def import_tables_by_level(
+    spark, jdbc_url, conn_props, table_defs, dependency_order, s3_input_path
+):
     """Import tables in dependency order, parallelizing within each level.
 
     Tables at the same dependency level have no relationships between them and
@@ -350,8 +352,12 @@ def import_tables_by_level(spark, jdbc_url, conn_props, table_defs, dependency_o
                     continue
                 table_def = table_lookup[table_name]
                 future = executor.submit(
-                    import_table, spark, jdbc_url, conn_props,
-                    table_def, s3_input_path,
+                    import_table,
+                    spark,
+                    jdbc_url,
+                    conn_props,
+                    table_def,
+                    s3_input_path,
                 )
                 futures[future] = table_name
 
@@ -441,7 +447,12 @@ def main():
     jdbc_url, conn_props = get_jdbc_url(glue_context, connection_name)
 
     results = import_tables_by_level(
-        spark, jdbc_url, conn_props, table_defs, dependency_order, s3_input_path,
+        spark,
+        jdbc_url,
+        conn_props,
+        table_defs,
+        dependency_order,
+        s3_input_path,
     )
 
     write_summary(spark, s3_input_path, results)

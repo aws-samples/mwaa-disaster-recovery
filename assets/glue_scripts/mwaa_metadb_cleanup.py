@@ -148,8 +148,9 @@ def cleanup_table(connection, table_name):
             stmt.close()
 
 
-def cleanup_tables_by_level(spark, jdbc_url, user, password, table_defs,
-                            dependency_order):
+def cleanup_tables_by_level(
+    spark, jdbc_url, user, password, table_defs, dependency_order
+):
     """Delete records from tables in reverse dependency order.
 
     Tables at the same dependency level have no relationships between them and
@@ -235,13 +236,19 @@ def main():
     jdbc_url, user, password = get_jdbc_connection(glue_context, connection_name)
 
     results = cleanup_tables_by_level(
-        spark, jdbc_url, user, password, table_defs, dependency_order,
+        spark,
+        jdbc_url,
+        user,
+        password,
+        table_defs,
+        dependency_order,
     )
 
     total_deleted = sum(r["rows_deleted"] for r in results)
     logger.info(
         "Cleanup job complete. Cleaned %d tables, deleted %d total rows.",
-        len(results), total_deleted,
+        len(results),
+        total_deleted,
     )
 
 

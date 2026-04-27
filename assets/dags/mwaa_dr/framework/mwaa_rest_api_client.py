@@ -119,7 +119,7 @@ class MwaaRestApiClient:
             )
 
             if attempt < MAX_RETRIES - 1:
-                wait_time = BACKOFF_BASE * (2 ** attempt)
+                wait_time = BACKOFF_BASE * (2**attempt)
                 logger.warning(
                     "Request to %s returned %s. Retrying in %s seconds (attempt %d/%d).",
                     url,

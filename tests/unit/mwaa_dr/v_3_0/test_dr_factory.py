@@ -230,8 +230,16 @@ class TestDRFactory_3_0:
         # any other table (only active_dag depends on them, but they don't
         # depend on anything themselves).
         expected_sources = {
-            "variable", "connection", "slot_pool", "log",
-            "job", "dag_run", "trigger", "dag_version", "asset", "backfill",
+            "variable",
+            "connection",
+            "slot_pool",
+            "log",
+            "job",
+            "dag_run",
+            "trigger",
+            "dag_version",
+            "asset",
+            "backfill",
         }
         expect(source_names).to.equal(expected_sources)
 

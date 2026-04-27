@@ -94,18 +94,12 @@ class CredentialExtractor:
         try:
             secrets = json.loads(db_secrets)
         except json.JSONDecodeError as e:
-            raise ValueError(
-                f"DB_SECRETS contains malformed JSON: {e}"
-            )
+            raise ValueError(f"DB_SECRETS contains malformed JSON: {e}")
 
         if "username" not in secrets:
-            raise ValueError(
-                "DB_SECRETS JSON is missing the required 'username' key."
-            )
+            raise ValueError("DB_SECRETS JSON is missing the required 'username' key.")
         if "password" not in secrets:
-            raise ValueError(
-                "DB_SECRETS JSON is missing the required 'password' key."
-            )
+            raise ValueError("DB_SECRETS JSON is missing the required 'password' key.")
 
         username = secrets["username"]
         password = secrets["password"]
@@ -160,6 +154,4 @@ class CredentialExtractor:
                 database=database,
             )
         except Exception as e:
-            raise ValueError(
-                f"Failed to parse SQLAlchemy connection string: {e}"
-            )
+            raise ValueError(f"Failed to parse SQLAlchemy connection string: {e}")

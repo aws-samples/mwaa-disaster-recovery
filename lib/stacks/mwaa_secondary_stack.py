@@ -754,9 +754,7 @@ class MwaaSecondaryStack(MwaaBaseStack):
 
         return cloudwatch_health_check_fn
 
-    def setup_glue_resources(
-        self, conf: config.Config, mwaa_role: iam.IRole
-    ) -> None:
+    def setup_glue_resources(self, conf: config.Config, mwaa_role: iam.IRole) -> None:
         """Provision Glue IAM role and MWAA role policies for Airflow 3.x."""
 
         # Create Glue IAM role with trust policy for glue.amazonaws.com

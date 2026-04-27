@@ -24,7 +24,10 @@ from unittest.mock import patch
 
 import pytest
 
-from mwaa_dr.framework.credential_extractor import CredentialExtractor, DatabaseCredentials
+from mwaa_dr.framework.credential_extractor import (
+    CredentialExtractor,
+    DatabaseCredentials,
+)
 
 
 class TestCredentialExtractor:
@@ -32,7 +35,9 @@ class TestCredentialExtractor:
     def test_extract_from_db_secrets_valid(self):
         """Test valid DB_SECRETS parsing (Airflow 3.x path) - Requirement 1.1"""
         env = {
-            "DB_SECRETS": json.dumps({"username": "airflow_user", "password": "s3cr3t"}),
+            "DB_SECRETS": json.dumps(
+                {"username": "airflow_user", "password": "s3cr3t"}
+            ),
             "POSTGRES_HOST": "my-db-host.rds.amazonaws.com",
             "POSTGRES_PORT": "5432",
             "POSTGRES_DB": "AirflowMetadata",
@@ -46,7 +51,10 @@ class TestCredentialExtractor:
         assert creds.host == "my-db-host.rds.amazonaws.com"
         assert creds.port == "5432"
         assert creds.database == "AirflowMetadata"
-        assert creds.jdbc_url == "jdbc:postgresql://my-db-host.rds.amazonaws.com:5432/AirflowMetadata"
+        assert (
+            creds.jdbc_url
+            == "jdbc:postgresql://my-db-host.rds.amazonaws.com:5432/AirflowMetadata"
+        )
 
     def test_extract_from_db_secrets_defaults(self):
         """Test DB_SECRETS with default host/port/db when env vars are missing."""
@@ -98,7 +106,9 @@ class TestCredentialExtractor:
     def test_extract_priority_db_secrets_over_sql_alchemy(self):
         """Test that DB_SECRETS takes priority over SQLAlchemy conn string."""
         env = {
-            "DB_SECRETS": json.dumps({"username": "primary_user", "password": "primary_pass"}),
+            "DB_SECRETS": json.dumps(
+                {"username": "primary_user", "password": "primary_pass"}
+            ),
             "POSTGRES_HOST": "primary-host",
             "POSTGRES_PORT": "5432",
             "POSTGRES_DB": "PrimaryDB",

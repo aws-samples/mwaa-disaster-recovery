@@ -37,6 +37,7 @@ from hypothesis.strategies import (
 # Helpers extracted from Glue scripts (no awsglue/pyspark dependency)
 # ---------------------------------------------------------------------------
 
+
 def build_summary_dict(results):
     """Replicate the summary dict construction from mwaa_metadb_export.py write_summary.
 
@@ -67,14 +68,17 @@ def get_cleanup_sql(table_name):
 # Strategies
 # ---------------------------------------------------------------------------
 
+
 @composite
 def valid_table_names(draw):
     """Generate valid SQL table names (lowercase alphanumeric + underscore)."""
-    name = draw(text(
-        alphabet="abcdefghijklmnopqrstuvwxyz0123456789_",
-        min_size=1,
-        max_size=63,
-    ))
+    name = draw(
+        text(
+            alphabet="abcdefghijklmnopqrstuvwxyz0123456789_",
+            min_size=1,
+            max_size=63,
+        )
+    )
     # Table names must start with a letter or underscore
     if not (name[0].isalpha() or name[0] == "_"):
         name = "t" + name
@@ -90,12 +94,14 @@ def valid_row_counts(draw):
 @composite
 def export_result_lists(draw):
     """Generate lists of export result dicts with unique table names and row counts."""
-    table_names = draw(lists(
-        valid_table_names(),
-        min_size=1,
-        max_size=30,
-        unique=True,
-    ))
+    table_names = draw(
+        lists(
+            valid_table_names(),
+            min_size=1,
+            max_size=30,
+            unique=True,
+        )
+    )
     results = []
     for name in table_names:
         rows = draw(valid_row_counts())
@@ -106,6 +112,7 @@ def export_result_lists(draw):
 # ---------------------------------------------------------------------------
 # Property 6: Job summary contains all processed tables
 # ---------------------------------------------------------------------------
+
 
 class TestJobSummaryProperties:
     """
@@ -131,9 +138,9 @@ class TestJobSummaryProperties:
 
         # Every table in the input must appear in the summary
         for r in results:
-            assert r["table"] in summary["tables"], (
-                f"Table '{r['table']}' missing from summary"
-            )
+            assert (
+                r["table"] in summary["tables"]
+            ), f"Table '{r['table']}' missing from summary"
             assert summary["tables"][r["table"]] == r["rows"], (
                 f"Row count mismatch for '{r['table']}': "
                 f"expected {r['rows']}, got {summary['tables'][r['table']]}"
@@ -154,15 +161,18 @@ class TestJobSummaryProperties:
 # Strategies for cleanup property
 # ---------------------------------------------------------------------------
 
+
 @composite
 def slot_pool_records(draw):
     """Generate a list of slot_pool records, always including default_pool."""
-    extra_pools = draw(lists(
-        valid_table_names(),
-        min_size=0,
-        max_size=20,
-        unique=True,
-    ))
+    extra_pools = draw(
+        lists(
+            valid_table_names(),
+            min_size=0,
+            max_size=20,
+            unique=True,
+        )
+    )
     # Filter out any generated name that happens to be 'default_pool'
     extra_pools = [p for p in extra_pools if p != "default_pool"]
     # Always include default_pool
@@ -174,15 +184,17 @@ def slot_pool_records(draw):
 def job_records(draw):
     """Generate a list of job records, always including SchedulerJob entries."""
     scheduler_count = draw(integers(min_value=1, max_value=5))
-    other_types = draw(lists(
-        text(
-            alphabet="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ",
-            min_size=1,
-            max_size=30,
-        ),
-        min_size=0,
-        max_size=20,
-    ))
+    other_types = draw(
+        lists(
+            text(
+                alphabet="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ",
+                min_size=1,
+                max_size=30,
+            ),
+            min_size=0,
+            max_size=20,
+        )
+    )
     # Filter out any generated type that happens to be 'SchedulerJob'
     other_types = [jt for jt in other_types if jt != "SchedulerJob"]
     # Build records: each record is a dict with job_type
@@ -194,6 +206,7 @@ def job_records(draw):
 # ---------------------------------------------------------------------------
 # Property 8: Cleanup preserves protected records
 # ---------------------------------------------------------------------------
+
 
 class TestCleanupProtectedRecordsProperties:
     """

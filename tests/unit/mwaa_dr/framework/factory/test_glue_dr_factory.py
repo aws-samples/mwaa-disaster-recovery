@@ -22,8 +22,7 @@ import json
 import os
 import sys
 import types
-from io import StringIO
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 
 import pytest
 from sure import expect
@@ -241,8 +240,15 @@ class TestGlueDRFactory:
 
         expect(len(all_tables)).to.equal(7)
         expect(set(all_tables)).to.equal(
-            {"variable", "connection", "slot_pool", "dag_run", "job",
-             "task_instance", "xcom"}
+            {
+                "variable",
+                "connection",
+                "slot_pool",
+                "dag_run",
+                "job",
+                "task_instance",
+                "xcom",
+            }
         )
 
     def test_get_table_dependency_order_respects_dependencies(self):
@@ -256,20 +262,14 @@ class TestGlueDRFactory:
                 level_lookup[name] = idx
 
         # task_instance depends on job and dag_run, so must be at a higher level
-        expect(level_lookup["task_instance"]).to.be.greater_than(
-            level_lookup["job"]
-        )
+        expect(level_lookup["task_instance"]).to.be.greater_than(level_lookup["job"])
         expect(level_lookup["task_instance"]).to.be.greater_than(
             level_lookup["dag_run"]
         )
 
         # xcom depends on task_instance and dag_run
-        expect(level_lookup["xcom"]).to.be.greater_than(
-            level_lookup["task_instance"]
-        )
-        expect(level_lookup["xcom"]).to.be.greater_than(
-            level_lookup["dag_run"]
-        )
+        expect(level_lookup["xcom"]).to.be.greater_than(level_lookup["task_instance"])
+        expect(level_lookup["xcom"]).to.be.greater_than(level_lookup["dag_run"])
 
     def test_get_table_dependency_order_independent_tables_same_level(self):
         factory = ConcreteGlueDRFactory("test_dag")
@@ -310,8 +310,7 @@ class TestGlueDRFactory:
     def test_detect_date_field_execution_date(self):
         model = DependencyModel()
         table = BaseTable(
-            name="test", model=model,
-            columns=["dag_id", "execution_date", "state"]
+            name="test", model=model, columns=["dag_id", "execution_date", "state"]
         )
         result = GlueDRFactory._detect_date_field(table)
         expect(result).to.equal("execution_date")
@@ -319,8 +318,7 @@ class TestGlueDRFactory:
     def test_detect_date_field_start_date(self):
         model = DependencyModel()
         table = BaseTable(
-            name="test", model=model,
-            columns=["dag_id", "start_date", "state"]
+            name="test", model=model, columns=["dag_id", "start_date", "state"]
         )
         result = GlueDRFactory._detect_date_field(table)
         expect(result).to.equal("start_date")
@@ -328,8 +326,7 @@ class TestGlueDRFactory:
     def test_detect_date_field_timestamp(self):
         model = DependencyModel()
         table = BaseTable(
-            name="test", model=model,
-            columns=["key", "timestamp", "value"]
+            name="test", model=model, columns=["key", "timestamp", "value"]
         )
         result = GlueDRFactory._detect_date_field(table)
         expect(result).to.equal("timestamp")
@@ -337,8 +334,7 @@ class TestGlueDRFactory:
     def test_detect_date_field_none(self):
         model = DependencyModel()
         table = BaseTable(
-            name="test", model=model,
-            columns=["key", "val", "description"]
+            name="test", model=model, columns=["key", "val", "description"]
         )
         result = GlueDRFactory._detect_date_field(table)
         expect(result).to.be.none
@@ -348,7 +344,6 @@ class TestGlueDRFactory:
         table = BaseTable(name="test", model=model)
         result = GlueDRFactory._detect_date_field(table)
         expect(result).to.be.none
-
 
     # --- Tests for create_glue_connection (Req 2.1, 2.2, 2.3, 2.4) ---
 
@@ -413,7 +408,7 @@ class TestGlueDRFactory:
         with patch.dict(os.environ, env_vars):
             # Call the inner function by extracting it from a DAG
             # We test the logic directly by simulating what the @task does
-            factory = ConcreteGlueDRFactory("test_dag")
+            ConcreteGlueDRFactory("test_dag")
 
             # Directly invoke the connection creation logic
             env_name = os.environ.get("MWAA_ENV_NAME", "")
@@ -526,7 +521,6 @@ class TestGlueDRFactory:
         # create_connection should NOT have been called
         mock_glue.create_connection.assert_not_called()
 
-
     # --- Tests for create_backup_dag (Req 3.1, 3.6) ---
 
     @patch("mwaa_dr.framework.factory.glue_dr_factory.Variable")
@@ -562,7 +556,10 @@ class TestGlueDRFactory:
 
         with (
             patch.dict(os.environ, env_vars),
-            patch.dict(sys.modules, {"airflow.providers.amazon.aws.operators.glue": mock_providers_module}),
+            patch.dict(
+                sys.modules,
+                {"airflow.providers.amazon.aws.operators.glue": mock_providers_module},
+            ),
         ):
             factory = ConcreteGlueDRFactory("backup_dag")
             dag = factory.create_backup_dag()
@@ -588,9 +585,7 @@ class TestGlueDRFactory:
 
     @patch("mwaa_dr.framework.factory.glue_dr_factory.Variable")
     @patch("mwaa_dr.framework.factory.glue_dr_factory.boto3")
-    def test_create_backup_dag_glue_job_arguments(
-        self, mock_boto3, mock_variable
-    ):
+    def test_create_backup_dag_glue_job_arguments(self, mock_boto3, mock_variable):
         """Test that backup DAG Glue job arguments contain all required parameters.
         Validates: Requirements 3.6
         """
@@ -619,11 +614,14 @@ class TestGlueDRFactory:
 
         with (
             patch.dict(os.environ, env_vars),
-            patch.dict(sys.modules, {"airflow.providers.amazon.aws.operators.glue": mock_providers_module}),
+            patch.dict(
+                sys.modules,
+                {"airflow.providers.amazon.aws.operators.glue": mock_providers_module},
+            ),
             patch("airflow.models.Variable.get", mock_variable.get),
         ):
             factory = ConcreteGlueDRFactory("backup_dag")
-            dag = factory.create_backup_dag()
+            factory.create_backup_dag()
 
         # Verify Glue job arguments
         glue_call_kwargs = mock_glue_operator_class.call_args.kwargs
@@ -636,9 +634,7 @@ class TestGlueDRFactory:
         expect(script_args).to.have.key("--TABLE_DEPENDENCY_ORDER")
 
         # Verify S3 output path
-        expect(script_args["--S3_OUTPUT_PATH"]).to.equal(
-            "s3://backup-bucket/data"
-        )
+        expect(script_args["--S3_OUTPUT_PATH"]).to.equal("s3://backup-bucket/data")
 
         # Verify export tables exclude variable and connection
         export_tables = json.loads(script_args["--EXPORT_TABLES"])
@@ -653,10 +649,7 @@ class TestGlueDRFactory:
         expect(dep_order).to.be.a(list)
 
         # Verify IAM role
-        expect(glue_call_kwargs["iam_role_name"]).to.equal(
-            "arn:aws:iam::123:role/glue"
-        )
-
+        expect(glue_call_kwargs["iam_role_name"]).to.equal("arn:aws:iam::123:role/glue")
 
     # --- Tests for create_restore_dag (Req 4.1, 4.5, 4.6) ---
 
@@ -691,7 +684,10 @@ class TestGlueDRFactory:
 
         with (
             patch.dict(os.environ, env_vars),
-            patch.dict(sys.modules, {"airflow.providers.amazon.aws.operators.glue": mock_providers_module}),
+            patch.dict(
+                sys.modules,
+                {"airflow.providers.amazon.aws.operators.glue": mock_providers_module},
+            ),
         ):
             factory = ConcreteGlueDRFactory("restore_dag")
             dag = factory.create_restore_dag()
@@ -715,15 +711,11 @@ class TestGlueDRFactory:
         glue_call_kwargs = mock_glue_operator_class.call_args.kwargs
         expect(glue_call_kwargs["task_id"]).to.equal("glue_import")
         expect(glue_call_kwargs["job_name"]).to.equal("restore_dag_import")
-        expect(glue_call_kwargs["script_location"]).to.contain(
-            "mwaa_metadb_import"
-        )
+        expect(glue_call_kwargs["script_location"]).to.contain("mwaa_metadb_import")
 
     @patch("mwaa_dr.framework.factory.glue_dr_factory.Variable")
     @patch("mwaa_dr.framework.factory.glue_dr_factory.boto3")
-    def test_create_restore_dag_glue_job_arguments(
-        self, mock_boto3, mock_variable
-    ):
+    def test_create_restore_dag_glue_job_arguments(self, mock_boto3, mock_variable):
         """Test that restore DAG Glue job arguments contain all required parameters.
         Validates: Requirements 4.1
         """
@@ -750,11 +742,14 @@ class TestGlueDRFactory:
 
         with (
             patch.dict(os.environ, env_vars),
-            patch.dict(sys.modules, {"airflow.providers.amazon.aws.operators.glue": mock_providers_module}),
+            patch.dict(
+                sys.modules,
+                {"airflow.providers.amazon.aws.operators.glue": mock_providers_module},
+            ),
             patch("airflow.models.Variable.get", mock_variable.get),
         ):
             factory = ConcreteGlueDRFactory("restore_dag")
-            dag = factory.create_restore_dag()
+            factory.create_restore_dag()
 
         glue_call_kwargs = mock_glue_operator_class.call_args.kwargs
         script_args = glue_call_kwargs["script_args"]
@@ -765,9 +760,7 @@ class TestGlueDRFactory:
         expect(script_args).to.have.key("--TABLE_DEPENDENCY_ORDER")
 
         # Verify S3 input path
-        expect(script_args["--S3_INPUT_PATH"]).to.equal(
-            "s3://backup-bucket/data"
-        )
+        expect(script_args["--S3_INPUT_PATH"]).to.equal("s3://backup-bucket/data")
 
         # Verify import tables exclude variable and connection
         import_tables = json.loads(script_args["--IMPORT_TABLES"])
@@ -808,7 +801,10 @@ class TestGlueDRFactory:
 
         with (
             patch.dict(os.environ, env_vars),
-            patch.dict(sys.modules, {"airflow.providers.amazon.aws.operators.glue": mock_providers_module}),
+            patch.dict(
+                sys.modules,
+                {"airflow.providers.amazon.aws.operators.glue": mock_providers_module},
+            ),
         ):
             factory = ConcreteGlueDRFactory("cleanup_dag")
             dag = factory.create_cleanup_dag()
@@ -830,15 +826,11 @@ class TestGlueDRFactory:
         glue_call_kwargs = mock_glue_operator_class.call_args.kwargs
         expect(glue_call_kwargs["task_id"]).to.equal("glue_cleanup")
         expect(glue_call_kwargs["job_name"]).to.equal("cleanup_dag_cleanup")
-        expect(glue_call_kwargs["script_location"]).to.contain(
-            "mwaa_metadb_cleanup"
-        )
+        expect(glue_call_kwargs["script_location"]).to.contain("mwaa_metadb_cleanup")
 
     @patch("mwaa_dr.framework.factory.glue_dr_factory.Variable")
     @patch("mwaa_dr.framework.factory.glue_dr_factory.boto3")
-    def test_create_cleanup_dag_glue_job_arguments(
-        self, mock_boto3, mock_variable
-    ):
+    def test_create_cleanup_dag_glue_job_arguments(self, mock_boto3, mock_variable):
         """Test that cleanup DAG Glue job arguments contain all required parameters.
         Validates: Requirements 5.1
         """
@@ -865,10 +857,13 @@ class TestGlueDRFactory:
 
         with (
             patch.dict(os.environ, env_vars),
-            patch.dict(sys.modules, {"airflow.providers.amazon.aws.operators.glue": mock_providers_module}),
+            patch.dict(
+                sys.modules,
+                {"airflow.providers.amazon.aws.operators.glue": mock_providers_module},
+            ),
         ):
             factory = ConcreteGlueDRFactory("cleanup_dag")
-            dag = factory.create_cleanup_dag()
+            factory.create_cleanup_dag()
 
         glue_call_kwargs = mock_glue_operator_class.call_args.kwargs
         script_args = glue_call_kwargs["script_args"]
@@ -884,7 +879,6 @@ class TestGlueDRFactory:
         expect(cleanup_table_names).to.contain("connection")
         expect(cleanup_table_names).to.contain("slot_pool")
         expect(cleanup_table_names).to.contain("dag_run")
-
 
     # --- Tests for backup/restore API methods ---
 
@@ -905,7 +899,9 @@ class TestGlueDRFactory:
         factory = ConcreteGlueDRFactory("test_dag")
 
         with (
-            patch.object(factory, "get_mwaa_rest_api_client", return_value=mock_rest_client),
+            patch.object(
+                factory, "get_mwaa_rest_api_client", return_value=mock_rest_client
+            ),
             patch.object(factory, "bucket", return_value="backup-bucket"),
         ):
             factory.backup_variables_via_api()
@@ -948,7 +944,9 @@ class TestGlueDRFactory:
         factory = ConcreteGlueDRFactory("test_dag")
 
         with (
-            patch.object(factory, "get_mwaa_rest_api_client", return_value=mock_rest_client),
+            patch.object(
+                factory, "get_mwaa_rest_api_client", return_value=mock_rest_client
+            ),
             patch.object(factory, "bucket", return_value="backup-bucket"),
         ):
             factory.backup_connections_via_api()
@@ -988,7 +986,9 @@ class TestGlueDRFactory:
 
         factory = ConcreteGlueDRFactory("test_dag")
 
-        with patch.object(factory, "get_mwaa_rest_api_client", return_value=mock_rest_client):
+        with patch.object(
+            factory, "get_mwaa_rest_api_client", return_value=mock_rest_client
+        ):
             factory.restore_variables_via_api()
 
         # Only var2 should be created (var1 already exists)
@@ -998,7 +998,9 @@ class TestGlueDRFactory:
 
     @patch("mwaa_dr.framework.factory.glue_dr_factory.boto3")
     @patch("mwaa_dr.framework.factory.glue_dr_factory.Variable")
-    def test_restore_variables_via_api_replace_strategy(self, mock_variable, mock_boto3):
+    def test_restore_variables_via_api_replace_strategy(
+        self, mock_variable, mock_boto3
+    ):
         """Test restore_variables_via_api with REPLACE strategy.
         Validates: Requirements 11.7
         """
@@ -1021,7 +1023,9 @@ class TestGlueDRFactory:
 
         factory = ConcreteGlueDRFactory("test_dag")
 
-        with patch.object(factory, "get_mwaa_rest_api_client", return_value=mock_rest_client):
+        with patch.object(
+            factory, "get_mwaa_rest_api_client", return_value=mock_rest_client
+        ):
             factory.restore_variables_via_api()
 
         # Old variable should be deleted
@@ -1033,7 +1037,9 @@ class TestGlueDRFactory:
 
     @patch("mwaa_dr.framework.factory.glue_dr_factory.boto3")
     @patch("mwaa_dr.framework.factory.glue_dr_factory.Variable")
-    def test_restore_variables_via_api_do_nothing_strategy(self, mock_variable, mock_boto3):
+    def test_restore_variables_via_api_do_nothing_strategy(
+        self, mock_variable, mock_boto3
+    ):
         """Test restore_variables_via_api with DO_NOTHING strategy.
         Validates: Requirements 11.8
         """
@@ -1045,7 +1051,9 @@ class TestGlueDRFactory:
         mock_rest_client = MagicMock()
         factory = ConcreteGlueDRFactory("test_dag")
 
-        with patch.object(factory, "get_mwaa_rest_api_client", return_value=mock_rest_client):
+        with patch.object(
+            factory, "get_mwaa_rest_api_client", return_value=mock_rest_client
+        ):
             factory.restore_variables_via_api()
 
         # No API calls should be made
@@ -1055,7 +1063,9 @@ class TestGlueDRFactory:
 
     @patch("mwaa_dr.framework.factory.glue_dr_factory.boto3")
     @patch("mwaa_dr.framework.factory.glue_dr_factory.Variable")
-    def test_restore_connections_via_api_append_strategy(self, mock_variable, mock_boto3):
+    def test_restore_connections_via_api_append_strategy(
+        self, mock_variable, mock_boto3
+    ):
         """Test restore_connections_via_api with APPEND strategy.
         Validates: Requirements 11.5, 11.6
         """
@@ -1079,7 +1089,9 @@ class TestGlueDRFactory:
 
         factory = ConcreteGlueDRFactory("test_dag")
 
-        with patch.object(factory, "get_mwaa_rest_api_client", return_value=mock_rest_client):
+        with patch.object(
+            factory, "get_mwaa_rest_api_client", return_value=mock_rest_client
+        ):
             factory.restore_connections_via_api()
 
         # Only conn2 should be created (conn1 already exists)
@@ -1089,7 +1101,9 @@ class TestGlueDRFactory:
 
     @patch("mwaa_dr.framework.factory.glue_dr_factory.boto3")
     @patch("mwaa_dr.framework.factory.glue_dr_factory.Variable")
-    def test_restore_connections_via_api_do_nothing_strategy(self, mock_variable, mock_boto3):
+    def test_restore_connections_via_api_do_nothing_strategy(
+        self, mock_variable, mock_boto3
+    ):
         """Test restore_connections_via_api with DO_NOTHING strategy.
         Validates: Requirements 11.8
         """
@@ -1101,7 +1115,9 @@ class TestGlueDRFactory:
         mock_rest_client = MagicMock()
         factory = ConcreteGlueDRFactory("test_dag")
 
-        with patch.object(factory, "get_mwaa_rest_api_client", return_value=mock_rest_client):
+        with patch.object(
+            factory, "get_mwaa_rest_api_client", return_value=mock_rest_client
+        ):
             factory.restore_connections_via_api()
 
         mock_rest_client.list_connections.assert_not_called()
