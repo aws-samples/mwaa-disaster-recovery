@@ -2,7 +2,7 @@
 <!-- TOC ignore:true -->
 # MWAA Disaster Recovery
 
-![MWAA](https://img.shields.io/badge/MWAA-2.11.0_|_2.10.3_|_2.10.1_|_2.9.2_|_2.8.1_|_2.7.2_|_2.6.3_|_2.5.1_|_2.4.3-blue)
+![MWAA](https://img.shields.io/badge/MWAA-3.0.2_|_2.11.0_|_2.10.3_|_2.10.1_|_2.9.2_|_2.8.1_|_2.7.2_|_2.6.3_|_2.5.1_|_2.4.3-blue)
 ![CDK](https://img.shields.io/badge/CDK-Python-orange)
 ![Python](https://img.shields.io/badge/Python-3.7+-blue)
 [![Black](https://img.shields.io/badge/Code%20Style-Black-000000.svg)](https://github.com/psf/black)
@@ -61,6 +61,7 @@
         - [Manually Triggering the Recovery Workflow](#manually-triggering-the-recovery-workflow)
         - [Using the Metadata Backup and Restore DAGs Independently](#using-the-metadata-backup-and-restore-dags-independently)
         - [May Need to Restart Environment for Plugins to Work](#may-need-to-restart-environment-for-plugins-to-work)
+        - [Airflow 3.0 Specific Considerations](#airflow-30-specific-considerations)
 - [Frequently Asked Questions](#frequently-asked-questions)
     - [FAQ-1: Failure to Read Environment Backup](#faq-1-failure-to-read-environment-backup)
     - [FAQ-2: Failure to Create New Environment](#faq-2-failure-to-create-new-environment)
@@ -77,6 +78,7 @@ This solution is a part of an AWS blog series on MWAA Disaster Recovery. Please 
 
 > [!NOTE]
 > The project currently supports the following versions of MWAA:
+> - **3.0.2** *(new — uses AWS Glue for metadata operations)*
 > - **2.11.0**
 > - **2.10.3**
 > - **2.10.1**
@@ -90,6 +92,9 @@ This solution is a part of an AWS blog series on MWAA Disaster Recovery. Please 
 # Architecture
 
 In this section, we will discuss two highly resilient, multi-region deployment architectures for MWAA. These architectures can achieve recovery time and recover point objectives of minutes ([Warm Standby](#warm-standby)) to an hour ([Backup and Restore](#backup-and-restore)) based on volume of historical data to be backed up and restored. Let's discuss the the two strategies in details next.
+
+> [!IMPORTANT]
+> **Airflow 3.0 Architecture Change:** Apache Airflow 3.0 prohibits direct database access from DAGs (`RuntimeError: Direct database access via the ORM is not allowed in Airflow 3.0`). For MWAA 3.0.2 and later, the DR framework uses [AWS Glue](https://aws.amazon.com/glue/) jobs to perform metadata export, import, and cleanup via JDBC instead of the ORM-based approach used in Airflow 2.x. Variables and connections are handled via the [MWAA Airflow REST API](https://docs.aws.amazon.com/mwaa/latest/userguide/access-airflow-ui.html) to preserve Fernet-encrypted values across environments. The CDK stacks automatically provision the required Glue IAM role and permissions when `MWAA_VERSION` starts with `3.`. See [Airflow 3.0 Specific Considerations](#airflow-30-specific-considerations) for details.
 
 ## Backup and Restore
 
@@ -192,11 +197,13 @@ The [lib](lib) folder hosts the deployment code for the project. The project per
     - Deploys the [mwaa_dr](assets/dags/mwaa_dr/) framework to the DAGs S3 bucket, which include DAGs for [backup](assets/dags/mwaa_dr/backup_metadata.py), [restore](assets/dags/mwaa_dr/restore_metadata.py), and [cleanup](assets/dags/mwaa_dr/cleanup_metadata.py) of metadata store
     - Deploys the [Airflow CLI](lib/constructs/airflow_cli.py) custom resource and associated lambda functions to setup necessary Airflow variables on the primary MWAA environment
     - Deploys an SNS topic for failure notifications
+    - For MWAA 3.x: provisions a Glue IAM role, grants MWAA execution role Glue/MWAA/EC2 permissions, and deploys [Glue scripts](assets/glue_scripts/) to S3
 
 - [The Secondary Region Stack](lib/stacks/mwaa_secondary_stack.py)
     - Deploys a backup S3 bucket to the secondary region
     - Deploys a StepFunctions workflow and associated Lambda functions to the secondary region configured with EventBridge schedule for health check of the primary region MWAA environment
     - Deploys an SNS topic for workflow failure notification
+    - For MWAA 3.x: provisions a Glue IAM role and grants MWAA execution role Glue/MWAA/EC2 permissions
 
 ## Prerequisites
 
@@ -328,7 +335,7 @@ Here are the required parameters that applies to both primary and secondary regi
 | `AWS_ACCOUNT_ID` | `111222333444` | Your AWS account id. |
 | `DR_TYPE` | `BACKUP_RESTORE`, `WARM_STANDBY` | The disaster recovery strategy to be deployed. |
 | `MWAA_UPDATE_EXECUTION_ROLE` | `YES` or `NO` | Flag to denote whether to update the existing MWAA execution role with new policies for allowing task token return calls from the StepFunctions workflow in the secondary stack. See the [Automated Updates to the Execution Role](#automated-updates-to-the-execution-role) for details. |
-| `MWAA_VERSION` | `2.4.3`, `2.5.1`, `2.6.3`, `2.7.2`, `2.8.1`, `2.9.2`, `2.10.1`, `2.10.3`, `2.11.0` | The deployed version of MWAA. |
+| `MWAA_VERSION` | `2.4.3`, `2.5.1`, `2.6.3`, `2.7.2`, `2.8.1`, `2.9.2`, `2.10.1`, `2.10.3`, `2.11.0`, `3.0.2` | The deployed version of MWAA. |
 | `PRIMARY_DAGS_BUCKET_NAME` | `mwaa-2-5-1-primary-bucket` | The name of the DAGs S3 bucket used by the environment in the primary region. |
 | `PRIMARY_MWAA_ENVIRONMENT_NAME` | `mwaa-2-5-1-primary` | The name of the MWAA environment in the primary region. |
 | `PRIMARY_MWAA_ROLE_ARN` | `arn:aws:...:role/service-role/primary-role` | The ARN of the execution role used by the primary MWAA environment. |
@@ -354,6 +361,7 @@ Here are the optional parameters that applies to both primary and secondary regi
 | ------------- | ------------- | -------------- | ----------- |
 | `DR_CONNECTION_RESTORE_STRATEGY` | `APPEND` | `DO_NOTHING`, `APPEND`, or `REPLACE` | The strategy to use to restore the connection table during recovery workflow. Review [Special Handling of Variable and Connection Tables](#special-handling-of-variable-and-connection-tables) for details. |
 | `DR_VARIABLE_RESTORE_STRATEGY` | `APPEND` | `DO_NOTHING`, `APPEND`, or `REPLACE` | The strategy to use to restore the variable table during recovery workflow. Review [Special Handling of Variable and Connection Tables](#special-handling-of-variable-and-connection-tables) for details. |
+| `GLUE_ROLE_ARN` | *(empty)* | `arn:aws:iam::123456789:role/glue-role` | The ARN of the IAM role for AWS Glue jobs. Only required for MWAA 3.x. If not set, the CDK stack creates a Glue role automatically. Set this as an Airflow variable to use a pre-existing role. |
 | `HEALTH_CHECK_ENABLED` | `YES` | `YES` or `NO` | Whether to enable periodic health check of the primary MWAA environment from the secondary region. If set to `NO` the, primary region failure will go undetected and the onus is on admins to manually trigger the recovery workflow. |
 | `HEALTH_CHECK_INTERVAL_MINS` | `5` | time interval in minutes | Health check frequency of the primary mwaa environment in mins. |
 | `HEALTH_CHECK_MAX_RETRY` | `2` | number | The maximum number of retries after the health check of the primary region MWAA fails before moving on to the disaster recovery flow. |
@@ -760,6 +768,27 @@ After the setup you are all set to run the [backup_metadata](assets/dags/mwaa_dr
 ### May Need to Restart Environment for Plugins to Work
 
 If you have plugins that rely on variables and connections, particularly, for the [Backup Restore](#backup-and-restore) approach, you may need to manually restart the MWAA environment after the restore is complete for the solution to work. The plugins get loaded in the secondary MWAA environment immediately after it is created before the variables and connections can be restored, thus, breaking your plugins dependencies. Restarting the environment will help mitigate this issue.
+
+### Airflow 3.0 Specific Considerations
+
+Airflow 3.0 introduces a fundamental change: direct database access via the ORM is no longer allowed from within DAGs. This means the existing `BaseTable.backup()` / `BaseTable.restore()` / `BaseDRFactory.cleanup_tables()` methods that use `airflow.settings.Session` cannot work on Airflow 3.x.
+
+For MWAA 3.0.2, the framework uses a different architecture:
+
+- **AWS Glue jobs** replace direct SQL operations. The DAG extracts database credentials from MWAA worker environment variables, creates a Glue JDBC connection using the MWAA VPC networking, and delegates all database read/write operations to Glue scripts running in the same VPC.
+- **MWAA Airflow REST API** handles `variable` and `connection` tables. These tables contain Fernet-encrypted values that must be decrypted by the source environment's API during export and re-encrypted by the target environment's API during import.
+- **Glue scripts** (`mwaa_metadb_export.py`, `mwaa_metadb_import.py`, `mwaa_metadb_cleanup.py`) are deployed to S3 by the CDK stack and process tables in dependency order with parallelism within each level.
+
+The CDK stacks automatically provision the following when `MWAA_VERSION` starts with `3.`:
+- A Glue IAM role with VPC networking, S3, and CloudWatch permissions
+- MWAA execution role policies for Glue, MWAA REST API, and EC2 operations
+- Glue script deployment to `s3://{dags_bucket}/scripts/`
+
+> [!NOTE]
+> The Airflow 3.0 table schema differs from 2.x. New tables include `dag_version`, `dag_code`, `asset`, `asset_event`, `backfill`, `backfill_dag_run`, `dag_run_note`, `task_instance_note`, and `task_instance_history`. Removed tables include `serialized_dag`, `sla_miss`, and `rendered_task_instance_fields`.
+
+> [!IMPORTANT]
+> All Airflow 2.x behavior remains completely unchanged. The Glue-based approach is only activated when the Airflow version starts with `3.`.
 
 # Frequently Asked Questions
 

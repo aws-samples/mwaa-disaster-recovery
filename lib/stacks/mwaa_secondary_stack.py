@@ -98,6 +98,10 @@ class MwaaSecondaryStack(MwaaBaseStack):
         if conf.secondary_create_step_functions_vpce:
             self.setup_sfn_vpce(conf, self._vpc)
 
+        # Conditionally provision Glue resources for Airflow 3.x
+        if conf.mwaa_version.startswith("3."):
+            self.setup_glue_resources(conf, mwaa_role)
+
     def setup_buckets(self, conf: config.Config, mwaa_role: iam.IRole) -> s3.Bucket:
         _source_bucket = s3.Bucket.from_bucket_name(
             self, conf.get_name("source-bucket"), conf.secondary_dags_bucket_name
@@ -749,6 +753,109 @@ class MwaaSecondaryStack(MwaaBaseStack):
         )
 
         return cloudwatch_health_check_fn
+
+    def setup_glue_resources(self, conf: config.Config, mwaa_role: iam.IRole) -> None:
+        """Provision Glue IAM role and MWAA role policies for Airflow 3.x."""
+
+        # Create Glue IAM role with trust policy for glue.amazonaws.com
+        glue_role = iam.Role(
+            self,
+            conf.get_name("glue-role"),
+            assumed_by=iam.ServicePrincipal("glue.amazonaws.com"),
+        )
+
+        # VPC networking permissions for Glue
+        glue_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "ec2:CreateNetworkInterface",
+                    "ec2:DeleteNetworkInterface",
+                    "ec2:DescribeNetworkInterfaces",
+                ],
+                resources=["*"],
+            )
+        )
+
+        # S3 access to backup bucket and scripts prefix
+        glue_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "s3:GetObject",
+                    "s3:PutObject",
+                ],
+                resources=[
+                    self._backup_bucket.arn_for_objects("*"),
+                    self._source_bucket.arn_for_objects("scripts/*"),
+                ],
+            )
+        )
+        glue_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "s3:GetBucketLocation",
+                    "s3:ListBucket",
+                ],
+                resources=[
+                    self._backup_bucket.bucket_arn,
+                    self._source_bucket.bucket_arn,
+                ],
+            )
+        )
+
+        # CloudWatch logging permissions
+        glue_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "logs:CreateLogGroup",
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents",
+                ],
+                resources=["arn:aws:logs:*:*:log-group:/aws-glue/*"],
+            )
+        )
+
+        self._glue_role = glue_role
+
+        # Grant MWAA execution role Glue permissions
+        mwaa_role.add_to_principal_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "glue:CreateJob",
+                    "glue:GetJob",
+                    "glue:StartJobRun",
+                    "glue:GetJobRun",
+                    "glue:CreateConnection",
+                    "glue:GetConnection",
+                ],
+                resources=["*"],
+            )
+        )
+
+        # Grant MWAA execution role MWAA and EC2 permissions
+        mwaa_role.add_to_principal_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "mwaa:GetEnvironment",
+                    "mwaa:CreateWebLoginToken",
+                    "ec2:DescribeSubnets",
+                    "ec2:DescribeSecurityGroups",
+                ],
+                resources=["*"],
+            )
+        )
+
+        # Grant MWAA execution role iam:PassRole scoped to Glue role
+        mwaa_role.add_to_principal_policy(
+            iam.PolicyStatement(
+                actions=["iam:PassRole"],
+                resources=[glue_role.role_arn],
+                conditions={
+                    "StringEquals": {
+                        "iam:PassedToService": "glue.amazonaws.com",
+                    }
+                },
+            )
+        )
 
     def setup_sfn_vpce(
         self, conf: config.Config, vpc_info: VpcInfo

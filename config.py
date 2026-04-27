@@ -36,6 +36,7 @@ SUPPORTED_MWAA_VERSIONS = [
     "2.10.1",
     "2.10.3",
     "2.11.0",
+    "3.0.2",
 ]
 
 # DR Option
@@ -93,6 +94,8 @@ SECONDARY_SECURITY_GROUP_IDS = "SECONDARY_SECURITY_GROUP_IDS"
 SECONDARY_CREATE_SFN_VPCE = "SECONDARY_CREATE_SFN_VPCE"
 SECONDARY_CLEANUP_COOL_OFF_SECS = "SECONDARY_CLEANUP_COOL_OFF_SECS"
 
+GLUE_ROLE_ARN = "GLUE_ROLE_ARN"
+
 REQUIRED_CONFIGS = [
     STACK_NAME_PREFIX,
     AWS_ACCOUNT_ID,
@@ -137,6 +140,7 @@ DEFAULT_CONFIGS = {
     PRIMARY_SCHEDULE_INTERVAL: "0 * * * *",
     PRIMARY_REPLICATION_POLLING_INTERVAL_SECS: "30",
     SECONDARY_CLEANUP_COOL_OFF_SECS: "30",
+    GLUE_ROLE_ARN: "",
 }
 
 
@@ -337,6 +341,10 @@ class Config:
     @property
     def secondary_create_step_functions_vpce(self) -> bool:
         return self.get("SECONDARY_CREATE_SFN_VPCE") == "YES"
+
+    @property
+    def glue_role_arn(self) -> str:
+        return self.get(GLUE_ROLE_ARN)
 
     @property
     def secondary_cleanup_cool_off_secs(self) -> int:

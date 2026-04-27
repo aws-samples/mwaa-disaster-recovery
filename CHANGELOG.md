@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-04-27
+### Added
+- Support for MWAA v3.0.2 (Apache Airflow 3.0) via AWS Glue-based metadata export/import/cleanup
+- `GlueDRFactory` base class replacing direct ORM access with Glue job orchestration for Airflow 3.x
+- `DRFactory_3_0` version-specific factory with Airflow 3.0 table schema (new tables: `dag_version`, `dag_code`, `asset`, `asset_event`, `backfill`, `backfill_dag_run`, `dag_run_note`, `task_instance_note`, `task_instance_history`)
+- `CredentialExtractor` utility for extracting database credentials from MWAA worker environment variables (`DB_SECRETS` for Airflow 3.x, `AIRFLOW__DATABASE__SQL_ALCHEMY_CONN` for 2.x)
+- `MwaaRestApiClient` utility for interacting with the MWAA Airflow REST API using web login token authentication, with retry and exponential backoff
+- Variable and connection backup/restore via MWAA REST API to handle Fernet-encrypted values across environments
+- Glue scripts for metadata operations: `mwaa_metadb_export.py`, `mwaa_metadb_import.py`, `mwaa_metadb_cleanup.py`
+- Dependency-ordered parallel execution in Glue scripts (topological sort for import/export/cleanup)
+- CDK stack support for Glue resources: IAM role, MWAA role policies, and script deployment (conditional on Airflow 3.x)
+- Property-based tests using Hypothesis for credential extraction, dependency ordering, restore strategies, version routing, and more
+- CDK assertion tests for Glue resource provisioning and Airflow 2.x backward compatibility
+
+### Changed
+- Entry point DAGs (`backup_metadata.py`, `restore_metadata.py`, `cleanup_metadata.py`) now route Airflow 3.x to `DRFactory_3_0`
+- `config.py`: Added `"3.0.2"` to `SUPPORTED_MWAA_VERSIONS`, added `GLUE_ROLE_ARN` configuration property
+
+### Fixed
+- Dependency vulnerability fixes: upgraded `apache-airflow` (2.9.2 → 2.11.2), `setuptools` (71.1.0 → 78.1.1), `requests` (2.31.0 → 2.33.0), `python-dotenv` (1.0.1 → 1.2.2), `pytest` (8.2.0 → 9.0.3)
+- Added missing `hypothesis` to `requirements-dev.txt` for CI property-based test support
+
 ## [2.2.0] - 2026-03-30
 ### Added
 - Support for MWAA v2.11.0 due to gracious contribution of [Kamen Sharlandjiev](https://github.com/ksharlandjiev)
@@ -148,7 +170,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial commit with sample readme, code of conduct, and license
 
 
-[unreleased]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v2.2.0...HEAD
+[unreleased]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v3.0.0...HEAD
+[3.0.0]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v2.2.0...v3.0.0
 [2.2.0]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v2.1.1...v2.2.0
 [2.1.1]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v2.1.0...v2.1.1
 [2.1.0]: https://github.com/aws-samples/mwaa-disaster-recovery/compare/v2.0.1...v2.1.0

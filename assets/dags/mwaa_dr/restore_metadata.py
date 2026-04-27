@@ -66,6 +66,11 @@ elif airflow_version.startswith("2.11"):
 
     factory = DRFactory_2_11(**kwargs)
 
+elif airflow_version.startswith("3."):
+    from mwaa_dr.v_3_0.dr_factory import DRFactory_3_0
+
+    factory = DRFactory_3_0(**kwargs)
+
 else:
     from mwaa_dr.framework.factory.default_dag_factory import DefaultDagFactory
 

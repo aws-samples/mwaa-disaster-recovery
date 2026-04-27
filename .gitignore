@@ -9,6 +9,7 @@ node_modules
 reports/
 apidocs/
 build/
+tmp/
 temp.py
 
 # CDK Context & Staging files

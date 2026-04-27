@@ -128,6 +128,10 @@ class MwaaPrimaryStack(MwaaBaseStack):
             )
         )
 
+        # Conditionally provision Glue resources for Airflow 3.x
+        if conf.mwaa_version.startswith("3."):
+            self.setup_glue_resources(conf, mwaa_role)
+
         self.variables_airflow_cli.node.add_dependency(failure_notification_topic)
         self.dags_deployment.node.add_dependency(self.variables_airflow_cli)
         self.replication_job_custom_resource.node.add_dependency(
@@ -608,6 +612,121 @@ class MwaaPrimaryStack(MwaaBaseStack):
             )
         )
         return replication_job_fn
+
+    def setup_glue_resources(self, conf: config.Config, mwaa_role: iam.IRole) -> None:
+        """Provision Glue IAM role, MWAA role policies, and script deployment for Airflow 3.x."""
+
+        # Create Glue IAM role with trust policy for glue.amazonaws.com
+        glue_role = iam.Role(
+            self,
+            conf.get_name("glue-role"),
+            assumed_by=iam.ServicePrincipal("glue.amazonaws.com"),
+        )
+
+        # VPC networking permissions for Glue
+        glue_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "ec2:CreateNetworkInterface",
+                    "ec2:DeleteNetworkInterface",
+                    "ec2:DescribeNetworkInterfaces",
+                ],
+                resources=["*"],
+            )
+        )
+
+        # S3 access to backup bucket and scripts prefix
+        glue_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "s3:GetObject",
+                    "s3:PutObject",
+                ],
+                resources=[
+                    self._backup_bucket.arn_for_objects("*"),
+                    self._source_bucket.arn_for_objects("scripts/*"),
+                ],
+            )
+        )
+        glue_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "s3:GetBucketLocation",
+                    "s3:ListBucket",
+                ],
+                resources=[
+                    self._backup_bucket.bucket_arn,
+                    self._source_bucket.bucket_arn,
+                ],
+            )
+        )
+
+        # CloudWatch logging permissions
+        glue_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "logs:CreateLogGroup",
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents",
+                ],
+                resources=["arn:aws:logs:*:*:log-group:/aws-glue/*"],
+            )
+        )
+
+        self._glue_role = glue_role
+
+        # Grant MWAA execution role Glue permissions
+        mwaa_role.add_to_principal_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "glue:CreateJob",
+                    "glue:GetJob",
+                    "glue:StartJobRun",
+                    "glue:GetJobRun",
+                    "glue:CreateConnection",
+                    "glue:GetConnection",
+                ],
+                resources=["*"],
+            )
+        )
+
+        # Grant MWAA execution role MWAA and EC2 permissions
+        mwaa_role.add_to_principal_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "mwaa:GetEnvironment",
+                    "mwaa:CreateWebLoginToken",
+                    "ec2:DescribeSubnets",
+                    "ec2:DescribeSecurityGroups",
+                ],
+                resources=["*"],
+            )
+        )
+
+        # Grant MWAA execution role iam:PassRole scoped to Glue role
+        mwaa_role.add_to_principal_policy(
+            iam.PolicyStatement(
+                actions=["iam:PassRole"],
+                resources=[glue_role.role_arn],
+                conditions={
+                    "StringEquals": {
+                        "iam:PassedToService": "glue.amazonaws.com",
+                    }
+                },
+            )
+        )
+
+        # Deploy Glue scripts to s3://{dags_bucket}/scripts/
+        glue_scripts_deployment = s3_deployment.BucketDeployment(
+            self,
+            conf.get_name("glue-scripts-deployment"),
+            sources=[s3_deployment.Source.asset("assets/glue_scripts")],
+            destination_bucket=self._source_bucket,
+            destination_key_prefix="scripts",
+            prune=False,
+        )
+
+        self._glue_scripts_deployment = glue_scripts_deployment
 
     def create_replication_job_custom_resource(
         self,
