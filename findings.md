@@ -658,3 +658,144 @@ Additionally, `mwaa_metadb_export.py` logged the full JDBC URL and username via 
 | Restore SFN task token callback | 🔄 Pending (depends on restore job success) |
 | Variables/connections restore via REST API | ✅ Working |
 | End-to-end DR flow SUCCEEDED | 🔄 Pending final validation |
+
+---
+
+## TODO — Resume Point (2026-04-30)
+
+### Overnight DR Test Running
+
+A DR simulation test was kicked off at ~21:05 UTC on 2026-04-29. The EventBridge schedule is ENABLED with `MWAA_SIMULATE_DR=YES`. The SFN workflow should have triggered within 5 minutes and run the full flow: health check → disable schedule → cleanup → cool off (30s) → restore → success callback.
+
+**Latest fix applied:** Pre-import cleanup now deletes `dag_run` (non-DR) before `dag_version` to prevent FK constraint violations caused by the scheduler recreating `dag_version` records during the cool-off period.
+
+### Check Results
+
+```bash
+# 1. Check the SFN execution result
+SM_ARN="arn:aws:states:eu-west-2:515232103838:stateMachine:mwaa306statemachineDB584156-ILSeX4nw8QjO"
+aws stepfunctions list-executions --state-machine-arn "$SM_ARN" --region eu-west-2 --max-results 3 --query "executions[*].{Status:status,Start:startDate,Stop:stopDate}"
+
+# 2. If SUCCEEDED — verify restored data on secondary:
+aws mwaa invoke-rest-api --name mwaa-dr-secondary --region eu-west-2 --path "/variables" --method GET
+aws mwaa invoke-rest-api --name mwaa-dr-secondary --region eu-west-2 --path "/connections" --method GET
+aws mwaa invoke-rest-api --name mwaa-dr-secondary --region eu-west-2 --path "/dags" --method GET
+
+# 3. If FAILED — check what step failed:
+EXEC_ARN=$(aws stepfunctions list-executions --state-machine-arn "$SM_ARN" --region eu-west-2 --max-results 1 --query "executions[0].executionArn" --output text)
+aws stepfunctions describe-execution --execution-arn "$EXEC_ARN" --region eu-west-2 --query "{Status:status,Error:error,Cause:cause}"
+
+# 4. Check Glue jobs:
+aws glue get-job-runs --job-name cleanup_metadata_cleanup --region eu-west-2 --query "JobRuns[:1].{State:JobRunState}"
+aws glue get-job-runs --job-name restore_metadata_import --region eu-west-2 --query "JobRuns[:1].{State:JobRunState,Error:ErrorMessage}"
+
+# 5. Check restore DAG run task instances:
+aws mwaa invoke-rest-api --name mwaa-dr-secondary --region eu-west-2 --path "/dags/restore_metadata/dagRuns?order_by=-start_date&limit=1" --method GET
+```
+
+### If DR Test SUCCEEDED — Next Steps
+
+1. Verify secondary has the primary's variables (DB_HOST, API_KEY, ENVIRONMENT, etc.)
+2. Verify secondary has the primary's connections (test_postgres, test_http_api, test_s3)
+3. Verify secondary has restored DAG runs from primary
+4. Update findings.md with final "End-to-end DR flow SUCCEEDED" status
+5. Commit final state to `pr-52-fixes` branch
+6. Disable `MWAA_SIMULATE_DR` in `.env` and redeploy to stop DR simulation
+7. Consider cleaning up AWS resources (MWAA environments, VPCs, NAT gateways cost money)
+
+### If DR Test FAILED — Debug Steps
+
+1. Check which step failed (cleanup callback? restore Glue job? restore callback?)
+2. The most likely remaining issue is FK constraint on `dag_run` → `dag_version` if the scheduler recreated records between pre-import cleanup and the actual import
+3. If that's the case, the fix is to run the pre-import cleanup and import within a single transaction, or disable the scheduler temporarily during restore
+
+### Branch State
+
+- **Branch:** `pr-52-fixes` (4 commits ahead of `pr-52`)
+- **All code changes are committed** — nothing uncommitted
+- **`.env` has `MWAA_SIMULATE_DR=YES`** — remember to set back to `NO` after testing
+- **EventBridge schedule:** was ENABLED at test start, the DR flow disables it as part of the workflow
+
+### AWS Resources Running (cost reminder)
+
+- 2x MWAA 3.0.6 environments (mw1.small) — eu-west-1 + eu-west-2
+- 2x NAT Gateways — eu-west-1 + eu-west-2
+- 2x VPCs with subnets
+- S3 buckets (DAGs + backup in each region)
+- Glue jobs (pay per run, not idle)
+
+---
+
+## Important Discoveries for Final Code Review (2026-04-30)
+
+### Airflow 3.x Behavioral Changes Discovered During Testing
+
+These are undocumented or poorly documented AF 3.x behaviors we hit during testing that affect the DR solution design:
+
+1. **CLI `dags trigger` creates ephemeral runs** — DAG runs triggered via CLI without `--logical-date` get `logical_date=null` and are not properly tracked by the AF 3.x scheduler. Downstream `@task` functions never execute. Fix: use `InvokeRestApi` for triggering (or CLI with explicit `--logical-date`).
+
+2. **`dags unpause` output format changed** — AF 2.x outputs `paused: False`, AF 3.x outputs a table `dag_id | is_paused\n... | False`. Also returns `No paused DAGs were found` if already unpaused. The `airflow_cli_client.py` unpause check needs all three patterns.
+
+3. **`dags trigger -o json` output changed** — AF 2.x includes `"external_trigger": "True"`, AF 3.x doesn't have this field. Uses `"run_type": "manual"` instead.
+
+4. **`/aws_mwaa/cli` endpoint redirects** — MWAA 3.x returns 307 redirect from `/aws_mwaa/cli` to `/aws_mwaa/cli/` (trailing slash). `http.client.HTTPSConnection` doesn't follow redirects.
+
+5. **`CreateWebLoginToken` + cookie auth broken** — AF 3.x switched from Flask-AppBuilder to FastAPI. The login endpoint returns a React SPA, no session cookies. Must use `InvokeRestApi` AWS API instead.
+
+6. **`DagRun.get_task_instances()` removed** — AF 3.x `DagRun` in task context is a protocol object, not the ORM model. No `get_task_instances()` method.
+
+7. **`MWAA_ENV_NAME` env var doesn't exist** — Not a standard MWAA worker environment variable. Must use Airflow variable instead.
+
+8. **`DAGS_S3_PATH` env var doesn't exist** — Not available on MWAA 3.x workers. Must derive bucket from `mwaa.get_environment()`.
+
+9. **Cleanup deleting `dag_version`/`dag_code` kills running DAGs** — The scheduler loses track of DAGs mid-execution. These tables must be preserved during cleanup and only cleaned during the import step.
+
+10. **Cleanup deleting `dag_run` kills the cleanup DAG itself** — The cleanup DAG's own run gets deleted, preventing downstream callback tasks from executing. Must protect DR DAG runs.
+
+### Schema Differences: AF 3.x vs What PR #52 Defines
+
+The `DRFactory_3_0` hardcodes column lists that don't match the actual MWAA 3.0.6 schema:
+- `task_instance_note`: has different columns than defined (missing `dag_id`)
+- `dag_run`: has extra columns (`context_carrier`, `span_status`, `created_dag_version_id`, `bundle_version`, `scheduled_by_job_id`) not in the factory definition
+- `xcom.value` is `jsonb` not `bytea` — `encode()` fails, needs `::text` cast
+- `dag_run.conf` is `jsonb` not `bytea` — same issue
+- `backfill.dag_run_conf` is `jsonb` not `bytea` — same issue
+
+**Resolution:** Export uses `SELECT *` (ignores column definitions), import reads CSV with headers and casts to target table schema. Column definitions in `DRFactory_3_0` are now only used for dependency ordering, not for actual SQL.
+
+### Glue Job Configuration Gaps in Original PR
+
+The original PR's `GlueJobOperator` calls were missing:
+- `GlueVersion` — defaulted to Python 2 which is unsupported
+- `WorkerType` and `NumberOfWorkers` — required for Glue 4.0
+- `Connections` in `create_job_kwargs` — without this, the Glue job doesn't use the VPC connection and can't reach the database
+- `extract_jdbc_conf` returns `url` (without database name) not `fullUrl` (with database name)
+
+### IAM Permission Gaps in Original PR
+
+The original PR was missing these permissions:
+- `airflow:GetEnvironment` (note: IAM prefix is `airflow:` not `mwaa:`)
+- `airflow:InvokeRestApi` + role ARN resource
+- `iam:GetRole` on MWAA execution role (needed by GlueJobOperator)
+- `glue:GetConnection` on Glue role (needed by `extract_jdbc_conf`)
+- `glue:UpdateConnection` on MWAA execution role
+- `ec2:DescribeSubnets` and `ec2:DescribeSecurityGroups` on Glue role
+- `s3:DeleteObject` on Glue role (needed by Spark overwrite mode)
+
+### Code Quality Notes for PR Review
+
+1. **`glue_dr_factory.py` is 1000+ lines** — the 3 DAG creation methods have significant duplication. The `setup_glue_connection` task is now defined once per DAG method but the code is identical. Consider extracting to a shared function.
+
+2. **`_get_vpc_requirements` makes 2 API calls** (GetEnvironment + DescribeSubnets) every time `setup_glue_connection` runs. Could cache or pass as parameters.
+
+3. **`airflow_cli_client.py` version checks** use `int(sem_ver[0]) >= 3` in multiple places. Should be a property or method.
+
+4. **`airflow_dag_trigger_function.py`** has two code paths (CLI for 2.x, InvokeRestApi for 3.x). The 2.x path is untested with these changes — need to verify backward compatibility.
+
+5. **Unit tests need updating** — the 115 tests from the PR test the original code. Many will fail with our changes (merged tasks, removed `extract_credentials`, new `setup_glue_connection`, rewritten `MwaaRestApiClient`, etc.).
+
+6. **`mwaa_metadb_cleanup.py` PROTECTED_TABLES** hardcodes DR DAG names (`cleanup_metadata`, `restore_metadata`, `backup_metadata`). These should come from configuration, not be hardcoded.
+
+7. **`mwaa_metadb_import.py` `_pre_import_cleanup`** uses direct JDBC (not Spark) which is a different pattern from the rest of the script. Works but inconsistent.
+
+8. **No integration test** for the full DR flow. The unit tests mock everything. Consider adding a test that runs against the MWAA local runner.

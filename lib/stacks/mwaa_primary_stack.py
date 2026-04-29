@@ -724,6 +724,7 @@ class MwaaPrimaryStack(MwaaBaseStack):
                     "glue:GetJobRun",
                     "glue:CreateConnection",
                     "glue:GetConnection",
+                    "glue:UpdateConnection",
                 ],
                 resources=["*"],
             )

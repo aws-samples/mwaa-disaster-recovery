@@ -430,9 +430,13 @@ def _pre_import_cleanup(spark, jdbc_url, conn_props):
     try:
         connection.setAutoCommit(False)
         stmt = connection.createStatement()
-        for table in ["dag_code", "dag_version"]:
+        for table in ["dag_code", "dag_run", "dag_version"]:
             try:
-                rows = stmt.executeUpdate(f"DELETE FROM {table}")
+                if table == "dag_run":
+                    sql = f"DELETE FROM {table} WHERE dag_id NOT IN ('cleanup_metadata', 'restore_metadata', 'backup_metadata')"
+                else:
+                    sql = f"DELETE FROM {table}"
+                rows = stmt.executeUpdate(sql)
                 logger.info("Pre-import cleanup: deleted %d rows from '%s'.", rows, table)
             except Exception as e:
                 logger.warning("Pre-import cleanup failed for '%s': %s", table, e)
