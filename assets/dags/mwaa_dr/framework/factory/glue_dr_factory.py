@@ -815,12 +815,9 @@ class GlueDRFactory(BaseDRFactory):
                     )
                     return
 
-                task_instances = dag_run.get_task_instances()
-                task_states = [f"{ti.task_id} => {ti.state}" for ti in task_instances]
                 result = {
                     "dag": dag_run.dag_id,
                     "dag_run": dag_run.run_id,
-                    "tasks": task_states,
                     "status": "Success",
                     "location": f"s3://{factory.bucket()}/{factory.path_prefix}",
                 }
@@ -843,12 +840,9 @@ class GlueDRFactory(BaseDRFactory):
                     )
                     return
 
-                task_instances = dag_run.get_task_instances()
-                task_states = [f"{ti.task_id} => {ti.state}" for ti in task_instances]
                 result = {
                     "dag": dag_run.dag_id,
                     "dag_run": dag_run.run_id,
-                    "tasks": task_states,
                     "status": "Fail",
                 }
 
@@ -1030,12 +1024,9 @@ class GlueDRFactory(BaseDRFactory):
                     )
                     return
 
-                task_instances = dag_run.get_task_instances()
-                task_states = [f"{ti.task_id} => {ti.state}" for ti in task_instances]
                 result = {
                     "dag": dag_run.dag_id,
                     "dag_run": dag_run.run_id,
-                    "tasks": task_states,
                     "status": "Success",
                 }
 
@@ -1057,12 +1048,9 @@ class GlueDRFactory(BaseDRFactory):
                     )
                     return
 
-                task_instances = dag_run.get_task_instances()
-                task_states = [f"{ti.task_id} => {ti.state}" for ti in task_instances]
                 result = {
                     "dag": dag_run.dag_id,
                     "dag_run": dag_run.run_id,
-                    "tasks": task_states,
                     "status": "Fail",
                 }
 

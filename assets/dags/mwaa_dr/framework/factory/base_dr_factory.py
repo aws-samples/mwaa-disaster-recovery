@@ -155,10 +155,11 @@ class BaseDRFactory(ABC):
             dict: The DAG run result.
         """
         dag_run = context.get("dag_run")
-        task_instances = dag_run.get_task_instances()
-        task_states = []
-        for task in task_instances:
-            task_states.append(f"{task.task_id} => {task.state}")
+        try:
+            task_instances = dag_run.get_task_instances()
+            task_states = [f"{task.task_id} => {task.state}" for task in task_instances]
+        except AttributeError:
+            task_states = []
         return {"dag": dag_run.dag_id, "dag_run": dag_run.run_id, "tasks": task_states}
 
     def notify_success_to_sfn(self, **context):

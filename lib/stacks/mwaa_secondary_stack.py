@@ -466,7 +466,14 @@ class MwaaSecondaryStack(MwaaBaseStack):
         trigger_fn.add_to_role_policy(
             iam.PolicyStatement(
                 resources=[mwaa_arn],
-                actions=["airflow:CreateCliToken"],
+                actions=["airflow:CreateCliToken", "airflow:InvokeRestApi"],
+            )
+        )
+        # InvokeRestApi requires the Airflow role resource ARN
+        trigger_fn.add_to_role_policy(
+            iam.PolicyStatement(
+                resources=[f"{mwaa_arn.replace(':environment/', ':role/')}/Admin"],
+                actions=["airflow:InvokeRestApi"],
             )
         )
         return trigger_fn

@@ -187,26 +187,32 @@ class AirflowCliClient:
             )
         return result
 
-    def trigger_dag(self, dag_name: str, configuration: dict):
+    def trigger_dag(self, dag_name: str, configuration: dict, run_id: str = None):
         """
         Triggers a DAG.
 
         :param dag_name: The name of the DAG.
         :param configuration: A dictionary of configuration.
+        :param run_id: Optional explicit run ID (recommended for AF 3.x).
         """
         sem_ver = self.environment_version.split(".")
 
         command = ""
         expected_result = ""
 
+        run_id_flag = f" -r {run_id}" if run_id else ""
+
         if int(sem_ver[0]) <= 2 and int(sem_ver[1]) <= 5:
-            command = f"dags trigger {dag_name}"
+            command = f"dags trigger{run_id_flag} {dag_name}"
             expected_result = "triggered: True"
         elif int(sem_ver[0]) >= 3:
-            command = f"dags trigger -o json {dag_name}"
+            from datetime import datetime, timezone
+
+            logical_date = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S+00:00")
+            command = f"dags trigger -o json{run_id_flag} --logical-date {logical_date} {dag_name}"
             expected_result = dag_name
         else:
-            command = f"dags trigger -o json {dag_name}"
+            command = f"dags trigger -o json{run_id_flag} {dag_name}"
             expected_result = '"external_trigger": "True"'
 
         result = self.execute(
