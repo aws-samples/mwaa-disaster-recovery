@@ -43,7 +43,6 @@ def get_jdbc_url(glue_context, connection_name):
     """
     conn = glue_context.extract_jdbc_conf(connection_name)
     jdbc_url = conn.get("fullUrl") or conn.get("url", "")
-    logger.info("JDBC URL: '%s', user: '%s'", jdbc_url, conn.get("user", ""))
     return jdbc_url, {
         "user": conn["user"],
         "password": conn["password"],
@@ -182,7 +181,7 @@ def export_table(spark, jdbc_url, conn_props, table_def, s3_output_path, max_age
     (
         df.coalesce(1)
         .write.mode("overwrite")
-        .option("header", "false")
+        .option("header", "true")
         .option("delimiter", "|")
         .option("compression", "gzip")
         .csv(output_path)

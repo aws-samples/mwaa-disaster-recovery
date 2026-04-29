@@ -578,3 +578,83 @@ The PR's approach of using AWS Glue for metadata operations works after the fixe
 3. **CLI unpause_dag output format** — AF 3.x outputs table format, not `paused: False`. Fixed locally.
 4. **Column schema mismatches** — `task_instance_note` and potentially other tables have different columns in AF 3.0.6 vs what `DRFactory_3_0` defines. Fixed by using `SELECT *` in export.
 5. **jsonb vs bytea columns** — `conf`, `value`, `dag_run_conf` are `jsonb` in AF 3.x, not `bytea`. Fixed by using `::text` cast instead of `encode()`.
+
+---
+
+## Security Finding (2026-04-29)
+
+### DT11: HIGH — Database Credentials Exposed via XCom and Logs
+
+**Files:** `assets/dags/mwaa_dr/framework/factory/glue_dr_factory.py`, `assets/glue_scripts/mwaa_metadb_export.py`
+
+**Problem:** The `extract_credentials` `@task` returned a dict containing the plaintext database password, JDBC URL, and username. Because TaskFlow `@task` functions store their return values in XCom, these credentials were:
+1. Stored in the Airflow metadata database (XCom table) in plaintext
+2. Visible in the Airflow UI under XCom entries
+3. Logged by the TaskFlow executor when serializing task results
+
+Additionally, `mwaa_metadb_export.py` logged the full JDBC URL and username via `logger.info("JDBC URL: '%s', user: '%s'", jdbc_url, ...)`.
+
+**Fix applied:**
+- Merged `extract_credentials` + `create_glue_connection` into a single `setup_glue_connection` `@task` that extracts credentials, creates/updates the Glue connection, and returns ONLY the connection name string. Credentials never leave the task boundary and never enter XCom.
+- Removed JDBC URL/username logging from the export Glue script.
+- Added `_get_vpc_requirements()` helper to eliminate code duplication.
+- Glue connection is now updated on reuse (handles credential rotation instead of silently reusing stale credentials).
+
+**Status:** ✅ Fixed and committed.
+
+---
+
+## Latest Fix Summary (2026-04-29 evening)
+
+### All Fixes Applied to `pr-52-fixes` Branch (3 commits)
+
+| Fix | Category | Description |
+|-----|----------|-------------|
+| DT1 | CLI compat | Trailing slash on `/aws_mwaa/cli/` |
+| DT2 | Version | Added 3.0.6 to supported versions |
+| DT3 | Import compat | DummyOperator/PythonOperator try/except fallback |
+| DT4/DT9 | CDK | GLUE_ROLE_ARN + DR_MWAA_ENV_NAME set via AirflowCli on both stacks |
+| DT5 | REST API | Rewrote MwaaRestApiClient to use InvokeRestApi with pagination |
+| DT6 | Env var | MWAA_ENV_NAME fallback to Airflow variable |
+| DT11 | **Security** | Credentials no longer exposed via XCom or logs |
+| Glue version | Glue config | GlueVersion 4.0, WorkerType G.1X, Connections attached |
+| Script location | Glue config | Derive bucket from MWAA environment SourceBucketArn |
+| fullUrl | Glue JDBC | Use `fullUrl` from `extract_jdbc_conf` (includes database name) |
+| jsonb columns | Schema | `::text` cast for conf/value/dag_run_conf (not `encode()`) |
+| SELECT * | Schema | Export uses `SELECT *` for schema resilience |
+| CSV headers | Import/Export | Export writes headers, import reads headers + casts to target schema |
+| stringtype | Import | `stringtype=unspecified` for PostgreSQL UUID column compatibility |
+| s3:DeleteObject | IAM | Added to Glue role for Spark overwrite mode |
+| ec2:Describe* | IAM | Added DescribeSubnets/SecurityGroups to Glue role |
+| glue:GetConnection | IAM | Added to Glue role for extract_jdbc_conf |
+| iam:GetRole | IAM | Added to MWAA execution role for GlueJobOperator |
+| airflow:* prefix | IAM | Use `airflow:` prefix (not `mwaa:`) for MWAA IAM actions |
+| InvokeRestApi | IAM + Lambda | Added permission + role ARN resource for DAG triggering |
+| CLI response | CDK | Truncated response to avoid CloudFormation 4096 byte limit |
+| unpause_dag | CLI compat | Handle AF 3.x table output + "No paused DAGs" message |
+| trigger_dag | CLI compat | AF 3.x: use `--logical-date`, explicit run_id |
+| DAG trigger | Lambda | AF 3.x: use InvokeRestApi instead of CLI (runs persist properly) |
+| get_task_instances | AF 3.x compat | Removed from GlueDRFactory callbacks, try/except in BaseDRFactory |
+| import java.sql | Dead code | Removed invalid Python import in Glue import fallback |
+| Cleanup protection | Metadata | dag_run/task_instance protected for DR DAGs during cleanup |
+| Cleanup skip | Metadata | dag_version/dag_code/active_dag skipped during cleanup |
+| Import pre-cleanup | Metadata | dag_version/dag_code deleted before import to avoid FK conflicts |
+| DR_BACKUP_BUCKET | CDK | Set on secondary environment via AirflowCli |
+
+### Current DR Flow Status
+
+| Step | Status |
+|------|--------|
+| Backup (all 5 tasks) | ✅ Fully working |
+| S3 cross-region replication | ✅ Working |
+| Health check → UNHEALTHY detection | ✅ Working |
+| Disable EventBridge schedule | ✅ Working |
+| Trigger cleanup_metadata DAG | ✅ Working (via InvokeRestApi) |
+| Glue cleanup job | ✅ Succeeds |
+| Cleanup SFN task token callback | ✅ Working (after PROTECTED_TABLES fix) |
+| Cool-off wait | ✅ Working |
+| Trigger restore_metadata DAG | ✅ Working (via InvokeRestApi) |
+| Glue restore job | 🔄 Testing (latest fixes: CSV headers, schema casting, UUID compat, pre-import cleanup) |
+| Restore SFN task token callback | 🔄 Pending (depends on restore job success) |
+| Variables/connections restore via REST API | ✅ Working |
+| End-to-end DR flow SUCCEEDED | 🔄 Pending final validation |

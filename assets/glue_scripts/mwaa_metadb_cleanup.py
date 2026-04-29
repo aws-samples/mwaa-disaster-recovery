@@ -31,7 +31,12 @@ logging.basicConfig(level=logging.INFO)
 PROTECTED_TABLES = {
     "slot_pool": "DELETE FROM slot_pool WHERE pool != 'default_pool'",
     "job": "DELETE FROM job WHERE job_type != 'SchedulerJob'",
+    "dag_run": "DELETE FROM dag_run WHERE dag_id NOT IN ('cleanup_metadata', 'restore_metadata', 'backup_metadata')",
+    "task_instance": "DELETE FROM task_instance WHERE dag_id NOT IN ('cleanup_metadata', 'restore_metadata', 'backup_metadata')",
 }
+
+# Tables that should never be cleaned (DAG definitions needed by scheduler)
+SKIP_TABLES = {"dag_version", "dag_code", "active_dag"}
 
 
 def get_jdbc_connection(glue_context, connection_name):
@@ -116,6 +121,11 @@ def cleanup_table(connection, table_name):
     # Skip variable and connection tables (handled via REST API)
     if table_name in ("variable", "connection"):
         logger.info("Skipping table '%s' (handled via REST API).", table_name)
+        return None
+
+    # Skip tables needed by the scheduler
+    if table_name in SKIP_TABLES:
+        logger.info("Skipping table '%s' (needed by scheduler).", table_name)
         return None
 
     if not table_exists(connection, table_name):

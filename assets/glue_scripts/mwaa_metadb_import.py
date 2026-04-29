@@ -47,6 +47,7 @@ def get_jdbc_url(glue_context, connection_name):
         "user": conn["user"],
         "password": conn["password"],
         "driver": "org.postgresql.Driver",
+        "stringtype": "unspecified",
     }
 
 
@@ -190,8 +191,6 @@ def _insert_with_conflict_handling(spark, jdbc_url, conn_props, df, table_name):
     Returns:
         tuple: (rows_imported, rows_skipped) counts.
     """
-    import java.sql  # noqa: F401 — available in Glue/Spark JVM
-
     rows = df.collect()
     columns = df.columns
 
@@ -293,15 +292,17 @@ def import_table(spark, jdbc_url, conn_props, table_def, s3_input_path):
     binary_columns = table_def.get("binary_columns", [])
 
     # Read CSV from S3
-    reader = spark.read.option("header", "false").option("delimiter", "|")
+    df = spark.read.option("header", "true").option("delimiter", "|").csv(backup_path)
 
-    if columns:
-        from pyspark.sql.types import StructType, StructField, StringType
-
-        schema = StructType([StructField(col, StringType(), True) for col in columns])
-        df = reader.schema(schema).csv(backup_path)
-    else:
-        df = reader.csv(backup_path)
+    # Cast columns to match the target table schema
+    try:
+        target_schema_query = f"(SELECT * FROM {table_name} WHERE 1=0) AS schema_tbl"
+        target_df = spark.read.jdbc(url=jdbc_url, table=target_schema_query, properties=conn_props)
+        for field in target_df.schema.fields:
+            if field.name in df.columns:
+                df = df.withColumn(field.name, F.col(field.name).cast(field.dataType))
+    except Exception as e:
+        logger.warning("Could not read target schema for '%s': %s", table_name, e)
 
     # Decode hex-encoded binary columns
     if binary_columns:
@@ -418,6 +419,31 @@ def write_summary(spark, s3_input_path, results):
     logger.info("Summary: %s", summary_json)
 
 
+def _pre_import_cleanup(spark, jdbc_url, conn_props):
+    """Delete dag_version and dag_code before import so primary's records can be inserted."""
+    sc = spark.sparkContext
+    gateway = sc._gateway
+    gateway.jvm.Class.forName("org.postgresql.Driver")
+    connection = gateway.jvm.java.sql.DriverManager.getConnection(
+        jdbc_url, conn_props.get("user", ""), conn_props.get("password", "")
+    )
+    try:
+        connection.setAutoCommit(False)
+        stmt = connection.createStatement()
+        for table in ["dag_code", "dag_version"]:
+            try:
+                rows = stmt.executeUpdate(f"DELETE FROM {table}")
+                logger.info("Pre-import cleanup: deleted %d rows from '%s'.", rows, table)
+            except Exception as e:
+                logger.warning("Pre-import cleanup failed for '%s': %s", table, e)
+        connection.commit()
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
+
+
 def main():
     """Entry point for the Glue import job."""
     args = getResolvedOptions(
@@ -446,6 +472,10 @@ def main():
     logger.info("Tables to import: %d", len(table_defs))
 
     jdbc_url, conn_props = get_jdbc_url(glue_context, connection_name)
+
+    # Pre-import: clean dag_version and dag_code so primary's records can be imported
+    # These are skipped during cleanup (to keep DAGs alive) but must be replaced during restore
+    _pre_import_cleanup(spark, jdbc_url, conn_props)
 
     results = import_tables_by_level(
         spark,

@@ -886,12 +886,15 @@ class MwaaSecondaryStack(MwaaBaseStack):
         )
 
     def setup_glue_variables_cli(self, conf: config.Config) -> AirflowCli:
-        """Set GLUE_ROLE_ARN and DR_MWAA_ENV_NAME Airflow variables on the secondary environment."""
+        """Set GLUE_ROLE_ARN, DR_MWAA_ENV_NAME, and DR_BACKUP_BUCKET Airflow variables on the secondary environment."""
         set_glue_role_cmd = AirflowCliCommand(
             command=f"variables set GLUE_ROLE_ARN {self._glue_role.role_name}"
         )
         set_mwaa_env_name_cmd = AirflowCliCommand(
             command=f"variables set DR_MWAA_ENV_NAME {conf.secondary_mwaa_environment_name}"
+        )
+        set_backup_bucket_cmd = AirflowCliCommand(
+            command=f"variables set DR_BACKUP_BUCKET {self._backup_bucket.bucket_name}"
         )
         unset_glue_role_cmd = AirflowCliCommand(
             command="variables delete GLUE_ROLE_ARN"
@@ -899,11 +902,14 @@ class MwaaSecondaryStack(MwaaBaseStack):
         unset_mwaa_env_name_cmd = AirflowCliCommand(
             command="variables delete DR_MWAA_ENV_NAME"
         )
+        unset_backup_bucket_cmd = AirflowCliCommand(
+            command="variables delete DR_BACKUP_BUCKET"
+        )
 
         cli_input = AirflowCliInput(
-            create=[set_glue_role_cmd, set_mwaa_env_name_cmd],
-            update=[set_glue_role_cmd, set_mwaa_env_name_cmd],
-            delete=[unset_glue_role_cmd, unset_mwaa_env_name_cmd],
+            create=[set_glue_role_cmd, set_mwaa_env_name_cmd, set_backup_bucket_cmd],
+            update=[set_glue_role_cmd, set_mwaa_env_name_cmd, set_backup_bucket_cmd],
+            delete=[unset_glue_role_cmd, unset_mwaa_env_name_cmd, unset_backup_bucket_cmd],
         )
 
         airflow_cli = AirflowCli(
