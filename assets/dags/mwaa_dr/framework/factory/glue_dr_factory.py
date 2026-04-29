@@ -66,6 +66,7 @@ class GlueDRFactory(BaseDRFactory):
 
         The script is expected to be deployed at
         ``s3://{dags_bucket}/scripts/{script_name}.py`` by the CDK stack.
+        Derives the bucket name from the MWAA environment's SourceBucketArn.
 
         Args:
             script_name: The base name of the Glue script (without extension).
@@ -73,15 +74,17 @@ class GlueDRFactory(BaseDRFactory):
         Returns:
             str: The full S3 URI for the Glue script.
         """
-        dags_s3_path = os.environ.get("DAGS_S3_PATH", "")
-        if dags_s3_path.startswith("s3://"):
-            # DAGS_S3_PATH is like "s3://bucket-name/dags" — extract bucket
-            parts = dags_s3_path.replace("s3://", "").split("/", 1)
-            bucket = parts[0]
-        else:
-            # Fall back: bucket name is the DAGS_S3_PATH itself or empty
-            bucket = dags_s3_path
-
+        env_name = os.environ.get("MWAA_ENV_NAME", "") or Variable.get(
+            "DR_MWAA_ENV_NAME", default_var=""
+        )
+        region = os.environ.get(
+            "AWS_REGION", os.environ.get("AWS_DEFAULT_REGION", "")
+        )
+        mwaa_client = boto3.client("mwaa", region_name=region)
+        env_response = mwaa_client.get_environment(Name=env_name)
+        source_bucket_arn = env_response["Environment"]["SourceBucketArn"]
+        # ARN format: arn:aws:s3:::bucket-name
+        bucket = source_bucket_arn.split(":::")[-1]
         return f"s3://{bucket}/scripts/{script_name}.py"
 
     def get_table_definitions(self) -> list:
@@ -182,13 +185,13 @@ class GlueDRFactory(BaseDRFactory):
         """Create and return a configured MwaaRestApiClient.
 
         Reads the MWAA environment name from the ``MWAA_ENV_NAME`` environment
-        variable and the AWS region from ``AWS_REGION`` (falling back to
-        ``AWS_DEFAULT_REGION``).
+        variable (or ``DR_MWAA_ENV_NAME`` Airflow variable as fallback) and the
+        AWS region from ``AWS_REGION`` (falling back to ``AWS_DEFAULT_REGION``).
 
         Returns:
             MwaaRestApiClient: A client configured for the current MWAA environment.
         """
-        env_name = os.environ.get("MWAA_ENV_NAME", "")
+        env_name = os.environ.get("MWAA_ENV_NAME", "") or Variable.get("DR_MWAA_ENV_NAME", default_var="")
         region = os.environ.get("AWS_REGION", os.environ.get("AWS_DEFAULT_REGION", ""))
         return MwaaRestApiClient(env_name, region)
 
@@ -572,7 +575,7 @@ class GlueDRFactory(BaseDRFactory):
             @task
             def create_glue_connection(credentials):
                 """Create or reuse a Glue JDBC connection using MWAA VPC networking."""
-                env_name = os.environ.get("MWAA_ENV_NAME", "")
+                env_name = os.environ.get("MWAA_ENV_NAME", "") or Variable.get("DR_MWAA_ENV_NAME", default_var="")
                 region = os.environ.get(
                     "AWS_REGION", os.environ.get("AWS_DEFAULT_REGION", "")
                 )
@@ -658,6 +661,12 @@ class GlueDRFactory(BaseDRFactory):
                 job_name=f"{factory.dag_id}_export",
                 script_location=factory.get_script_location("mwaa_metadb_export"),
                 iam_role_name=factory.get_glue_role_name(),
+                create_job_kwargs={
+                    "GlueVersion": "4.0",
+                    "NumberOfWorkers": 2,
+                    "WorkerType": "G.1X",
+                    "Connections": {"Connections": [conn_name]},
+                },
                 script_args={
                     "--S3_OUTPUT_PATH": f"s3://{backup_bucket}/{factory.path_prefix}",
                     "--EXPORT_TABLES": json.dumps(table_defs),
@@ -728,7 +737,7 @@ class GlueDRFactory(BaseDRFactory):
             @task
             def create_glue_connection(credentials):
                 """Create or reuse a Glue JDBC connection using MWAA VPC networking."""
-                env_name = os.environ.get("MWAA_ENV_NAME", "")
+                env_name = os.environ.get("MWAA_ENV_NAME", "") or Variable.get("DR_MWAA_ENV_NAME", default_var="")
                 region = os.environ.get(
                     "AWS_REGION", os.environ.get("AWS_DEFAULT_REGION", "")
                 )
@@ -872,6 +881,12 @@ class GlueDRFactory(BaseDRFactory):
                 job_name=f"{factory.dag_id}_import",
                 script_location=factory.get_script_location("mwaa_metadb_import"),
                 iam_role_name=factory.get_glue_role_name(),
+                create_job_kwargs={
+                    "GlueVersion": "4.0",
+                    "NumberOfWorkers": 2,
+                    "WorkerType": "G.1X",
+                    "Connections": {"Connections": [conn_name]},
+                },
                 script_args={
                     "--S3_INPUT_PATH": f"s3://{backup_bucket}/{factory.path_prefix}",
                     "--IMPORT_TABLES": json.dumps(table_defs),
@@ -947,7 +962,7 @@ class GlueDRFactory(BaseDRFactory):
             @task
             def create_glue_connection(credentials):
                 """Create or reuse a Glue JDBC connection using MWAA VPC networking."""
-                env_name = os.environ.get("MWAA_ENV_NAME", "")
+                env_name = os.environ.get("MWAA_ENV_NAME", "") or Variable.get("DR_MWAA_ENV_NAME", default_var="")
                 region = os.environ.get(
                     "AWS_REGION", os.environ.get("AWS_DEFAULT_REGION", "")
                 )
@@ -1073,6 +1088,12 @@ class GlueDRFactory(BaseDRFactory):
                 job_name=f"{factory.dag_id}_cleanup",
                 script_location=factory.get_script_location("mwaa_metadb_cleanup"),
                 iam_role_name=factory.get_glue_role_name(),
+                create_job_kwargs={
+                    "GlueVersion": "4.0",
+                    "NumberOfWorkers": 2,
+                    "WorkerType": "G.1X",
+                    "Connections": {"Connections": [conn_name]},
+                },
                 script_args={
                     "--CLEANUP_TABLES": json.dumps(table_defs),
                     "--GLUE_CONNECTION_NAME": conn_name,

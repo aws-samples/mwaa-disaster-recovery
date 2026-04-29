@@ -91,4 +91,5 @@ def execute_commands(commands):
 
     result = {"results": json_results}
     print(f"Command results: {result}")
-    return result
+    # Truncate results to avoid CloudFormation 4096 byte response limit
+    return {"count": len(json_results)}

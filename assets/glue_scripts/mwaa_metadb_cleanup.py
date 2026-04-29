@@ -45,7 +45,8 @@ def get_jdbc_connection(glue_context, connection_name):
         tuple: (jdbc_url, user, password) for direct JDBC operations.
     """
     conn = glue_context.extract_jdbc_conf(connection_name)
-    return conn["url"], conn["user"], conn["password"]
+    jdbc_url = conn.get("fullUrl") or conn.get("url", "")
+    return jdbc_url, conn["user"], conn["password"]
 
 
 def get_direct_connection(spark, jdbc_url, user, password):

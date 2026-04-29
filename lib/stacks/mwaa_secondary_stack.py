@@ -29,6 +29,8 @@ from aws_cdk import aws_stepfunctions_tasks as tasks
 from constructs import Construct
 
 import config
+from lib.dr_constructs.airflow_cli import AirflowCli
+from lib.functions.airflow_cli_client import AirflowCliCommand, AirflowCliInput
 from lib.stacks.mwaa_base_stack import MwaaBaseStack, VpcInfo
 
 
@@ -101,6 +103,7 @@ class MwaaSecondaryStack(MwaaBaseStack):
         # Conditionally provision Glue resources for Airflow 3.x
         if conf.mwaa_version.startswith("3."):
             self.setup_glue_resources(conf, mwaa_role)
+            self.setup_glue_variables_cli(conf)
 
     def setup_buckets(self, conf: config.Config, mwaa_role: iam.IRole) -> s3.Bucket:
         _source_bucket = s3.Bucket.from_bucket_name(
@@ -771,6 +774,22 @@ class MwaaSecondaryStack(MwaaBaseStack):
                     "ec2:CreateNetworkInterface",
                     "ec2:DeleteNetworkInterface",
                     "ec2:DescribeNetworkInterfaces",
+                    "ec2:DescribeSubnets",
+                    "ec2:DescribeSecurityGroups",
+                    "ec2:DescribeVpcEndpoints",
+                    "ec2:DescribeRouteTables",
+                    "ec2:CreateTags",
+                    "ec2:DeleteTags",
+                ],
+                resources=["*"],
+            )
+        )
+
+        # Glue catalog access (needed for extract_jdbc_conf)
+        glue_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "glue:GetConnection",
                 ],
                 resources=["*"],
             )
@@ -782,6 +801,7 @@ class MwaaSecondaryStack(MwaaBaseStack):
                 actions=[
                     "s3:GetObject",
                     "s3:PutObject",
+                    "s3:DeleteObject",
                 ],
                 resources=[
                     self._backup_bucket.arn_for_objects("*"),
@@ -837,6 +857,7 @@ class MwaaSecondaryStack(MwaaBaseStack):
                 actions=[
                     "mwaa:GetEnvironment",
                     "mwaa:CreateWebLoginToken",
+                    "mwaa:InvokeRestApi",
                     "ec2:DescribeSubnets",
                     "ec2:DescribeSecurityGroups",
                 ],
@@ -856,6 +877,38 @@ class MwaaSecondaryStack(MwaaBaseStack):
                 },
             )
         )
+
+    def setup_glue_variables_cli(self, conf: config.Config) -> AirflowCli:
+        """Set GLUE_ROLE_ARN and DR_MWAA_ENV_NAME Airflow variables on the secondary environment."""
+        set_glue_role_cmd = AirflowCliCommand(
+            command=f"variables set GLUE_ROLE_ARN {self._glue_role.role_name}"
+        )
+        set_mwaa_env_name_cmd = AirflowCliCommand(
+            command=f"variables set DR_MWAA_ENV_NAME {conf.secondary_mwaa_environment_name}"
+        )
+        unset_glue_role_cmd = AirflowCliCommand(
+            command="variables delete GLUE_ROLE_ARN"
+        )
+        unset_mwaa_env_name_cmd = AirflowCliCommand(
+            command="variables delete DR_MWAA_ENV_NAME"
+        )
+
+        cli_input = AirflowCliInput(
+            create=[set_glue_role_cmd, set_mwaa_env_name_cmd],
+            update=[set_glue_role_cmd, set_mwaa_env_name_cmd],
+            delete=[unset_glue_role_cmd, unset_mwaa_env_name_cmd],
+        )
+
+        airflow_cli = AirflowCli(
+            self,
+            id=conf.get_name("airflow-cli-glue-vars"),
+            env_name=conf.secondary_mwaa_environment_name,
+            env_version=conf.mwaa_version,
+            vpc_info=self._vpc,
+            cli_input=cli_input,
+        )
+        self._glue_variables_cli = airflow_cli
+        return airflow_cli
 
     def setup_sfn_vpce(
         self, conf: config.Config, vpc_info: VpcInfo

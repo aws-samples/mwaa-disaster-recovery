@@ -134,7 +134,7 @@ class AirflowCliClient:
         print(f"Executing CLI command: {payload} ...")
         token = self.setup()
 
-        url = f'https://{token["WebServerHostname"]}/aws_mwaa/cli'
+        url = f'https://{token["WebServerHostname"]}/aws_mwaa/cli/'
         headers = {
             "Authorization": f'Bearer {token["CliToken"]}',
             "Content-Type": "text/plain",
@@ -180,7 +180,7 @@ class AirflowCliClient:
         :param dag_name: The name of the DAG.
         """
         result = self.execute(AirflowCliCommand(command=f"dags unpause {dag_name}"))
-        if "paused: False" not in result.stdout:
+        if "paused: False" not in result.stdout and "| False" not in result.stdout and "No paused DAGs" not in result.stdout:
             raise AirflowCliException(
                 f"The dag, {dag_name}, failed to unpause with the following error: {result}",
                 result=result,
@@ -202,6 +202,9 @@ class AirflowCliClient:
         if int(sem_ver[0]) <= 2 and int(sem_ver[1]) <= 5:
             command = f"dags trigger {dag_name}"
             expected_result = "triggered: True"
+        elif int(sem_ver[0]) >= 3:
+            command = f"dags trigger -o json {dag_name}"
+            expected_result = dag_name
         else:
             command = f"dags trigger -o json {dag_name}"
             expected_result = '"external_trigger": "True"'

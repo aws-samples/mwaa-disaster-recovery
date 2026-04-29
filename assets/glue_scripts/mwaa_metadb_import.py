@@ -42,7 +42,8 @@ def get_jdbc_url(glue_context, connection_name):
         tuple: (jdbc_url, connection_properties) for JDBC operations.
     """
     conn = glue_context.extract_jdbc_conf(connection_name)
-    return conn["url"], {
+    jdbc_url = conn.get("fullUrl") or conn.get("url", "")
+    return jdbc_url, {
         "user": conn["user"],
         "password": conn["password"],
         "driver": "org.postgresql.Driver",
