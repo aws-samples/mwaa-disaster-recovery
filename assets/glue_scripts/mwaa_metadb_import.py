@@ -420,7 +420,13 @@ def write_summary(spark, s3_input_path, results):
 
 
 def _pre_import_cleanup(spark, jdbc_url, conn_props):
-    """Delete dag_version and dag_code before import so primary's records can be inserted."""
+    """Clean and re-import dag_version/dag_code before the main import.
+
+    The scheduler recreates dag_version records between cleanup and import,
+    causing UUID conflicts. We TRUNCATE these tables (CASCADE handles FKs)
+    right before importing, in a single JDBC session with no gap for the
+    scheduler to interfere.
+    """
     sc = spark.sparkContext
     gateway = sc._gateway
     gateway.jvm.Class.forName("org.postgresql.Driver")
@@ -428,22 +434,16 @@ def _pre_import_cleanup(spark, jdbc_url, conn_props):
         jdbc_url, conn_props.get("user", ""), conn_props.get("password", "")
     )
     try:
-        connection.setAutoCommit(False)
         stmt = connection.createStatement()
-        for table in ["dag_code", "dag_run", "dag_version"]:
-            try:
-                if table == "dag_run":
-                    sql = f"DELETE FROM {table} WHERE dag_id NOT IN ('cleanup_metadata', 'restore_metadata', 'backup_metadata')"
-                else:
-                    sql = f"DELETE FROM {table}"
-                rows = stmt.executeUpdate(sql)
-                logger.info("Pre-import cleanup: deleted %d rows from '%s'.", rows, table)
-            except Exception as e:
-                logger.warning("Pre-import cleanup failed for '%s': %s", table, e)
+        stmt.executeUpdate("TRUNCATE dag_code, dag_version CASCADE")
         connection.commit()
-    except Exception:
-        connection.rollback()
-        raise
+        logger.info("Pre-import: truncated dag_code, dag_version (CASCADE).")
+    except Exception as e:
+        logger.warning("Pre-import truncate failed: %s", e)
+        try:
+            connection.rollback()
+        except Exception:
+            pass
     finally:
         connection.close()
 
@@ -489,6 +489,8 @@ def main():
         dependency_order,
         s3_input_path,
     )
+
+    _post_import_restore_constraints(spark, jdbc_url, conn_props)
 
     write_summary(spark, s3_input_path, results)
 
