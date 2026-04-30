@@ -156,10 +156,8 @@ def import_table_jdbc(spark, jdbc_url, conn_props, df, table_name):
             "org.postgresql.jdbc.PgConnection"
         ).cast(connection)
         copy_mgr = gateway.jvm.org.postgresql.copy.CopyManager(pg_conn)
-        input_stream = gateway.jvm.java.io.ByteArrayInputStream(
-            gateway.new_array(gateway.jvm.byte, *list(csv_data))
-        )
-        rows_imported = copy_mgr.copyIn(copy_sql, input_stream)
+        reader = gateway.jvm.java.io.StringReader(csv_data.decode("utf-8"))
+        rows_imported = copy_mgr.copyIn(copy_sql, reader)
     except Exception as e:
         error_msg = str(e)
         if "duplicate key" in error_msg.lower() or "unique" in error_msg.lower() or "violates" in error_msg.lower():
@@ -541,10 +539,8 @@ def _copy_table_from_s3(spark, pg_conn, gateway, table_name, s3_input_path):
     # Use PostgreSQL COPY FROM STDIN
     copy_sql = f"COPY {table_name} FROM STDIN WITH (FORMAT CSV, HEADER FALSE, DELIMITER '|')"
     copy_mgr = gateway.jvm.org.postgresql.copy.CopyManager(pg_conn)
-    input_stream = gateway.jvm.java.io.ByteArrayInputStream(
-        gateway.new_array(gateway.jvm.byte, *list(csv_data))
-    )
-    rows = copy_mgr.copyIn(copy_sql, input_stream)
+    reader = gateway.jvm.java.io.StringReader(csv_data.decode("utf-8"))
+    rows = copy_mgr.copyIn(copy_sql, reader)
     logger.info("Pre-import COPY: loaded %d rows into '%s'.", rows, table_name)
 
 
