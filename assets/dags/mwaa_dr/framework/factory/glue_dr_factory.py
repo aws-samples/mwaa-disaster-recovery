@@ -80,7 +80,7 @@ class GlueDRFactory(BaseDRFactory):
         Returns:
             str: The ARN of the IAM role for Glue jobs.
         """
-        return Variable.get("GLUE_ROLE_ARN")
+        return Variable.get("GLUE_ROLE_ARN", default_var="")
 
     def get_glue_connection_name(self) -> str:
         """Get the Glue JDBC connection name (deterministic: {env_name}_conn)."""
@@ -95,7 +95,7 @@ class GlueDRFactory(BaseDRFactory):
         Uses the DR_DAGS_BUCKET Airflow variable (set by CDK).
         No API calls at parse time to avoid silent failures.
         """
-        bucket = Variable.get("DR_DAGS_BUCKET")
+        bucket = Variable.get("DR_DAGS_BUCKET", default_var="")
         return f"s3://{bucket}/scripts/{script_name}.py"
 
     def get_table_definitions(self) -> list:
