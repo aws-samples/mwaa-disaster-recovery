@@ -649,6 +649,7 @@ class GlueDRFactory(BaseDRFactory):
                 iam_role_name=factory.get_glue_role_name(),
                 update_config=True,
                 replace_script_file=True,
+                deferrable=True,
                 create_job_kwargs={
                     "GlueVersion": "4.0",
                     "NumberOfWorkers": 2,
@@ -825,6 +826,7 @@ class GlueDRFactory(BaseDRFactory):
                 iam_role_name=factory.get_glue_role_name(),
                 update_config=True,
                 replace_script_file=True,
+                deferrable=True,
                 create_job_kwargs={
                     "GlueVersion": "4.0",
                     "NumberOfWorkers": 2,
@@ -988,6 +990,7 @@ class GlueDRFactory(BaseDRFactory):
                 iam_role_name=factory.get_glue_role_name(),
                 update_config=True,
                 replace_script_file=True,
+                deferrable=True,
                 create_job_kwargs={
                     "GlueVersion": "4.0",
                     "NumberOfWorkers": 2,
