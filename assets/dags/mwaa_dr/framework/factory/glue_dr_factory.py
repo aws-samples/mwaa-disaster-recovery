@@ -80,6 +80,13 @@ class GlueDRFactory(BaseDRFactory):
         """
         return Variable.get("GLUE_ROLE_ARN")
 
+    def get_glue_connection_name(self) -> str:
+        """Get the Glue JDBC connection name (deterministic: {env_name}_conn)."""
+        env_name = os.environ.get("MWAA_ENV_NAME", "") or Variable.get(
+            "DR_MWAA_ENV_NAME", default_var=""
+        )
+        return f"{env_name}_conn"
+
     def get_script_location(self, script_name: str) -> str:
         """Construct the S3 location for a Glue script.
 
@@ -645,12 +652,12 @@ class GlueDRFactory(BaseDRFactory):
                     "GlueVersion": "4.0",
                     "NumberOfWorkers": 2,
                     "WorkerType": "G.1X",
-                    "Connections": {"Connections": [conn_name]},
+                    "Connections": {"Connections": [factory.get_glue_connection_name()]},
                 },
                 script_args={
                     "--S3_OUTPUT_PATH": f"s3://{backup_bucket}/{factory.path_prefix}",
                     "--EXPORT_TABLES": json.dumps(table_defs),
-                    "--GLUE_CONNECTION_NAME": conn_name,
+                    "--GLUE_CONNECTION_NAME": factory.get_glue_connection_name(),
                     "--MAX_AGE_IN_DAYS": str(max_age),
                     "--TABLE_DEPENDENCY_ORDER": json.dumps(dependency_order),
                 },
@@ -820,12 +827,12 @@ class GlueDRFactory(BaseDRFactory):
                     "GlueVersion": "4.0",
                     "NumberOfWorkers": 2,
                     "WorkerType": "G.1X",
-                    "Connections": {"Connections": [conn_name]},
+                    "Connections": {"Connections": [factory.get_glue_connection_name()]},
                 },
                 script_args={
                     "--S3_INPUT_PATH": f"s3://{backup_bucket}/{factory.path_prefix}",
                     "--IMPORT_TABLES": json.dumps(table_defs),
-                    "--GLUE_CONNECTION_NAME": conn_name,
+                    "--GLUE_CONNECTION_NAME": factory.get_glue_connection_name(),
                     "--TABLE_DEPENDENCY_ORDER": json.dumps(dependency_order),
                 },
                 region_name=os.environ.get(
@@ -982,11 +989,11 @@ class GlueDRFactory(BaseDRFactory):
                     "GlueVersion": "4.0",
                     "NumberOfWorkers": 2,
                     "WorkerType": "G.1X",
-                    "Connections": {"Connections": [conn_name]},
+                    "Connections": {"Connections": [factory.get_glue_connection_name()]},
                 },
                 script_args={
                     "--CLEANUP_TABLES": json.dumps(table_defs),
-                    "--GLUE_CONNECTION_NAME": conn_name,
+                    "--GLUE_CONNECTION_NAME": factory.get_glue_connection_name(),
                     "--TABLE_DEPENDENCY_ORDER": json.dumps(dependency_order),
                 },
                 region_name=os.environ.get(
