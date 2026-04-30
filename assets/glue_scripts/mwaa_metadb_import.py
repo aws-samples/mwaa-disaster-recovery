@@ -442,7 +442,6 @@ def _pre_import_cleanup(spark, jdbc_url, conn_props, s3_input_path):
     """
     import boto3
     import gzip
-    from io import ByteArrayInputStream  # noqa: will use JVM version
 
     sc = spark.sparkContext
     gateway = sc._gateway
