@@ -93,7 +93,7 @@ def hex_decode_binary_columns(df, binary_columns):
                 col_name,
                 F.when(
                     F.col(col_name).isNotNull(),
-                    F.unbase16(
+                    F.unhex(
                         F.when(
                             F.col(col_name).startswith("\\x"),
                             F.expr(f"substring({col_name}, 3)"),
