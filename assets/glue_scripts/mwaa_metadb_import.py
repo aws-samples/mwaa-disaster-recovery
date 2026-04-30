@@ -160,21 +160,18 @@ def import_table_jdbc(spark, jdbc_url, conn_props, df, table_name):
         rows_imported = copy_mgr.copyIn(copy_sql, reader)
     except Exception as e:
         error_msg = str(e)
-        if "duplicate key" in error_msg.lower() or "unique" in error_msg.lower() or "violates" in error_msg.lower():
-            logger.warning(
-                "COPY failed for table '%s' with constraint violation, "
-                "falling back to row-by-row insert.",
-                table_name,
-            )
-            try:
-                connection.rollback()
-            except Exception:
-                pass
-            rows_imported, rows_skipped = _insert_with_conflict_handling(
-                spark, jdbc_url, conn_props, df, table_name
-            )
-        else:
-            raise
+        logger.warning(
+            "COPY failed for table '%s': %s. Falling back to row-by-row insert.",
+            table_name,
+            error_msg[:200],
+        )
+        try:
+            connection.rollback()
+        except Exception:
+            pass
+        rows_imported, rows_skipped = _insert_with_conflict_handling(
+            spark, jdbc_url, conn_props, df, table_name
+        )
     finally:
         connection.close()
 
@@ -483,65 +480,32 @@ def _pre_import_cleanup(spark, jdbc_url, conn_props, s3_input_path):
 
 def _copy_table_from_s3(spark, pg_conn, gateway, table_name, s3_input_path):
     """Load a table from S3 CSV using PostgreSQL COPY command."""
-    import boto3
-    import gzip
-
     backup_path = f"{s3_input_path}/{table_name}.csv.gz"
 
-    # Read the CSV from S3 via Spark's Hadoop filesystem
-    hadoop_conf = spark.sparkContext._jsc.hadoopConfiguration()
-    fs = spark.sparkContext._jvm.org.apache.hadoop.fs.FileSystem.get(
-        spark.sparkContext._jvm.java.net.URI(s3_input_path), hadoop_conf
-    )
-
-    # Find the actual part file inside the .csv.gz directory
-    path = spark.sparkContext._jvm.org.apache.hadoop.fs.Path(backup_path)
-    if not fs.exists(path):
+    try:
+        df = spark.read.option("header", "true").option("delimiter", "|").csv(backup_path)
+    except Exception:
         logger.warning("Backup not found for '%s' at %s, skipping.", table_name, backup_path)
         return
 
-    # Spark writes CSV as a directory with part files - find them
-    csv_data = b""
-    if fs.isDirectory(path):
-        file_statuses = fs.listStatus(path)
-        for i in range(file_statuses.length):
-            fname = file_statuses[i].getPath().getName()
-            if fname.startswith("part-") and fname.endswith(".csv.gz"):
-                stream = fs.open(file_statuses[i].getPath())
-                gz_bytes = bytearray()
-                while True:
-                    b = stream.read()
-                    if b == -1:
-                        break
-                    gz_bytes.append(b & 0xFF)
-                stream.close()
-                csv_data += gzip.decompress(bytes(gz_bytes))
-    else:
-        stream = fs.open(path)
-        gz_bytes = bytearray()
-        while True:
-            b = stream.read()
-            if b == -1:
-                break
-            gz_bytes.append(b & 0xFF)
-        stream.close()
-        csv_data = gzip.decompress(bytes(gz_bytes))
-
-    if not csv_data:
+    rows = df.collect()
+    if not rows:
         logger.info("No data for table '%s', skipping COPY.", table_name)
         return
 
-    # Skip header line (first line)
-    lines = csv_data.split(b"\n", 1)
-    if len(lines) > 1:
-        csv_data = lines[1]
+    columns = df.columns
+    csv_lines = []
+    for row in rows:
+        vals = [str(v).replace("|", "\\|") if v is not None else "" for v in row]
+        csv_lines.append("|".join(vals))
+    csv_text = "\n".join(csv_lines)
 
-    # Use PostgreSQL COPY FROM STDIN
-    copy_sql = f"COPY {table_name} FROM STDIN WITH (FORMAT CSV, HEADER FALSE, DELIMITER '|')"
+    col_list = ", ".join([f'"{c}"' for c in columns])
+    copy_sql = f"COPY {table_name} ({col_list}) FROM STDIN WITH (FORMAT CSV, HEADER FALSE, DELIMITER '|', NULL '')"
     copy_mgr = gateway.jvm.org.postgresql.copy.CopyManager(pg_conn)
-    reader = gateway.jvm.java.io.StringReader(csv_data.decode("utf-8"))
-    rows = copy_mgr.copyIn(copy_sql, reader)
-    logger.info("Pre-import COPY: loaded %d rows into '%s'.", rows, table_name)
+    reader = gateway.jvm.java.io.StringReader(csv_text)
+    rows_copied = copy_mgr.copyIn(copy_sql, reader)
+    logger.info("Pre-import COPY: loaded %d rows into '%s'.", rows_copied, table_name)
 
 
 def main():
