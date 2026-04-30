@@ -550,8 +550,6 @@ def main():
         s3_input_path,
     )
 
-    _post_import_restore_constraints(spark, jdbc_url, conn_props)
-
     write_summary(spark, s3_input_path, results)
 
     logger.info("Import job complete. Imported %d tables.", len(results))
