@@ -31,6 +31,8 @@ from mwaa_dr.framework.factory.base_dr_factory import BaseDRFactory
 from mwaa_dr.framework.model.base_table import BaseTable
 from mwaa_dr.framework.mwaa_rest_api_client import MwaaRestApiClient
 
+from airflow.providers.amazon.aws.operators.glue import GlueJobOperator
+
 logger = logging.getLogger(__name__)
 
 
@@ -640,8 +642,6 @@ class GlueDRFactory(BaseDRFactory):
             backup_bucket = factory.bucket()
             max_age = Variable.get("DR_MAX_AGE_IN_DAYS", default_var="0")
 
-            from airflow.providers.amazon.aws.operators.glue import GlueJobOperator
-
             export_job = GlueJobOperator(
                 task_id="glue_export",
                 job_name=f"{factory.dag_id}_export",
@@ -817,8 +817,6 @@ class GlueDRFactory(BaseDRFactory):
 
             backup_bucket = factory.bucket()
 
-            from airflow.providers.amazon.aws.operators.glue import GlueJobOperator
-
             import_job = GlueJobOperator(
                 task_id="glue_import",
                 job_name=f"{factory.dag_id}_import",
@@ -980,8 +978,6 @@ class GlueDRFactory(BaseDRFactory):
 
             table_defs = factory.get_table_definitions()
             dependency_order = factory.get_table_dependency_order()
-
-            from airflow.providers.amazon.aws.operators.glue import GlueJobOperator
 
             cleanup_job = GlueJobOperator(
                 task_id="glue_cleanup",
