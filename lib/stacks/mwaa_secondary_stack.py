@@ -898,6 +898,9 @@ class MwaaSecondaryStack(MwaaBaseStack):
         set_backup_bucket_cmd = AirflowCliCommand(
             command=f"variables set DR_BACKUP_BUCKET {self._backup_bucket.bucket_name}"
         )
+        set_dags_bucket_cmd = AirflowCliCommand(
+            command=f"variables set DR_DAGS_BUCKET {conf.secondary_dags_bucket_name}"
+        )
         unset_glue_role_cmd = AirflowCliCommand(
             command="variables delete GLUE_ROLE_ARN"
         )
@@ -907,11 +910,14 @@ class MwaaSecondaryStack(MwaaBaseStack):
         unset_backup_bucket_cmd = AirflowCliCommand(
             command="variables delete DR_BACKUP_BUCKET"
         )
+        unset_dags_bucket_cmd = AirflowCliCommand(
+            command="variables delete DR_DAGS_BUCKET"
+        )
 
         cli_input = AirflowCliInput(
-            create=[set_glue_role_cmd, set_mwaa_env_name_cmd, set_backup_bucket_cmd],
-            update=[set_glue_role_cmd, set_mwaa_env_name_cmd, set_backup_bucket_cmd],
-            delete=[unset_glue_role_cmd, unset_mwaa_env_name_cmd, unset_backup_bucket_cmd],
+            create=[set_glue_role_cmd, set_mwaa_env_name_cmd, set_backup_bucket_cmd, set_dags_bucket_cmd],
+            update=[set_glue_role_cmd, set_mwaa_env_name_cmd, set_backup_bucket_cmd, set_dags_bucket_cmd],
+            delete=[unset_glue_role_cmd, unset_mwaa_env_name_cmd, unset_backup_bucket_cmd, unset_dags_bucket_cmd],
         )
 
         airflow_cli = AirflowCli(

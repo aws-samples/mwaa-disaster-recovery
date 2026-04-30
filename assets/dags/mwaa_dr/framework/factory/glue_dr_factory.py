@@ -92,27 +92,10 @@ class GlueDRFactory(BaseDRFactory):
     def get_script_location(self, script_name: str) -> str:
         """Construct the S3 location for a Glue script.
 
-        The script is expected to be deployed at
-        ``s3://{dags_bucket}/scripts/{script_name}.py`` by the CDK stack.
-        Derives the bucket name from the MWAA environment's SourceBucketArn.
-
-        Args:
-            script_name: The base name of the Glue script (without extension).
-
-        Returns:
-            str: The full S3 URI for the Glue script.
+        Uses the DR_DAGS_BUCKET Airflow variable (set by CDK).
+        No API calls at parse time to avoid silent failures.
         """
-        env_name = os.environ.get("MWAA_ENV_NAME", "") or Variable.get(
-            "DR_MWAA_ENV_NAME", default_var=""
-        )
-        region = os.environ.get(
-            "AWS_REGION", os.environ.get("AWS_DEFAULT_REGION", "")
-        )
-        mwaa_client = boto3.client("mwaa", region_name=region)
-        env_response = mwaa_client.get_environment(Name=env_name)
-        source_bucket_arn = env_response["Environment"]["SourceBucketArn"]
-        # ARN format: arn:aws:s3:::bucket-name
-        bucket = source_bucket_arn.split(":::")[-1]
+        bucket = Variable.get("DR_DAGS_BUCKET")
         return f"s3://{bucket}/scripts/{script_name}.py"
 
     def get_table_definitions(self) -> list:
