@@ -419,11 +419,11 @@ def write_summary(spark, s3_input_path, results):
     logger.info("Summary: %s", summary_json)
 
 
-def _pre_import_cleanup(spark, jdbc_url, conn_props):
-    """Clean dag_code, dag_run, and dag_version before import.
+def _pre_import_cleanup(spark, jdbc_url, conn_props, s3_input_path):
+    """Clean and re-import dag_version/dag_code in a single transaction.
 
-    Deletes in FK-safe order (children first) in a single transaction
-    so the scheduler cannot recreate records between deletes.
+    The scheduler recreates dag_version records immediately after deletion.
+    By doing DELETE + INSERT in one transaction, we prevent the race condition.
     """
     sc = spark.sparkContext
     gateway = sc._gateway
@@ -434,7 +434,8 @@ def _pre_import_cleanup(spark, jdbc_url, conn_props):
     try:
         connection.setAutoCommit(False)
         stmt = connection.createStatement()
-        # Order matters: dag_code depends on dag_version, dag_run references dag_version
+
+        # Delete in FK-safe order
         for sql in [
             "DELETE FROM dag_code",
             "DELETE FROM dag_run WHERE dag_id NOT IN ('cleanup_metadata', 'restore_metadata', 'backup_metadata')",
@@ -442,6 +443,27 @@ def _pre_import_cleanup(spark, jdbc_url, conn_props):
         ]:
             rows = stmt.executeUpdate(sql)
             logger.info("Pre-import: %s → %d rows.", sql[:50], rows)
+
+        # Re-import dag_version from CSV in the SAME transaction
+        dag_version_path = f"{s3_input_path}/dag_version.csv.gz"
+        try:
+            df = spark.read.option("header", "true").option("delimiter", "|").csv(dag_version_path)
+            for row in df.collect():
+                cols = ", ".join([f'"{c}"' for c in df.columns])
+                vals = ", ".join(["?" for _ in df.columns])
+                insert_sql = f"INSERT INTO dag_version ({cols}) VALUES ({vals}) ON CONFLICT DO NOTHING"
+                ps = connection.prepareStatement(insert_sql)
+                for i, val in enumerate(row):
+                    if val is None:
+                        ps.setNull(i + 1, gateway.jvm.java.sql.Types.NULL)
+                    else:
+                        ps.setObject(i + 1, str(val))
+                ps.executeUpdate()
+                ps.close()
+            logger.info("Pre-import: inserted dag_version rows in same transaction.")
+        except Exception as e:
+            logger.warning("Pre-import dag_version insert failed: %s", e)
+
         connection.commit()
     except Exception as e:
         logger.error("Pre-import cleanup failed: %s", e)
@@ -484,7 +506,7 @@ def main():
 
     # Pre-import: clean dag_version and dag_code so primary's records can be imported
     # These are skipped during cleanup (to keep DAGs alive) but must be replaced during restore
-    _pre_import_cleanup(spark, jdbc_url, conn_props)
+    _pre_import_cleanup(spark, jdbc_url, conn_props, s3_input_path)
 
     results = import_tables_by_level(
         spark,
