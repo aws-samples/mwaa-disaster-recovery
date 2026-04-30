@@ -648,6 +648,8 @@ class GlueDRFactory(BaseDRFactory):
                 job_name=f"{factory.dag_id}_export",
                 script_location=factory.get_script_location("mwaa_metadb_export"),
                 iam_role_name=factory.get_glue_role_name(),
+                update_config=True,
+                replace_script_file=True,
                 create_job_kwargs={
                     "GlueVersion": "4.0",
                     "NumberOfWorkers": 2,
@@ -823,6 +825,8 @@ class GlueDRFactory(BaseDRFactory):
                 job_name=f"{factory.dag_id}_import",
                 script_location=factory.get_script_location("mwaa_metadb_import"),
                 iam_role_name=factory.get_glue_role_name(),
+                update_config=True,
+                replace_script_file=True,
                 create_job_kwargs={
                     "GlueVersion": "4.0",
                     "NumberOfWorkers": 2,
@@ -985,6 +989,8 @@ class GlueDRFactory(BaseDRFactory):
                 job_name=f"{factory.dag_id}_cleanup",
                 script_location=factory.get_script_location("mwaa_metadb_cleanup"),
                 iam_role_name=factory.get_glue_role_name(),
+                update_config=True,
+                replace_script_file=True,
                 create_job_kwargs={
                     "GlueVersion": "4.0",
                     "NumberOfWorkers": 2,
