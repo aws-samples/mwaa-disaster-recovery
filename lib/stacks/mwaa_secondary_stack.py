@@ -849,6 +849,7 @@ class MwaaSecondaryStack(MwaaBaseStack):
                 actions=[
                     "glue:CreateJob",
                     "glue:GetJob",
+                    "glue:UpdateJob",
                     "glue:StartJobRun",
                     "glue:GetJobRun",
                     "glue:CreateConnection",
