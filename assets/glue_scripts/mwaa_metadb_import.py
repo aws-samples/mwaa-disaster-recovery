@@ -105,12 +105,10 @@ def hex_decode_binary_columns(df, binary_columns):
 
 
 def import_table_jdbc(spark, jdbc_url, conn_props, df, table_name):
-    """Write a DataFrame to PostgreSQL via JDBC with duplicate key handling.
+    """Write a DataFrame to PostgreSQL via COPY FROM STDIN.
 
-    Uses ``batchsize=1000`` and ``numPartitions=1`` to avoid concurrent write
-    conflicts. Duplicate key conflicts are handled by the database using
-    ``INSERT ... ON CONFLICT DO NOTHING`` semantics — rows that conflict with
-    existing primary keys are silently skipped.
+    Uses PostgreSQL's native COPY command for type-safe bulk loading,
+    matching the approach used in the 2.x DR solution.
 
     Args:
         spark: The SparkSession.
@@ -123,47 +121,64 @@ def import_table_jdbc(spark, jdbc_url, conn_props, df, table_name):
         tuple: (rows_imported, rows_skipped) counts.
     """
     total_rows = df.count()
-
     if total_rows == 0:
         logger.info("Table '%s' has 0 rows to import.", table_name)
         return 0, 0
 
-    # Get the count of existing rows before import for skip calculation
-    try:
-        existing_query = f"(SELECT COUNT(*) as cnt FROM {table_name}) AS cnt_tbl"
-        existing_count_before = spark.read.jdbc(
-            url=jdbc_url, table=existing_query, properties=conn_props
-        ).collect()[0]["cnt"]
-    except Exception:
-        pass
+    # Collect data and convert to pipe-delimited CSV (no header)
+    rows = df.collect()
+    columns = df.columns
+    csv_lines = []
+    for row in rows:
+        vals = []
+        for v in row:
+            if v is None:
+                vals.append("")
+            else:
+                vals.append(str(v).replace("|", "\\|"))
+        csv_lines.append("|".join(vals))
+    csv_data = "\n".join(csv_lines).encode("utf-8")
 
-    # Write using JDBC append mode with batching
-    write_props = dict(conn_props)
-    write_props["batchsize"] = "1000"
-    write_props["numPartitions"] = "1"
+    col_list = ", ".join([f'"{c}"' for c in columns])
+    copy_sql = f"COPY {table_name} ({col_list}) FROM STDIN WITH (FORMAT CSV, HEADER FALSE, DELIMITER '|', NULL '')"
 
+    sc = spark.sparkContext
+    gateway = sc._gateway
+    gateway.jvm.Class.forName("org.postgresql.Driver")
+    connection = gateway.jvm.java.sql.DriverManager.getConnection(
+        jdbc_url, conn_props.get("user", ""), conn_props.get("password", "")
+    )
+
+    rows_imported = 0
+    rows_skipped = 0
     try:
-        (
-            df.write.mode("append")
-            .option("batchsize", "1000")
-            .option("numPartitions", "1")
-            .jdbc(url=jdbc_url, table=table_name, properties=write_props)
+        pg_conn = gateway.jvm.Class.forName(
+            "org.postgresql.jdbc.PgConnection"
+        ).cast(connection)
+        copy_mgr = gateway.jvm.org.postgresql.copy.CopyManager(pg_conn)
+        input_stream = gateway.jvm.java.io.ByteArrayInputStream(
+            gateway.new_array(gateway.jvm.byte, *list(csv_data))
         )
-        rows_imported = total_rows
-        rows_skipped = 0
+        rows_imported = copy_mgr.copyIn(copy_sql, input_stream)
     except Exception as e:
         error_msg = str(e)
-        if "duplicate key" in error_msg.lower() or "unique" in error_msg.lower():
+        if "duplicate key" in error_msg.lower() or "unique" in error_msg.lower() or "violates" in error_msg.lower():
             logger.warning(
-                "Duplicate key conflicts for table '%s', falling back to "
-                "row-by-row insert with conflict handling.",
+                "COPY failed for table '%s' with constraint violation, "
+                "falling back to row-by-row insert.",
                 table_name,
             )
+            try:
+                connection.rollback()
+            except Exception:
+                pass
             rows_imported, rows_skipped = _insert_with_conflict_handling(
                 spark, jdbc_url, conn_props, df, table_name
             )
         else:
             raise
+    finally:
+        connection.close()
 
     logger.info(
         "Table '%s': imported %d rows, skipped %d rows.",
@@ -422,9 +437,13 @@ def write_summary(spark, s3_input_path, results):
 def _pre_import_cleanup(spark, jdbc_url, conn_props, s3_input_path):
     """Clean and re-import dag_version/dag_code in a single transaction.
 
-    The scheduler recreates dag_version records immediately after deletion.
-    By doing DELETE + INSERT in one transaction, we prevent the race condition.
+    Uses PostgreSQL COPY command (same as the 2.x DR solution) for type-safe
+    bulk loading. DELETE + COPY in one transaction prevents scheduler race.
     """
+    import boto3
+    import gzip
+    from io import ByteArrayInputStream  # noqa: will use JVM version
+
     sc = spark.sparkContext
     gateway = sc._gateway
     gateway.jvm.Class.forName("org.postgresql.Driver")
@@ -432,6 +451,10 @@ def _pre_import_cleanup(spark, jdbc_url, conn_props, s3_input_path):
         jdbc_url, conn_props.get("user", ""), conn_props.get("password", "")
     )
     try:
+        # Cast to PgConnection for COPY API
+        pg_conn = gateway.jvm.Class.forName(
+            "org.postgresql.jdbc.PgConnection"
+        ).cast(connection)
         connection.setAutoCommit(False)
         stmt = connection.createStatement()
 
@@ -444,27 +467,13 @@ def _pre_import_cleanup(spark, jdbc_url, conn_props, s3_input_path):
             rows = stmt.executeUpdate(sql)
             logger.info("Pre-import: %s → %d rows.", sql[:50], rows)
 
-        # Re-import dag_version from CSV in the SAME transaction
-        dag_version_path = f"{s3_input_path}/dag_version.csv.gz"
-        try:
-            df = spark.read.option("header", "true").option("delimiter", "|").csv(dag_version_path)
-            for row in df.collect():
-                cols = ", ".join([f'"{c}"' for c in df.columns])
-                vals = ", ".join(["?" for _ in df.columns])
-                insert_sql = f"INSERT INTO dag_version ({cols}) VALUES ({vals}) ON CONFLICT DO NOTHING"
-                ps = connection.prepareStatement(insert_sql)
-                for i, val in enumerate(row):
-                    if val is None:
-                        ps.setNull(i + 1, gateway.jvm.java.sql.Types.NULL)
-                    else:
-                        ps.setObject(i + 1, str(val))
-                ps.executeUpdate()
-                ps.close()
-            logger.info("Pre-import: inserted dag_version rows in same transaction.")
-        except Exception as e:
-            logger.warning("Pre-import dag_version insert failed: %s", e)
+        # COPY dag_version from backup CSV in the SAME transaction
+        _copy_table_from_s3(spark, pg_conn, gateway, "dag_version", s3_input_path)
+        # COPY dag_code from backup CSV
+        _copy_table_from_s3(spark, pg_conn, gateway, "dag_code", s3_input_path)
 
         connection.commit()
+        logger.info("Pre-import: dag_version and dag_code restored in single transaction.")
     except Exception as e:
         logger.error("Pre-import cleanup failed: %s", e)
         try:
@@ -473,6 +482,71 @@ def _pre_import_cleanup(spark, jdbc_url, conn_props, s3_input_path):
             pass
     finally:
         connection.close()
+
+
+def _copy_table_from_s3(spark, pg_conn, gateway, table_name, s3_input_path):
+    """Load a table from S3 CSV using PostgreSQL COPY command."""
+    import boto3
+    import gzip
+
+    backup_path = f"{s3_input_path}/{table_name}.csv.gz"
+
+    # Read the CSV from S3 via Spark's Hadoop filesystem
+    hadoop_conf = spark.sparkContext._jsc.hadoopConfiguration()
+    fs = spark.sparkContext._jvm.org.apache.hadoop.fs.FileSystem.get(
+        spark.sparkContext._jvm.java.net.URI(s3_input_path), hadoop_conf
+    )
+
+    # Find the actual part file inside the .csv.gz directory
+    path = spark.sparkContext._jvm.org.apache.hadoop.fs.Path(backup_path)
+    if not fs.exists(path):
+        logger.warning("Backup not found for '%s' at %s, skipping.", table_name, backup_path)
+        return
+
+    # Spark writes CSV as a directory with part files - find them
+    csv_data = b""
+    if fs.isDirectory(path):
+        file_statuses = fs.listStatus(path)
+        for i in range(file_statuses.length):
+            fname = file_statuses[i].getPath().getName()
+            if fname.startswith("part-") and fname.endswith(".csv.gz"):
+                stream = fs.open(file_statuses[i].getPath())
+                gz_bytes = bytearray()
+                while True:
+                    b = stream.read()
+                    if b == -1:
+                        break
+                    gz_bytes.append(b & 0xFF)
+                stream.close()
+                csv_data += gzip.decompress(bytes(gz_bytes))
+    else:
+        stream = fs.open(path)
+        gz_bytes = bytearray()
+        while True:
+            b = stream.read()
+            if b == -1:
+                break
+            gz_bytes.append(b & 0xFF)
+        stream.close()
+        csv_data = gzip.decompress(bytes(gz_bytes))
+
+    if not csv_data:
+        logger.info("No data for table '%s', skipping COPY.", table_name)
+        return
+
+    # Skip header line (first line)
+    lines = csv_data.split(b"\n", 1)
+    if len(lines) > 1:
+        csv_data = lines[1]
+
+    # Use PostgreSQL COPY FROM STDIN
+    copy_sql = f"COPY {table_name} FROM STDIN WITH (FORMAT CSV, HEADER FALSE, DELIMITER '|')"
+    copy_mgr = gateway.jvm.org.postgresql.copy.CopyManager(pg_conn)
+    input_stream = gateway.jvm.java.io.ByteArrayInputStream(
+        gateway.new_array(gateway.jvm.byte, *list(csv_data))
+    )
+    rows = copy_mgr.copyIn(copy_sql, input_stream)
+    logger.info("Pre-import COPY: loaded %d rows into '%s'.", rows, table_name)
 
 
 def main():
