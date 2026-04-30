@@ -799,3 +799,29 @@ The original PR was missing these permissions:
 7. **`mwaa_metadb_import.py` `_pre_import_cleanup`** uses direct JDBC (not Spark) which is a different pattern from the rest of the script. Works but inconsistent.
 
 8. **No integration test** for the full DR flow. The unit tests mock everything. Consider adding a test that runs against the MWAA local runner.
+
+---
+
+## Root Causes Identified (2026-04-30 late evening)
+
+### The "Missing GlueJobOperator Task" Mystery — SOLVED
+
+The `GlueJobOperator` task was consistently missing from DAG task instances on the secondary environment. Three root causes were identified:
+
+**1. `Variable.get()` without `default_var` at DAG parse time**
+In AF 3.x, `Variable.get()` during DAG parsing goes through the Task Execution API. If the variable doesn't exist or the API call fails, it raises `AirflowRuntimeError` which silently kills the operator instantiation. The `GlueJobOperator` constructor calls `factory.get_glue_role_name()` → `Variable.get("GLUE_ROLE_ARN")` and `factory.get_script_location()` → `Variable.get("DR_DAGS_BUCKET")`. Fix: add `default_var=""` to all `Variable.get()` calls used at parse time.
+
+**2. API calls at DAG parse time**
+`get_script_location()` called `mwaa.get_environment()` to derive the DAGs bucket name. This API call can fail during parsing (permissions, network). Fix: use `DR_DAGS_BUCKET` Airflow variable instead.
+
+**3. Inline imports of `GlueJobOperator`**
+The `from airflow.providers.amazon.aws.operators.glue import GlueJobOperator` was inside the DAG creation methods. While this works in AF 2.x, AF 3.x's DAG processor may not handle inline imports correctly for classic operators. Fix: move to top-level import.
+
+**4. `deferrable=True` doesn't work on MWAA 3.x**
+When `deferrable=True`, the operator defers to the triggerer. The Glue job runs and succeeds, but the triggerer doesn't properly resume the task — the task instance disappears from the DAG run. Fix: use `deferrable=False` (default). The Glue jobs are short enough (~2-5 min) to not hit the heartbeat timeout.
+
+### Cleanup DAG: VERIFIED WORKING on Secondary ✅
+After all fixes, the cleanup_metadata DAG ran successfully on the secondary environment with all 4 tasks completing: `setup_glue_connection` → `glue_cleanup` → `notify_success_to_sfn`.
+
+### Next: Full DR Flow Test
+The cleanup DAG works. Need to test the full DR flow (cleanup → restore) end-to-end.
