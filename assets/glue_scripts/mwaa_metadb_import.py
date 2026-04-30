@@ -420,12 +420,10 @@ def write_summary(spark, s3_input_path, results):
 
 
 def _pre_import_cleanup(spark, jdbc_url, conn_props):
-    """Clean and re-import dag_version/dag_code before the main import.
+    """Clean dag_code, dag_run, and dag_version before import.
 
-    The scheduler recreates dag_version records between cleanup and import,
-    causing UUID conflicts. We TRUNCATE these tables (CASCADE handles FKs)
-    right before importing, in a single JDBC session with no gap for the
-    scheduler to interfere.
+    Deletes in FK-safe order (children first) in a single transaction
+    so the scheduler cannot recreate records between deletes.
     """
     sc = spark.sparkContext
     gateway = sc._gateway
@@ -434,12 +432,19 @@ def _pre_import_cleanup(spark, jdbc_url, conn_props):
         jdbc_url, conn_props.get("user", ""), conn_props.get("password", "")
     )
     try:
+        connection.setAutoCommit(False)
         stmt = connection.createStatement()
-        stmt.executeUpdate("TRUNCATE dag_code, dag_version CASCADE")
+        # Order matters: dag_code depends on dag_version, dag_run references dag_version
+        for sql in [
+            "DELETE FROM dag_code",
+            "DELETE FROM dag_run WHERE dag_id NOT IN ('cleanup_metadata', 'restore_metadata', 'backup_metadata')",
+            "DELETE FROM dag_version",
+        ]:
+            rows = stmt.executeUpdate(sql)
+            logger.info("Pre-import: %s → %d rows.", sql[:50], rows)
         connection.commit()
-        logger.info("Pre-import: truncated dag_code, dag_version (CASCADE).")
     except Exception as e:
-        logger.warning("Pre-import truncate failed: %s", e)
+        logger.error("Pre-import cleanup failed: %s", e)
         try:
             connection.rollback()
         except Exception:
