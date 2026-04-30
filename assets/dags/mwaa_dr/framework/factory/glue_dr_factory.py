@@ -615,7 +615,6 @@ class GlueDRFactory(BaseDRFactory):
                 except glue_client.exceptions.EntityNotFoundException:
                     glue_client.create_connection(ConnectionInput=conn_input)
                 logger.info("Glue connection '%s' ready.", connection_name)
-                return connection_name
 
             @task
             def backup_variables_via_api():
@@ -628,7 +627,7 @@ class GlueDRFactory(BaseDRFactory):
                 factory.backup_connections_via_api()
 
             # Build the DAG structure
-            conn_name = setup_glue_connection()
+            setup_task = setup_glue_connection()
 
             # Filter out variable and connection from table definitions
             table_defs = [
@@ -668,7 +667,7 @@ class GlueDRFactory(BaseDRFactory):
                 ),
             )
 
-            conn_name >> export_job
+            setup_task >> export_job
 
             # Variables and connections backup run in parallel with the Glue job
             backup_variables_via_api()
@@ -740,7 +739,6 @@ class GlueDRFactory(BaseDRFactory):
                 except glue_client.exceptions.EntityNotFoundException:
                     glue_client.create_connection(ConnectionInput=conn_input)
                 logger.info("Glue connection '%s' ready.", connection_name)
-                return connection_name
 
             @task
             def restore_variables_via_api_task():
@@ -806,7 +804,7 @@ class GlueDRFactory(BaseDRFactory):
                 logger.info("Sent task failure to StepFunctions.")
 
             # Build the DAG structure
-            conn_name = setup_glue_connection()
+            setup_task = setup_glue_connection()
 
             # Filter out variable and connection from table definitions
             table_defs = [
@@ -844,7 +842,7 @@ class GlueDRFactory(BaseDRFactory):
                 ),
             )
 
-            conn_name >> import_job
+            setup_task >> import_job
 
             # Variables and connections restore run in parallel with the Glue job
             restore_vars = restore_variables_via_api_task()
@@ -922,7 +920,6 @@ class GlueDRFactory(BaseDRFactory):
                 except glue_client.exceptions.EntityNotFoundException:
                     glue_client.create_connection(ConnectionInput=conn_input)
                 logger.info("Glue connection '%s' ready.", connection_name)
-                return connection_name
 
             @task
             def notify_success_to_sfn(**context):
@@ -977,7 +974,7 @@ class GlueDRFactory(BaseDRFactory):
                 logger.info("Sent task failure to StepFunctions.")
 
             # Build the DAG structure
-            conn_name = setup_glue_connection()
+            setup_task = setup_glue_connection()
 
             table_defs = factory.get_table_definitions()
             dependency_order = factory.get_table_dependency_order()
@@ -1007,7 +1004,7 @@ class GlueDRFactory(BaseDRFactory):
                 ),
             )
 
-            conn_name >> cleanup_job
+            setup_task >> cleanup_job
 
             # Notify StepFunctions on success or failure
             success = notify_success_to_sfn()
