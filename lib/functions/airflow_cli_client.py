@@ -180,7 +180,11 @@ class AirflowCliClient:
         :param dag_name: The name of the DAG.
         """
         result = self.execute(AirflowCliCommand(command=f"dags unpause {dag_name}"))
-        if "paused: False" not in result.stdout and "| False" not in result.stdout and "No paused DAGs" not in result.stdout:
+        if (
+            "paused: False" not in result.stdout
+            and "| False" not in result.stdout
+            and "No paused DAGs" not in result.stdout
+        ):
             raise AirflowCliException(
                 f"The dag, {dag_name}, failed to unpause with the following error: {result}",
                 result=result,
@@ -208,7 +212,9 @@ class AirflowCliClient:
         elif int(sem_ver[0]) >= 3:
             from datetime import datetime, timezone
 
-            logical_date = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S+00:00")
+            logical_date = datetime.now(timezone.utc).strftime(
+                "%Y-%m-%dT%H:%M:%S+00:00"
+            )
             command = f"dags trigger -o json{run_id_flag} --logical-date {logical_date} {dag_name}"
             expected_result = dag_name
         else:

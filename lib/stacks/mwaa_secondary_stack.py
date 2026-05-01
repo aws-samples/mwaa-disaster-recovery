@@ -915,9 +915,24 @@ class MwaaSecondaryStack(MwaaBaseStack):
         )
 
         cli_input = AirflowCliInput(
-            create=[set_glue_role_cmd, set_mwaa_env_name_cmd, set_backup_bucket_cmd, set_dags_bucket_cmd],
-            update=[set_glue_role_cmd, set_mwaa_env_name_cmd, set_backup_bucket_cmd, set_dags_bucket_cmd],
-            delete=[unset_glue_role_cmd, unset_mwaa_env_name_cmd, unset_backup_bucket_cmd, unset_dags_bucket_cmd],
+            create=[
+                set_glue_role_cmd,
+                set_mwaa_env_name_cmd,
+                set_backup_bucket_cmd,
+                set_dags_bucket_cmd,
+            ],
+            update=[
+                set_glue_role_cmd,
+                set_mwaa_env_name_cmd,
+                set_backup_bucket_cmd,
+                set_dags_bucket_cmd,
+            ],
+            delete=[
+                unset_glue_role_cmd,
+                unset_mwaa_env_name_cmd,
+                unset_backup_bucket_cmd,
+                unset_dags_bucket_cmd,
+            ],
         )
 
         airflow_cli = AirflowCli(

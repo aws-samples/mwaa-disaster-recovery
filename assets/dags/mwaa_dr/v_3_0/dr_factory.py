@@ -340,9 +340,7 @@ class DRFactory_3_0(GlueDRFactory):
                 "to_date",
                 "updated_at",
             ],
-            export_mappings={
-                "dag_run_conf": "dag_run_conf::text as dag_run_conf"
-            },
+            export_mappings={"dag_run_conf": "dag_run_conf::text as dag_run_conf"},
             storage_type=self.storage_type,
             path_prefix=self.path_prefix,
             batch_size=self.batch_size,

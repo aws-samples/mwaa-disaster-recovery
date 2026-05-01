@@ -22,6 +22,7 @@ from datetime import datetime
 from airflow import DAG, settings
 from airflow.exceptions import AirflowFailException
 from airflow.models import Variable
+
 try:
     from airflow.operators.dummy import DummyOperator
 except ImportError:

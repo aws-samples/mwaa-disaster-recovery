@@ -332,7 +332,9 @@ def main():
     # Diagnostic: list all tables in the database
     try:
         all_tables_query = "(SELECT table_schema, table_name FROM information_schema.tables WHERE table_schema NOT IN ('information_schema', 'pg_catalog') ORDER BY table_schema, table_name) AS all_tables"
-        all_tables_df = spark.read.jdbc(url=jdbc_url, table=all_tables_query, properties=conn_props)
+        all_tables_df = spark.read.jdbc(
+            url=jdbc_url, table=all_tables_query, properties=conn_props
+        )
         logger.info("Database tables found:")
         for row in all_tables_df.collect():
             logger.info("  %s.%s", row["table_schema"], row["table_name"])

@@ -202,7 +202,9 @@ class GlueDRFactory(BaseDRFactory):
         Returns:
             MwaaRestApiClient: A client configured for the current MWAA environment.
         """
-        env_name = os.environ.get("MWAA_ENV_NAME", "") or Variable.get("DR_MWAA_ENV_NAME", default_var="")
+        env_name = os.environ.get("MWAA_ENV_NAME", "") or Variable.get(
+            "DR_MWAA_ENV_NAME", default_var=""
+        )
         region = os.environ.get("AWS_REGION", os.environ.get("AWS_DEFAULT_REGION", ""))
         return MwaaRestApiClient(env_name, region)
 
@@ -577,7 +579,9 @@ class GlueDRFactory(BaseDRFactory):
                 Credentials stay within this task — never exposed via XCom.
                 """
                 creds = CredentialExtractor.extract()
-                env_name = os.environ.get("MWAA_ENV_NAME", "") or Variable.get("DR_MWAA_ENV_NAME", default_var="")
+                env_name = os.environ.get("MWAA_ENV_NAME", "") or Variable.get(
+                    "DR_MWAA_ENV_NAME", default_var=""
+                )
                 region = os.environ.get(
                     "AWS_REGION", os.environ.get("AWS_DEFAULT_REGION", "")
                 )
@@ -592,11 +596,15 @@ class GlueDRFactory(BaseDRFactory):
                         "USERNAME": creds.username,
                         "PASSWORD": creds.password,
                     },
-                    "PhysicalConnectionRequirements": _get_vpc_requirements(env_name, region),
+                    "PhysicalConnectionRequirements": _get_vpc_requirements(
+                        env_name, region
+                    ),
                 }
                 try:
                     glue_client.get_connection(Name=connection_name)
-                    glue_client.update_connection(Name=connection_name, ConnectionInput=conn_input)
+                    glue_client.update_connection(
+                        Name=connection_name, ConnectionInput=conn_input
+                    )
                 except glue_client.exceptions.EntityNotFoundException:
                     glue_client.create_connection(ConnectionInput=conn_input)
                 logger.info("Glue connection '%s' ready.", connection_name)
@@ -637,7 +645,9 @@ class GlueDRFactory(BaseDRFactory):
                     "GlueVersion": "4.0",
                     "NumberOfWorkers": 2,
                     "WorkerType": "G.1X",
-                    "Connections": {"Connections": [factory.get_glue_connection_name()]},
+                    "Connections": {
+                        "Connections": [factory.get_glue_connection_name()]
+                    },
                 },
                 script_args={
                     "--S3_OUTPUT_PATH": f"s3://{backup_bucket}/{factory.path_prefix}",
@@ -700,7 +710,9 @@ class GlueDRFactory(BaseDRFactory):
                 Credentials stay within this task — never exposed via XCom.
                 """
                 creds = CredentialExtractor.extract()
-                env_name = os.environ.get("MWAA_ENV_NAME", "") or Variable.get("DR_MWAA_ENV_NAME", default_var="")
+                env_name = os.environ.get("MWAA_ENV_NAME", "") or Variable.get(
+                    "DR_MWAA_ENV_NAME", default_var=""
+                )
                 region = os.environ.get(
                     "AWS_REGION", os.environ.get("AWS_DEFAULT_REGION", "")
                 )
@@ -715,11 +727,15 @@ class GlueDRFactory(BaseDRFactory):
                         "USERNAME": creds.username,
                         "PASSWORD": creds.password,
                     },
-                    "PhysicalConnectionRequirements": _get_vpc_requirements(env_name, region),
+                    "PhysicalConnectionRequirements": _get_vpc_requirements(
+                        env_name, region
+                    ),
                 }
                 try:
                     glue_client.get_connection(Name=connection_name)
-                    glue_client.update_connection(Name=connection_name, ConnectionInput=conn_input)
+                    glue_client.update_connection(
+                        Name=connection_name, ConnectionInput=conn_input
+                    )
                 except glue_client.exceptions.EntityNotFoundException:
                     glue_client.create_connection(ConnectionInput=conn_input)
                 logger.info("Glue connection '%s' ready.", connection_name)
@@ -812,7 +828,9 @@ class GlueDRFactory(BaseDRFactory):
                     "GlueVersion": "4.0",
                     "NumberOfWorkers": 2,
                     "WorkerType": "G.1X",
-                    "Connections": {"Connections": [factory.get_glue_connection_name()]},
+                    "Connections": {
+                        "Connections": [factory.get_glue_connection_name()]
+                    },
                 },
                 script_args={
                     "--S3_INPUT_PATH": f"s3://{backup_bucket}/{factory.path_prefix}",
@@ -880,7 +898,9 @@ class GlueDRFactory(BaseDRFactory):
                 Credentials stay within this task — never exposed via XCom.
                 """
                 creds = CredentialExtractor.extract()
-                env_name = os.environ.get("MWAA_ENV_NAME", "") or Variable.get("DR_MWAA_ENV_NAME", default_var="")
+                env_name = os.environ.get("MWAA_ENV_NAME", "") or Variable.get(
+                    "DR_MWAA_ENV_NAME", default_var=""
+                )
                 region = os.environ.get(
                     "AWS_REGION", os.environ.get("AWS_DEFAULT_REGION", "")
                 )
@@ -895,11 +915,15 @@ class GlueDRFactory(BaseDRFactory):
                         "USERNAME": creds.username,
                         "PASSWORD": creds.password,
                     },
-                    "PhysicalConnectionRequirements": _get_vpc_requirements(env_name, region),
+                    "PhysicalConnectionRequirements": _get_vpc_requirements(
+                        env_name, region
+                    ),
                 }
                 try:
                     glue_client.get_connection(Name=connection_name)
-                    glue_client.update_connection(Name=connection_name, ConnectionInput=conn_input)
+                    glue_client.update_connection(
+                        Name=connection_name, ConnectionInput=conn_input
+                    )
                 except glue_client.exceptions.EntityNotFoundException:
                     glue_client.create_connection(ConnectionInput=conn_input)
                 logger.info("Glue connection '%s' ready.", connection_name)
@@ -974,7 +998,9 @@ class GlueDRFactory(BaseDRFactory):
                     "GlueVersion": "4.0",
                     "NumberOfWorkers": 2,
                     "WorkerType": "G.1X",
-                    "Connections": {"Connections": [factory.get_glue_connection_name()]},
+                    "Connections": {
+                        "Connections": [factory.get_glue_connection_name()]
+                    },
                 },
                 script_args={
                     "--CLEANUP_TABLES": json.dumps(table_defs),

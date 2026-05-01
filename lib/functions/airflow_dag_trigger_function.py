@@ -81,5 +81,7 @@ def _trigger_via_rest_api(env_name, dag_id, conf):
     if status >= 400:
         raise Exception(f"Failed to trigger DAG {dag_id}: {status} {data}")
 
-    print(f"DAG {dag_id} triggered: run_id={data.get('dag_run_id')}, state={data.get('state')}")
+    print(
+        f"DAG {dag_id} triggered: run_id={data.get('dag_run_id')}, state={data.get('state')}"
+    )
     return data

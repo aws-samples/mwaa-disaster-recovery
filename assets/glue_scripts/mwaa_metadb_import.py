@@ -152,9 +152,9 @@ def import_table_jdbc(spark, jdbc_url, conn_props, df, table_name):
     rows_imported = 0
     rows_skipped = 0
     try:
-        pg_conn = gateway.jvm.Class.forName(
-            "org.postgresql.jdbc.PgConnection"
-        ).cast(connection)
+        pg_conn = gateway.jvm.Class.forName("org.postgresql.jdbc.PgConnection").cast(
+            connection
+        )
         copy_mgr = gateway.jvm.org.postgresql.copy.CopyManager(pg_conn)
         reader = gateway.jvm.java.io.StringReader(csv_data.decode("utf-8"))
         rows_imported = copy_mgr.copyIn(copy_sql, reader)
@@ -298,7 +298,7 @@ def import_table(spark, jdbc_url, conn_props, table_def, s3_input_path):
 
     logger.info("Importing table '%s' from %s...", table_name, backup_path)
 
-    columns = table_def.get("columns", [])
+    table_def.get("columns", [])
     binary_columns = table_def.get("binary_columns", [])
 
     # Read CSV from S3
@@ -307,7 +307,9 @@ def import_table(spark, jdbc_url, conn_props, table_def, s3_input_path):
     # Cast columns to match the target table schema
     try:
         target_schema_query = f"(SELECT * FROM {table_name} WHERE 1=0) AS schema_tbl"
-        target_df = spark.read.jdbc(url=jdbc_url, table=target_schema_query, properties=conn_props)
+        target_df = spark.read.jdbc(
+            url=jdbc_url, table=target_schema_query, properties=conn_props
+        )
         for field in target_df.schema.fields:
             if field.name in df.columns:
                 df = df.withColumn(field.name, F.col(field.name).cast(field.dataType))
@@ -436,7 +438,6 @@ def _pre_import_cleanup(spark, jdbc_url, conn_props, s3_input_path):
     bulk loading. DELETE + COPY in one transaction prevents scheduler race.
     """
     import boto3
-    import gzip
 
     sc = spark.sparkContext
     gateway = sc._gateway
@@ -446,9 +447,9 @@ def _pre_import_cleanup(spark, jdbc_url, conn_props, s3_input_path):
     )
     try:
         # Cast to PgConnection for COPY API
-        pg_conn = gateway.jvm.Class.forName(
-            "org.postgresql.jdbc.PgConnection"
-        ).cast(connection)
+        pg_conn = gateway.jvm.Class.forName("org.postgresql.jdbc.PgConnection").cast(
+            connection
+        )
         connection.setAutoCommit(False)
         stmt = connection.createStatement()
 
@@ -467,7 +468,9 @@ def _pre_import_cleanup(spark, jdbc_url, conn_props, s3_input_path):
         _copy_table_from_s3(spark, pg_conn, gateway, "dag_code", s3_input_path)
 
         connection.commit()
-        logger.info("Pre-import: dag_version and dag_code restored in single transaction.")
+        logger.info(
+            "Pre-import: dag_version and dag_code restored in single transaction."
+        )
     except Exception as e:
         logger.error("Pre-import cleanup failed: %s", e)
         try:
@@ -483,9 +486,15 @@ def _copy_table_from_s3(spark, pg_conn, gateway, table_name, s3_input_path):
     backup_path = f"{s3_input_path}/{table_name}.csv.gz"
 
     try:
-        df = spark.read.option("header", "true").option("delimiter", "|").csv(backup_path)
+        df = (
+            spark.read.option("header", "true")
+            .option("delimiter", "|")
+            .csv(backup_path)
+        )
     except Exception:
-        logger.warning("Backup not found for '%s' at %s, skipping.", table_name, backup_path)
+        logger.warning(
+            "Backup not found for '%s' at %s, skipping.", table_name, backup_path
+        )
         return
 
     rows = df.collect()

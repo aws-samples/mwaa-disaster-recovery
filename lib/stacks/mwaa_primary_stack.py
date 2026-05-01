@@ -206,9 +206,15 @@ class MwaaPrimaryStack(MwaaBaseStack):
             unset_dags_bucket_cmd = AirflowCliCommand(
                 command="variables delete DR_DAGS_BUCKET"
             )
-            create_cmds.extend([set_glue_role_cmd, set_mwaa_env_name_cmd, set_dags_bucket_cmd])
-            update_cmds.extend([set_glue_role_cmd, set_mwaa_env_name_cmd, set_dags_bucket_cmd])
-            delete_cmds.extend([unset_glue_role_cmd, unset_mwaa_env_name_cmd, unset_dags_bucket_cmd])
+            create_cmds.extend(
+                [set_glue_role_cmd, set_mwaa_env_name_cmd, set_dags_bucket_cmd]
+            )
+            update_cmds.extend(
+                [set_glue_role_cmd, set_mwaa_env_name_cmd, set_dags_bucket_cmd]
+            )
+            delete_cmds.extend(
+                [unset_glue_role_cmd, unset_mwaa_env_name_cmd, unset_dags_bucket_cmd]
+            )
 
         cli_input = AirflowCliInput(
             create=create_cmds,
