@@ -138,7 +138,7 @@ class TestAirflowCliClient:
 
         httpretty.register_uri(
             httpretty.POST,
-            f"https://{mwaa_web_server_hostname}/aws_mwaa/cli/",
+            f"https://{mwaa_web_server_hostname}/aws_mwaa/cli",
             body=json.dumps(result),
             status=200,
         )
@@ -198,7 +198,7 @@ class TestAirflowCliClient:
 
         httpretty.register_uri(
             httpretty.POST,
-            f"https://{mwaa_web_server_hostname}/aws_mwaa/cli/",
+            f"https://{mwaa_web_server_hostname}/aws_mwaa/cli",
             body=json.dumps(result),
             status=200,
         )
@@ -258,7 +258,7 @@ class TestAirflowCliClient:
 
         httpretty.register_uri(
             httpretty.POST,
-            f"https://{mwaa_web_server_hostname}/aws_mwaa/cli/",
+            f"https://{mwaa_web_server_hostname}/aws_mwaa/cli",
             body=json.dumps(result),
             status=200,
         )
@@ -279,7 +279,7 @@ class TestAirflowCliClient:
 
         httpretty.register_uri(
             httpretty.POST,
-            f"https://{mwaa_web_server_hostname}/aws_mwaa/cli/",
+            f"https://{mwaa_web_server_hostname}/aws_mwaa/cli",
             body="Gateway Timeout",
             status=504,
         )

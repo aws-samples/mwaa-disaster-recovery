@@ -134,7 +134,10 @@ class AirflowCliClient:
         print(f"Executing CLI command: {payload} ...")
         token = self.setup()
 
-        url = f'https://{token["WebServerHostname"]}/aws_mwaa/cli/'
+        # AF 3.x redirects /aws_mwaa/cli to /aws_mwaa/cli/ (trailing slash required)
+        sem_ver = self.environment_version.split(".")
+        cli_path = "/aws_mwaa/cli/" if int(sem_ver[0]) >= 3 else "/aws_mwaa/cli"
+        url = f'https://{token["WebServerHostname"]}{cli_path}'
         headers = {
             "Authorization": f'Bearer {token["CliToken"]}',
             "Content-Type": "text/plain",
