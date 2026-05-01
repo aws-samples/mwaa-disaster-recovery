@@ -131,7 +131,7 @@ class TestGlueDRFactory:
         result = factory.get_glue_role_name()
 
         expect(result).to.equal("arn:aws:iam::123456789:role/glue-role")
-        mock_variable.get.assert_called_once_with("GLUE_ROLE_ARN")
+        mock_variable.get.assert_called_once_with("GLUE_ROLE_ARN", default_var="")
 
     def test_get_script_location_with_s3_path(self):
         factory = ConcreteGlueDRFactory("test_dag")
@@ -345,11 +345,11 @@ class TestGlueDRFactory:
         result = GlueDRFactory._detect_date_field(table)
         expect(result).to.be.none
 
-    # --- Tests for create_glue_connection (Req 2.1, 2.2, 2.3, 2.4) ---
+    # --- Tests for setup_glue_connection (Req 2.1, 2.2, 2.3, 2.4) ---
 
     @patch("mwaa_dr.framework.factory.glue_dr_factory.boto3")
-    def test_create_glue_connection_creates_with_correct_vpc_config(self, mock_boto3):
-        """Test that create_glue_connection creates a connection with correct VPC config.
+    def test_setup_glue_connection_creates_with_correct_vpc_config(self, mock_boto3):
+        """Test that setup_glue_connection creates a connection with correct VPC config.
         Validates: Requirements 2.1, 2.3, 2.4
         """
         # Set up mock clients
@@ -477,8 +477,8 @@ class TestGlueDRFactory:
         )
 
     @patch("mwaa_dr.framework.factory.glue_dr_factory.boto3")
-    def test_create_glue_connection_reuses_existing(self, mock_boto3):
-        """Test that create_glue_connection reuses an existing connection.
+    def test_setup_glue_connection_reuses_existing(self, mock_boto3):
+        """Test that setup_glue_connection reuses an existing connection.
         Validates: Requirements 2.2
         """
         mock_glue = MagicMock()
@@ -569,8 +569,8 @@ class TestGlueDRFactory:
 
         # Verify key tasks exist
         task_ids = [t.task_id for t in dag.tasks]
-        expect(task_ids).to.contain("extract_credentials")
-        expect(task_ids).to.contain("create_glue_connection")
+        expect(task_ids).to.contain("setup_glue_connection")
+        expect(task_ids).to.contain("setup_glue_connection")
         expect(task_ids).to.contain("backup_variables_via_api")
         expect(task_ids).to.contain("backup_connections_via_api")
 
@@ -699,8 +699,8 @@ class TestGlueDRFactory:
 
         # Verify key tasks exist
         task_ids = [t.task_id for t in dag.tasks]
-        expect(task_ids).to.contain("extract_credentials")
-        expect(task_ids).to.contain("create_glue_connection")
+        expect(task_ids).to.contain("setup_glue_connection")
+        expect(task_ids).to.contain("setup_glue_connection")
         expect(task_ids).to.contain("restore_variables_via_api_task")
         expect(task_ids).to.contain("restore_connections_via_api_task")
         expect(task_ids).to.contain("notify_success_to_sfn")
@@ -816,8 +816,8 @@ class TestGlueDRFactory:
 
         # Verify key tasks exist
         task_ids = [t.task_id for t in dag.tasks]
-        expect(task_ids).to.contain("extract_credentials")
-        expect(task_ids).to.contain("create_glue_connection")
+        expect(task_ids).to.contain("setup_glue_connection")
+        expect(task_ids).to.contain("setup_glue_connection")
         expect(task_ids).to.contain("notify_success_to_sfn")
         expect(task_ids).to.contain("notify_failure_to_sfn")
 
