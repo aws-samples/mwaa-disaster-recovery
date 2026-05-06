@@ -20,7 +20,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import json
 import os
-import sys
 import types
 from unittest.mock import MagicMock, patch
 
@@ -135,19 +134,22 @@ class TestGlueDRFactory:
 
     def test_get_script_location_with_s3_path(self):
         factory = ConcreteGlueDRFactory("test_dag")
-        with patch.dict(os.environ, {"DAGS_S3_PATH": "s3://my-bucket/dags"}):
+        with patch("mwaa_dr.framework.factory.glue_dr_factory.Variable") as mock_var:
+            mock_var.get.return_value = "my-bucket"
             result = factory.get_script_location("mwaa_metadb_export")
         expect(result).to.equal("s3://my-bucket/scripts/mwaa_metadb_export.py")
 
     def test_get_script_location_with_bucket_name_only(self):
         factory = ConcreteGlueDRFactory("test_dag")
-        with patch.dict(os.environ, {"DAGS_S3_PATH": "my-bucket"}):
+        with patch("mwaa_dr.framework.factory.glue_dr_factory.Variable") as mock_var:
+            mock_var.get.return_value = "my-bucket"
             result = factory.get_script_location("mwaa_metadb_import")
         expect(result).to.equal("s3://my-bucket/scripts/mwaa_metadb_import.py")
 
     def test_get_script_location_with_s3_path_no_prefix(self):
         factory = ConcreteGlueDRFactory("test_dag")
-        with patch.dict(os.environ, {"DAGS_S3_PATH": "s3://my-bucket"}):
+        with patch("mwaa_dr.framework.factory.glue_dr_factory.Variable") as mock_var:
+            mock_var.get.return_value = "my-bucket"
             result = factory.get_script_location("mwaa_metadb_cleanup")
         expect(result).to.equal("s3://my-bucket/scripts/mwaa_metadb_cleanup.py")
 
@@ -546,6 +548,7 @@ class TestGlueDRFactory:
             "DR_BACKUP_SCHEDULE": None,
             "DR_BACKUP_BUCKET": "backup-bucket",
             "DR_MAX_AGE_IN_DAYS": "30",
+            "DR_DAGS_BUCKET": "dags-bucket",
         }.get(key, kwargs.get("default_var", ""))
 
         env_vars = {
@@ -556,9 +559,9 @@ class TestGlueDRFactory:
 
         with (
             patch.dict(os.environ, env_vars),
-            patch.dict(
-                sys.modules,
-                {"airflow.providers.amazon.aws.operators.glue": mock_providers_module},
+            patch(
+                "mwaa_dr.framework.factory.glue_dr_factory.GlueJobOperator",
+                mock_glue_operator_class,
             ),
         ):
             factory = ConcreteGlueDRFactory("backup_dag")
@@ -604,6 +607,7 @@ class TestGlueDRFactory:
             "DR_BACKUP_SCHEDULE": None,
             "DR_BACKUP_BUCKET": "backup-bucket",
             "DR_MAX_AGE_IN_DAYS": "30",
+            "DR_DAGS_BUCKET": "dags-bucket",
         }.get(key, kwargs.get("default_var", ""))
 
         env_vars = {
@@ -614,9 +618,9 @@ class TestGlueDRFactory:
 
         with (
             patch.dict(os.environ, env_vars),
-            patch.dict(
-                sys.modules,
-                {"airflow.providers.amazon.aws.operators.glue": mock_providers_module},
+            patch(
+                "mwaa_dr.framework.factory.glue_dr_factory.GlueJobOperator",
+                mock_glue_operator_class,
             ),
             patch("airflow.models.Variable.get", mock_variable.get),
         ):
@@ -684,9 +688,9 @@ class TestGlueDRFactory:
 
         with (
             patch.dict(os.environ, env_vars),
-            patch.dict(
-                sys.modules,
-                {"airflow.providers.amazon.aws.operators.glue": mock_providers_module},
+            patch(
+                "mwaa_dr.framework.factory.glue_dr_factory.GlueJobOperator",
+                mock_glue_operator_class,
             ),
         ):
             factory = ConcreteGlueDRFactory("restore_dag")
@@ -742,9 +746,9 @@ class TestGlueDRFactory:
 
         with (
             patch.dict(os.environ, env_vars),
-            patch.dict(
-                sys.modules,
-                {"airflow.providers.amazon.aws.operators.glue": mock_providers_module},
+            patch(
+                "mwaa_dr.framework.factory.glue_dr_factory.GlueJobOperator",
+                mock_glue_operator_class,
             ),
             patch("airflow.models.Variable.get", mock_variable.get),
         ):
@@ -801,9 +805,9 @@ class TestGlueDRFactory:
 
         with (
             patch.dict(os.environ, env_vars),
-            patch.dict(
-                sys.modules,
-                {"airflow.providers.amazon.aws.operators.glue": mock_providers_module},
+            patch(
+                "mwaa_dr.framework.factory.glue_dr_factory.GlueJobOperator",
+                mock_glue_operator_class,
             ),
         ):
             factory = ConcreteGlueDRFactory("cleanup_dag")
@@ -857,9 +861,9 @@ class TestGlueDRFactory:
 
         with (
             patch.dict(os.environ, env_vars),
-            patch.dict(
-                sys.modules,
-                {"airflow.providers.amazon.aws.operators.glue": mock_providers_module},
+            patch(
+                "mwaa_dr.framework.factory.glue_dr_factory.GlueJobOperator",
+                mock_glue_operator_class,
             ),
         ):
             factory = ConcreteGlueDRFactory("cleanup_dag")
