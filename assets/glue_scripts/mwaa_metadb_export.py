@@ -42,8 +42,7 @@ def get_jdbc_url(glue_context, connection_name):
         tuple: (jdbc_url, connection_properties) for JDBC reads.
     """
     conn = glue_context.extract_jdbc_conf(connection_name)
-    jdbc_url = conn.get("fullUrl") or conn.get("url", "")
-    return jdbc_url, {
+    return conn["url"], {
         "user": conn["user"],
         "password": conn["password"],
         "driver": "org.postgresql.Driver",
@@ -69,8 +68,7 @@ def table_exists(spark, jdbc_url, conn_props, table_name):
         )
         df = spark.read.jdbc(url=jdbc_url, table=query, properties=conn_props)
         return df.count() > 0
-    except Exception as e:
-        logger.warning("table_exists check failed for '%s': %s", table_name, e)
+    except Exception:
         return False
 
 
@@ -102,9 +100,6 @@ def hex_encode_binary_columns(df, binary_columns):
 def build_jdbc_query(table_def, max_age_days):
     """Build a JDBC query string for a table, applying date filtering if applicable.
 
-    Always uses SELECT * to avoid column mismatch issues across Airflow versions.
-    Binary column encoding is handled post-read in Spark.
-
     Args:
         table_def: Dict with table definition (table, date_field, columns, binary_columns).
         max_age_days: Maximum age in days for date-based filtering. 0 means no filter.
@@ -113,7 +108,21 @@ def build_jdbc_query(table_def, max_age_days):
         str: A JDBC-compatible table expression (subquery alias).
     """
     table_name = table_def["table"]
+    columns = table_def.get("columns", [])
     date_field = table_def.get("date_field")
+    binary_columns = table_def.get("binary_columns", [])
+
+    # Build column list with hex-encoding for binary columns
+    if columns:
+        col_exprs = []
+        for col in columns:
+            if col in binary_columns:
+                col_exprs.append(f"'\\x' || encode({col},'hex') as {col}")
+            else:
+                col_exprs.append(col)
+        select_clause = ", ".join(col_exprs)
+    else:
+        select_clause = "*"
 
     where_clauses = []
 
@@ -125,7 +134,9 @@ def build_jdbc_query(table_def, max_age_days):
 
     where_str = f" WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
 
-    return f"(SELECT * FROM {table_name}{where_str}) AS {table_name}_export"
+    return (
+        f"(SELECT {select_clause} FROM {table_name}{where_str}) AS {table_name}_export"
+    )
 
 
 def export_table(spark, jdbc_url, conn_props, table_def, s3_output_path, max_age_days):
@@ -181,7 +192,7 @@ def export_table(spark, jdbc_url, conn_props, table_def, s3_output_path, max_age
     (
         df.coalesce(1)
         .write.mode("overwrite")
-        .option("header", "true")
+        .option("header", "false")
         .option("delimiter", "|")
         .option("compression", "gzip")
         .csv(output_path)
@@ -328,18 +339,6 @@ def main():
     logger.info("Tables to export: %d", len(table_defs))
 
     jdbc_url, conn_props = get_jdbc_url(glue_context, connection_name)
-
-    # Diagnostic: list all tables in the database
-    try:
-        all_tables_query = "(SELECT table_schema, table_name FROM information_schema.tables WHERE table_schema NOT IN ('information_schema', 'pg_catalog') ORDER BY table_schema, table_name) AS all_tables"
-        all_tables_df = spark.read.jdbc(
-            url=jdbc_url, table=all_tables_query, properties=conn_props
-        )
-        logger.info("Database tables found:")
-        for row in all_tables_df.collect():
-            logger.info("  %s.%s", row["table_schema"], row["table_name"])
-    except Exception as e:
-        logger.error("Failed to list database tables: %s", e)
 
     results = export_tables_by_level(
         spark,

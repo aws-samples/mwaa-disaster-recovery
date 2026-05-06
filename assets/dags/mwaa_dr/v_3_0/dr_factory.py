@@ -254,7 +254,7 @@ class DRFactory_3_0(GlueDRFactory):
                 "state",
             ],
             export_filter="dag_id != 'backup_metadata'",
-            export_mappings={"conf": "conf::text as conf"},
+            export_mappings={"conf": "'\\x' || encode(conf,'hex') as conf"},
             storage_type=self.storage_type,
             path_prefix=self.path_prefix,
             batch_size=self.batch_size,
@@ -340,7 +340,9 @@ class DRFactory_3_0(GlueDRFactory):
                 "to_date",
                 "updated_at",
             ],
-            export_mappings={"dag_run_conf": "dag_run_conf::text as dag_run_conf"},
+            export_mappings={
+                "dag_run_conf": "'\\x' || encode(dag_run_conf,'hex') as dag_run_conf"
+            },
             storage_type=self.storage_type,
             path_prefix=self.path_prefix,
             batch_size=self.batch_size,
@@ -450,7 +452,7 @@ class DRFactory_3_0(GlueDRFactory):
                 "timestamp",
                 "value",
             ],
-            export_mappings={"value": "value::text as value"},
+            export_mappings={"value": "'\\x' || encode(value,'hex') as value"},
             storage_type=self.storage_type,
             path_prefix=self.path_prefix,
             batch_size=self.batch_size,

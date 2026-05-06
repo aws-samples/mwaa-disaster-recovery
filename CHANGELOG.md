@@ -7,39 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-- Support for MWAA v3.0.6
-- `DR_DAGS_BUCKET` and `DR_MWAA_ENV_NAME` Airflow variables set via CDK on both primary and secondary stacks
-- `AirflowCli` construct on secondary stack for setting Glue-related Airflow variables
-- `DR_BACKUP_BUCKET` Airflow variable on secondary stack for restore operations
-- PostgreSQL `COPY FROM STDIN` for metadata import (consistent with 2.x approach)
-- Pre-import cleanup of `dag_version`/`dag_code` in single JDBC transaction to prevent scheduler race conditions
-- Protected `dag_run`/`task_instance` rows for DR DAGs during metadata cleanup
-
-### Changed
-- `MwaaRestApiClient` rewritten to use `mwaa:InvokeRestApi` AWS API with pagination (replaces broken cookie-based auth)
-- `GlueJobOperator` import moved to top-level (inline imports silently dropped in AF 3.x)
-- `get_script_location()` uses `DR_DAGS_BUCKET` variable instead of API call at parse time
-- All `Variable.get()` calls at DAG parse time use `default_var` to prevent silent parse failures
-- Merged `extract_credentials` + `create_glue_connection` into single `setup_glue_connection` task (credentials never enter XCom)
-- DAG trigger Lambda uses `InvokeRestApi` for AF 3.x (CLI triggers don't persist DAG runs)
-- Glue export uses `SELECT *` and CSV headers for schema resilience across AF versions
-- `jsonb` columns (`conf`, `value`, `dag_run_conf`) use `::text` cast instead of `encode(hex)`
-- Cleanup script skips `dag_version`/`dag_code`/`active_dag` tables (needed by scheduler during cleanup)
-
-### Fixed
-- MWAA 3.x CLI endpoint redirect (`/aws_mwaa/cli` → `/aws_mwaa/cli/`)
-- `DummyOperator`/`PythonOperator` import compatibility for AF 3.x
-- `DagRun.get_task_instances()` removed in AF 3.x — wrapped in try/except
-- CLI `unpause_dag` and `trigger_dag` output parsing for AF 3.x format changes
-- `extract_jdbc_conf` returns `fullUrl` (includes database name) instead of `url`
-- `stringtype=unspecified` in JDBC properties for PostgreSQL UUID column compatibility
-- Removed invalid `import java.sql` from Glue import fallback path
-- Replaced `F.unbase16()` with `F.unhex()` for Spark compatibility
-- Credential logging removed from Glue export script
-- CloudFormation response size truncated to avoid 4096 byte limit
-- Added missing IAM permissions: `glue:UpdateJob`, `glue:UpdateConnection`, `glue:GetConnection`, `airflow:InvokeRestApi`, `iam:GetRole`, `s3:DeleteObject`, `ec2:DescribeSubnets/DescribeSecurityGroups`
-
 ## [3.0.0] - 2026-04-27
 ### Added
 - Support for MWAA v3.0.2 (Apache Airflow 3.0) via AWS Glue-based metadata export/import/cleanup

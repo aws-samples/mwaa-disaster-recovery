@@ -132,6 +132,10 @@ class MwaaPrimaryStack(MwaaBaseStack):
             )
         )
 
+        # Conditionally provision Glue resources for Airflow 3.x
+        if conf.mwaa_version.startswith("3."):
+            self.setup_glue_resources(conf, mwaa_role)
+
         self.variables_airflow_cli.node.add_dependency(failure_notification_topic)
         self.dags_deployment.node.add_dependency(self.variables_airflow_cli)
         self.replication_job_custom_resource.node.add_dependency(
@@ -664,22 +668,6 @@ class MwaaPrimaryStack(MwaaBaseStack):
                     "ec2:CreateNetworkInterface",
                     "ec2:DeleteNetworkInterface",
                     "ec2:DescribeNetworkInterfaces",
-                    "ec2:DescribeSubnets",
-                    "ec2:DescribeSecurityGroups",
-                    "ec2:DescribeVpcEndpoints",
-                    "ec2:DescribeRouteTables",
-                    "ec2:CreateTags",
-                    "ec2:DeleteTags",
-                ],
-                resources=["*"],
-            )
-        )
-
-        # Glue catalog access (needed for extract_jdbc_conf)
-        glue_role.add_to_policy(
-            iam.PolicyStatement(
-                actions=[
-                    "glue:GetConnection",
                 ],
                 resources=["*"],
             )
@@ -691,7 +679,6 @@ class MwaaPrimaryStack(MwaaBaseStack):
                 actions=[
                     "s3:GetObject",
                     "s3:PutObject",
-                    "s3:DeleteObject",
                 ],
                 resources=[
                     self._backup_bucket.arn_for_objects("*"),
@@ -732,12 +719,10 @@ class MwaaPrimaryStack(MwaaBaseStack):
                 actions=[
                     "glue:CreateJob",
                     "glue:GetJob",
-                    "glue:UpdateJob",
                     "glue:StartJobRun",
                     "glue:GetJobRun",
                     "glue:CreateConnection",
                     "glue:GetConnection",
-                    "glue:UpdateConnection",
                 ],
                 resources=["*"],
             )
@@ -749,7 +734,6 @@ class MwaaPrimaryStack(MwaaBaseStack):
                 actions=[
                     "mwaa:GetEnvironment",
                     "mwaa:CreateWebLoginToken",
-                    "mwaa:InvokeRestApi",
                     "ec2:DescribeSubnets",
                     "ec2:DescribeSecurityGroups",
                 ],

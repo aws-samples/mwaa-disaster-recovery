@@ -42,12 +42,10 @@ def get_jdbc_url(glue_context, connection_name):
         tuple: (jdbc_url, connection_properties) for JDBC operations.
     """
     conn = glue_context.extract_jdbc_conf(connection_name)
-    jdbc_url = conn.get("fullUrl") or conn.get("url", "")
-    return jdbc_url, {
+    return conn["url"], {
         "user": conn["user"],
         "password": conn["password"],
         "driver": "org.postgresql.Driver",
-        "stringtype": "unspecified",
     }
 
 
@@ -93,7 +91,7 @@ def hex_decode_binary_columns(df, binary_columns):
                 col_name,
                 F.when(
                     F.col(col_name).isNotNull(),
-                    F.unhex(
+                    F.unbase16(
                         F.when(
                             F.col(col_name).startswith("\\x"),
                             F.expr(f"substring({col_name}, 3)"),
@@ -105,10 +103,12 @@ def hex_decode_binary_columns(df, binary_columns):
 
 
 def import_table_jdbc(spark, jdbc_url, conn_props, df, table_name):
-    """Write a DataFrame to PostgreSQL via COPY FROM STDIN.
+    """Write a DataFrame to PostgreSQL via JDBC with duplicate key handling.
 
-    Uses PostgreSQL's native COPY command for type-safe bulk loading,
-    matching the approach used in the 2.x DR solution.
+    Uses ``batchsize=1000`` and ``numPartitions=1`` to avoid concurrent write
+    conflicts. Duplicate key conflicts are handled by the database using
+    ``INSERT ... ON CONFLICT DO NOTHING`` semantics — rows that conflict with
+    existing primary keys are silently skipped.
 
     Args:
         spark: The SparkSession.
@@ -121,59 +121,47 @@ def import_table_jdbc(spark, jdbc_url, conn_props, df, table_name):
         tuple: (rows_imported, rows_skipped) counts.
     """
     total_rows = df.count()
+
     if total_rows == 0:
         logger.info("Table '%s' has 0 rows to import.", table_name)
         return 0, 0
 
-    # Collect data and convert to pipe-delimited CSV (no header)
-    rows = df.collect()
-    columns = df.columns
-    csv_lines = []
-    for row in rows:
-        vals = []
-        for v in row:
-            if v is None:
-                vals.append("")
-            else:
-                vals.append(str(v).replace("|", "\\|"))
-        csv_lines.append("|".join(vals))
-    csv_data = "\n".join(csv_lines).encode("utf-8")
-
-    col_list = ", ".join([f'"{c}"' for c in columns])
-    copy_sql = f"COPY {table_name} ({col_list}) FROM STDIN WITH (FORMAT CSV, HEADER FALSE, DELIMITER '|', NULL '')"
-
-    sc = spark.sparkContext
-    gateway = sc._gateway
-    gateway.jvm.Class.forName("org.postgresql.Driver")
-    connection = gateway.jvm.java.sql.DriverManager.getConnection(
-        jdbc_url, conn_props.get("user", ""), conn_props.get("password", "")
-    )
-
-    rows_imported = 0
-    rows_skipped = 0
+    # Get the count of existing rows before import for skip calculation
     try:
-        pg_conn = gateway.jvm.Class.forName("org.postgresql.jdbc.PgConnection").cast(
-            connection
+        existing_query = f"(SELECT COUNT(*) as cnt FROM {table_name}) AS cnt_tbl"
+        existing_count_before = spark.read.jdbc(
+            url=jdbc_url, table=existing_query, properties=conn_props
+        ).collect()[0]["cnt"]
+    except Exception:
+        pass
+
+    # Write using JDBC append mode with batching
+    write_props = dict(conn_props)
+    write_props["batchsize"] = "1000"
+    write_props["numPartitions"] = "1"
+
+    try:
+        (
+            df.write.mode("append")
+            .option("batchsize", "1000")
+            .option("numPartitions", "1")
+            .jdbc(url=jdbc_url, table=table_name, properties=write_props)
         )
-        copy_mgr = gateway.jvm.org.postgresql.copy.CopyManager(pg_conn)
-        reader = gateway.jvm.java.io.StringReader(csv_data.decode("utf-8"))
-        rows_imported = copy_mgr.copyIn(copy_sql, reader)
+        rows_imported = total_rows
+        rows_skipped = 0
     except Exception as e:
         error_msg = str(e)
-        logger.warning(
-            "COPY failed for table '%s': %s. Falling back to row-by-row insert.",
-            table_name,
-            error_msg[:200],
-        )
-        try:
-            connection.rollback()
-        except Exception:
-            pass
-        rows_imported, rows_skipped = _insert_with_conflict_handling(
-            spark, jdbc_url, conn_props, df, table_name
-        )
-    finally:
-        connection.close()
+        if "duplicate key" in error_msg.lower() or "unique" in error_msg.lower():
+            logger.warning(
+                "Duplicate key conflicts for table '%s', falling back to "
+                "row-by-row insert with conflict handling.",
+                table_name,
+            )
+            rows_imported, rows_skipped = _insert_with_conflict_handling(
+                spark, jdbc_url, conn_props, df, table_name
+            )
+        else:
+            raise
 
     logger.info(
         "Table '%s': imported %d rows, skipped %d rows.",
@@ -201,6 +189,8 @@ def _insert_with_conflict_handling(spark, jdbc_url, conn_props, df, table_name):
     Returns:
         tuple: (rows_imported, rows_skipped) counts.
     """
+    import java.sql  # noqa: F401 — available in Glue/Spark JVM
+
     rows = df.collect()
     columns = df.columns
 
@@ -298,23 +288,19 @@ def import_table(spark, jdbc_url, conn_props, table_def, s3_input_path):
 
     logger.info("Importing table '%s' from %s...", table_name, backup_path)
 
-    table_def.get("columns", [])
+    columns = table_def.get("columns", [])
     binary_columns = table_def.get("binary_columns", [])
 
     # Read CSV from S3
-    df = spark.read.option("header", "true").option("delimiter", "|").csv(backup_path)
+    reader = spark.read.option("header", "false").option("delimiter", "|")
 
-    # Cast columns to match the target table schema
-    try:
-        target_schema_query = f"(SELECT * FROM {table_name} WHERE 1=0) AS schema_tbl"
-        target_df = spark.read.jdbc(
-            url=jdbc_url, table=target_schema_query, properties=conn_props
-        )
-        for field in target_df.schema.fields:
-            if field.name in df.columns:
-                df = df.withColumn(field.name, F.col(field.name).cast(field.dataType))
-    except Exception as e:
-        logger.warning("Could not read target schema for '%s': %s", table_name, e)
+    if columns:
+        from pyspark.sql.types import StructType, StructField, StringType
+
+        schema = StructType([StructField(col, StringType(), True) for col in columns])
+        df = reader.schema(schema).csv(backup_path)
+    else:
+        df = reader.csv(backup_path)
 
     # Decode hex-encoded binary columns
     if binary_columns:
@@ -431,92 +417,6 @@ def write_summary(spark, s3_input_path, results):
     logger.info("Summary: %s", summary_json)
 
 
-def _pre_import_cleanup(spark, jdbc_url, conn_props, s3_input_path):
-    """Clean and re-import dag_version/dag_code in a single transaction.
-
-    Uses PostgreSQL COPY command (same as the 2.x DR solution) for type-safe
-    bulk loading. DELETE + COPY in one transaction prevents scheduler race.
-    """
-    import boto3
-
-    sc = spark.sparkContext
-    gateway = sc._gateway
-    gateway.jvm.Class.forName("org.postgresql.Driver")
-    connection = gateway.jvm.java.sql.DriverManager.getConnection(
-        jdbc_url, conn_props.get("user", ""), conn_props.get("password", "")
-    )
-    try:
-        # Cast to PgConnection for COPY API
-        pg_conn = gateway.jvm.Class.forName("org.postgresql.jdbc.PgConnection").cast(
-            connection
-        )
-        connection.setAutoCommit(False)
-        stmt = connection.createStatement()
-
-        # Delete in FK-safe order
-        for sql in [
-            "DELETE FROM dag_code",
-            "DELETE FROM dag_run WHERE dag_id NOT IN ('cleanup_metadata', 'restore_metadata', 'backup_metadata')",
-            "DELETE FROM dag_version",
-        ]:
-            rows = stmt.executeUpdate(sql)
-            logger.info("Pre-import: %s → %d rows.", sql[:50], rows)
-
-        # COPY dag_version from backup CSV in the SAME transaction
-        _copy_table_from_s3(spark, pg_conn, gateway, "dag_version", s3_input_path)
-        # COPY dag_code from backup CSV
-        _copy_table_from_s3(spark, pg_conn, gateway, "dag_code", s3_input_path)
-
-        connection.commit()
-        logger.info(
-            "Pre-import: dag_version and dag_code restored in single transaction."
-        )
-    except Exception as e:
-        logger.error("Pre-import cleanup failed: %s", e)
-        try:
-            connection.rollback()
-        except Exception:
-            pass
-    finally:
-        connection.close()
-
-
-def _copy_table_from_s3(spark, pg_conn, gateway, table_name, s3_input_path):
-    """Load a table from S3 CSV using PostgreSQL COPY command."""
-    backup_path = f"{s3_input_path}/{table_name}.csv.gz"
-
-    try:
-        df = (
-            spark.read.option("header", "true")
-            .option("delimiter", "|")
-            .csv(backup_path)
-        )
-    except Exception:
-        logger.warning(
-            "Backup not found for '%s' at %s, skipping.", table_name, backup_path
-        )
-        return
-
-    rows = df.collect()
-    if not rows:
-        logger.info("No data for table '%s', skipping COPY.", table_name)
-        return
-
-    columns = df.columns
-    csv_lines = []
-    for row in rows:
-        vals = [str(v).replace("|", "\\|") if v is not None else "" for v in row]
-        csv_lines.append("|".join(vals))
-    csv_text = "\n".join(csv_lines)
-
-    col_list = ", ".join([f'"{c}"' for c in columns])
-    copy_sql = f"COPY {table_name} ({col_list}) FROM STDIN WITH (FORMAT CSV, HEADER FALSE, DELIMITER '|', NULL '')"
-    copy_mgr = gateway.jvm.org.postgresql.copy.CopyManager(pg_conn)
-    reader = gateway.jvm.java.io.StringReader(csv_text)
-    rows_copied = copy_mgr.copyIn(copy_sql, reader)
-    logger.info("Pre-import COPY: loaded %d rows into '%s'.", rows_copied, table_name)
-
-
 def main():
     """Entry point for the Glue import job."""
     args = getResolvedOptions(
@@ -545,10 +445,6 @@ def main():
     logger.info("Tables to import: %d", len(table_defs))
 
     jdbc_url, conn_props = get_jdbc_url(glue_context, connection_name)
-
-    # Pre-import: clean dag_version and dag_code so primary's records can be imported
-    # These are skipped during cleanup (to keep DAGs alive) but must be replaced during restore
-    _pre_import_cleanup(spark, jdbc_url, conn_props, s3_input_path)
 
     results = import_tables_by_level(
         spark,
