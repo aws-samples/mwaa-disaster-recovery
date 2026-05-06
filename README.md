@@ -2,7 +2,7 @@
 <!-- TOC ignore:true -->
 # MWAA Disaster Recovery
 
-![MWAA](https://img.shields.io/badge/MWAA-3.2.1_|_3.2.0_|_3.0.6_|_3.0.2_|_2.11.0_|_2.10.3_|_2.10.1_|_2.9.2_|_2.8.1_|_2.7.2_|_2.6.3_|_2.5.1_|_2.4.3-blue)
+![MWAA](https://img.shields.io/badge/MWAA-3.2.1_|_3.0.6_|_3.0.2_|_2.11.0_|_2.10.3_|_2.10.1_|_2.9.2_|_2.8.1_|_2.7.2_|_2.6.3_|_2.5.1_|_2.4.3-blue)
 ![CDK](https://img.shields.io/badge/CDK-Python-orange)
 ![Python](https://img.shields.io/badge/Python-3.7+-blue)
 [![Black](https://img.shields.io/badge/Code%20Style-Black-000000.svg)](https://github.com/psf/black)
@@ -79,7 +79,6 @@ This solution is a part of an AWS blog series on MWAA Disaster Recovery. Please 
 > [!NOTE]
 > The project currently supports the following versions of MWAA:
 > - **3.2.1** *(new — uses AWS Glue for metadata operations)*
-> - **3.2.0** *(uses AWS Glue for metadata operations)*
 > - **3.0.6** *(uses AWS Glue for metadata operations)*
 > - **3.0.2** *(uses AWS Glue for metadata operations)*
 > - **2.11.0**
