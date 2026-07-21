@@ -25,6 +25,14 @@ framework reuses them automatically — it only redeploys the DR solution and
 reruns the test checks, and keeps the infrastructure afterwards. Pass
 `--provision-infrastructure` to force the full provisioning path instead.
 
+Failure behavior: when a version FAILS, its resources are KEPT (not torn
+down) so you can fix the problem and simply rerun `./run_e2e.py` to resume —
+provisioning is idempotent: existing buckets/roles/envs are reused, envs
+stuck in CREATE_FAILED are deleted and recreated, and AVAILABLE envs are
+adopted directly. Cleanup only happens automatically on PASS; use
+`--cleanup-only` to remove everything after a failed run you don't want to
+resume.
+
 Ctrl+C terminates all child processes (CDK subprocesses included) — no
 zombies. Resources already created stay; remove them with `--cleanup-only`.
 

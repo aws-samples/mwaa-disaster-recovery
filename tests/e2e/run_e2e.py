@@ -561,9 +561,17 @@ def create_mwaa_env(ctx: Ctx, env_name: str, region: str, bucket: str,
                     role_arn: str, net: dict):
     mwaa = boto3.client("mwaa", region_name=region)
     try:
-        mwaa.get_environment(Name=env_name)
-        ctx.board.log(f"MWAA env {env_name} already exists, reusing")
-        return
+        status = mwaa.get_environment(Name=env_name)["Environment"]["Status"]
+        if status == "CREATE_FAILED":
+            # Resume after a failed run: a CREATE_FAILED env can only be
+            # deleted, so remove it and recreate below.
+            ctx.board.log(f"MWAA env {env_name} is CREATE_FAILED — deleting "
+                          f"before recreate", key=ctx.key)
+            delete_mwaa_env(ctx.cfg, ctx.board, env_name, region)
+        else:
+            ctx.board.log(f"MWAA env {env_name} already exists "
+                          f"({status}), reusing")
+            return
     except ClientError as e:
         if e.response["Error"]["Code"] != "ResourceNotFoundException":
             raise
@@ -1288,12 +1296,22 @@ def run_version(ctx: Ctx, infra: Infra, skip_cleanup: bool,
         ctx.errors.append(str(e))
         ctx.board.log(f"FAILED: {e}", key=ctx.key)
     finally:
+        cleaned = False
         if reused:
             ctx.board.log("Reused infrastructure kept (use --cleanup-only to "
                           "remove everything)", key=ctx.key)
-        elif not skip_cleanup:
+        elif skip_cleanup:
+            pass  # user asked to keep everything
+        elif result == "FAIL":
+            # Keep resources so a rerun can resume from where it left off:
+            # provisioning is idempotent and AVAILABLE envs are adopted.
+            ctx.board.log("FAIL — resources KEPT for resume. Fix the issue and "
+                          "rerun ./run_e2e.py to continue; use --cleanup-only "
+                          "to remove everything instead.", key=ctx.key)
+        else:
             try:
                 cleanup_version(ctx, infra)
+                cleaned = True
             except Exception as e:
                 ctx.board.log(f"WARN cleanup: {e}", key=ctx.key)
     ctx.board.finish(ctx.key, result)
@@ -1302,6 +1320,7 @@ def run_version(ctx: Ctx, infra: Infra, skip_cleanup: bool,
         "strategy": ctx.strategy,
         "result": result,
         "infra_reused": reused,
+        "cleaned": cleaned,
         "duration_secs": round(time.time() - t0, 1),
         "checks": ctx.checks,
         "errors": ctx.errors,
@@ -1438,9 +1457,10 @@ def main():
 
         board.stop_printer()
 
-        # Shared VPC cleanup (only when nothing was kept)
-        any_reused = any(r.get("infra_reused") for r in results)
-        if not args.skip_cleanup and not any_reused:
+        # Shared VPC cleanup — only when every version tore its resources
+        # down; anything kept (failure resume, reuse, --skip-cleanup) still
+        # needs the VPCs.
+        if not args.skip_cleanup and results and all(r.get("cleaned") for r in results):
             board.log("Deleting shared VPCs...")
             for region in (cfg.primary_region, cfg.secondary_region):
                 try:
@@ -1448,9 +1468,9 @@ def main():
                 except Exception as e:
                     board.log(f"WARN: shared VPC cleanup ({region}): {e}")
         else:
-            reason = "--skip-cleanup" if args.skip_cleanup else "infra reused"
-            board.log(f"{reason}: resources kept. "
-                      f"Run './run_e2e.py --cleanup-only' later.")
+            board.log("Resources kept (failed/reused/skip-cleanup). "
+                      "Rerun './run_e2e.py' to resume, or "
+                      "'./run_e2e.py --cleanup-only' to remove everything.")
 
         # Reporting
         results.sort(key=lambda r: r["version"])
