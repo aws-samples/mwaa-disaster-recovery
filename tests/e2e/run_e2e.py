@@ -896,14 +896,18 @@ def verify_restore(ctx: Ctx):
 def delete_mwaa_env(cfg: Config, board: StatusBoard, env_name: str, region: str):
     mwaa = boto3.client("mwaa", region_name=region)
     # If the env is mid-CREATE, we must wait until it settles before deleting.
-    deadline = time.time() + 50 * 60
+    # Give it the full creation budget plus margin.
+    deadline = time.time() + (cfg.mwaa_creation_mins + 15) * 60
+    polls = 0
     while time.time() < deadline:
         try:
             status = mwaa.get_environment(Name=env_name)["Environment"]["Status"]
         except ClientError:
             return  # already gone
         if status in ("CREATING", "UPDATING", "DELETING"):
-            board.log(f"MWAA {env_name} is {status}; waiting to delete...")
+            if polls % 5 == 0:  # log every ~5 min, not every poll
+                board.log(f"MWAA {env_name} is {status}; waiting to delete...")
+            polls += 1
             time.sleep(60)
             continue
         break
