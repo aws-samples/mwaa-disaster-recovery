@@ -132,10 +132,6 @@ class MwaaPrimaryStack(MwaaBaseStack):
             )
         )
 
-        # Conditionally provision Glue resources for Airflow 3.x
-        if conf.mwaa_version.startswith("3."):
-            self.setup_glue_resources(conf, mwaa_role)
-
         self.variables_airflow_cli.node.add_dependency(failure_notification_topic)
         self.dags_deployment.node.add_dependency(self.variables_airflow_cli)
         self.replication_job_custom_resource.node.add_dependency(
