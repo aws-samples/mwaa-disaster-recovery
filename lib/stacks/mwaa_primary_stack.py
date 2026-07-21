@@ -657,13 +657,30 @@ class MwaaPrimaryStack(MwaaBaseStack):
             assumed_by=iam.ServicePrincipal("glue.amazonaws.com"),
         )
 
-        # VPC networking permissions for Glue
+        # VPC networking permissions for Glue (full set per AWS documentation)
         glue_role.add_to_policy(
             iam.PolicyStatement(
                 actions=[
                     "ec2:CreateNetworkInterface",
                     "ec2:DeleteNetworkInterface",
                     "ec2:DescribeNetworkInterfaces",
+                    "ec2:DescribeSubnets",
+                    "ec2:DescribeSecurityGroups",
+                    "ec2:DescribeVpcEndpoints",
+                    "ec2:DescribeRouteTables",
+                    "ec2:DescribeVpcs",
+                    "ec2:CreateTags",
+                    "ec2:DeleteTags",
+                ],
+                resources=["*"],
+            )
+        )
+
+        # Glue connection access (needed by the job to read its own connection)
+        glue_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "glue:GetConnection",
                 ],
                 resources=["*"],
             )
@@ -715,12 +732,22 @@ class MwaaPrimaryStack(MwaaBaseStack):
                 actions=[
                     "glue:CreateJob",
                     "glue:GetJob",
+                    "glue:UpdateJob",
                     "glue:StartJobRun",
                     "glue:GetJobRun",
                     "glue:CreateConnection",
                     "glue:GetConnection",
+                    "glue:UpdateConnection",
                 ],
                 resources=["*"],
+            )
+        )
+
+        # Grant MWAA execution role permission to pass the Glue role
+        mwaa_role.add_to_principal_policy(
+            iam.PolicyStatement(
+                actions=["iam:PassRole"],
+                resources=[glue_role.role_arn],
             )
         )
 

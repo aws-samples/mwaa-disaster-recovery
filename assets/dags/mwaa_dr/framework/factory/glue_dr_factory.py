@@ -37,7 +37,30 @@ logger = logging.getLogger(__name__)
 
 
 def _get_vpc_requirements(env_name, region):
-    """Get VPC networking requirements for a Glue connection from the MWAA environment."""
+    """Get VPC networking requirements for a Glue connection.
+
+    Uses DR_SUBNET_ID and DR_SECURITY_GROUP_IDS Airflow variables if set (avoids
+    mwaa:GetEnvironment which is restricted in AF 3.2.1+). Falls back to the
+    MWAA API for environments that allow it.
+    """
+    from airflow.models import Variable
+
+    subnet_id = Variable.get("DR_SUBNET_ID", default_var="")
+    security_groups = Variable.get("DR_SECURITY_GROUP_IDS", default_var="")
+
+    if subnet_id and security_groups:
+        # Use pre-configured variables (set by CDK)
+        sg_list = [sg.strip() for sg in security_groups.split(",")]
+        ec2_client = boto3.client("ec2", region_name=region)
+        subnet_response = ec2_client.describe_subnets(SubnetIds=[subnet_id])
+        availability_zone = subnet_response["Subnets"][0]["AvailabilityZone"]
+        return {
+            "SubnetId": subnet_id,
+            "SecurityGroupIdList": sg_list,
+            "AvailabilityZone": availability_zone,
+        }
+
+    # Fallback: get from MWAA environment (requires mwaa:GetEnvironment)
     mwaa_client = boto3.client("mwaa", region_name=region)
     env_response = mwaa_client.get_environment(Name=env_name)
     network_config = env_response["Environment"]["NetworkConfiguration"]
