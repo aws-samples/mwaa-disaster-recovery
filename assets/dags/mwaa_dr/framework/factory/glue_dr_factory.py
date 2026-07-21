@@ -31,7 +31,10 @@ from mwaa_dr.framework.factory.base_dr_factory import BaseDRFactory
 from mwaa_dr.framework.model.base_table import BaseTable
 from mwaa_dr.framework.mwaa_rest_api_client import MwaaRestApiClient
 
-from airflow.providers.amazon.aws.operators.glue import GlueJobOperator
+try:
+    from airflow.providers.amazon.aws.operators.glue import GlueJobOperator
+except ImportError:
+    GlueJobOperator = None  # Not available in test/CI environments
 
 logger = logging.getLogger(__name__)
 
