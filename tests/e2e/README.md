@@ -15,8 +15,15 @@ cd tests/e2e
 ./run_e2e.py --versions 2.11.0    # test a single version
 ./run_e2e.py --sequential         # force sequential even if config says parallel
 ./run_e2e.py --skip-cleanup       # keep resources after tests (debugging)
+./run_e2e.py --provision-infrastructure  # force re-provisioning of all infra
 ./run_e2e.py --cleanup-only       # delete ALL framework resources and exit
 ```
+
+Rerun behavior: if the MWAA environments for a version already exist and are
+AVAILABLE (e.g. after a `--skip-cleanup` run or an interrupted run), the
+framework reuses them automatically — it only redeploys the DR solution and
+reruns the test checks, and keeps the infrastructure afterwards. Pass
+`--provision-infrastructure` to force the full provisioning path instead.
 
 Ctrl+C terminates all child processes (CDK subprocesses included) — no
 zombies. Resources already created stay; remove them with `--cleanup-only`.
@@ -41,8 +48,10 @@ The AWS account is always auto-detected from active credentials
 
 1. Shared infra (once per run): 1 VPC per region (IGW, NAT, 2 private subnets,
    self-referencing SG) — shared by all versions to stay within EC2 limits.
-2. Per version: DAGs buckets (versioned) + MWAA execution roles (idempotent —
-   reused if they exist).
+2. Per version: DAGs buckets (versioned, seeded with `requirements.txt` and
+   an example workload DAG under `dags/`) + MWAA execution roles (idempotent —
+   reused if they exist). The DR framework DAGs (`backup_metadata` etc.) are
+   deployed into the bucket later, by the CDK primary stack (step 4).
 3. Create primary + secondary MWAA environments, wait for AVAILABLE (~30 min).
 4. `cdk deploy --all` of the DR solution with a per-version stack prefix and
    isolated `cdk.out.e2e-<version>` output dir.

@@ -44,6 +44,12 @@ except ImportError as e:
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent.parent
+
+# cdk.json says `python3 app.py`, but npx prepends the Node bin dir to PATH,
+# which can resolve `python3` to a different interpreter (e.g. Homebrew's)
+# that lacks aws_cdk. Pin the app command to the interpreter running this
+# script — the same one the preflight check validates.
+CDK_APP = f"{sys.executable} app.py"
 TAG_KEY = "e2e-framework"
 
 # Track child processes so Ctrl+C can terminate them (no zombies).
@@ -117,7 +123,15 @@ def slug(version: str) -> str:
 # ============================================================================
 
 class StatusBoard:
-    """Thread-safe status tracking with a background printer."""
+    """Thread-safe status tracking with a background printer.
+
+    Repeated identical status updates (poll loops waiting for a state
+    change) are silent: they refresh the timestamp but don't print.
+    The background printer only prints when something changed, plus a
+    low-frequency heartbeat so long waits still show signs of life.
+    """
+
+    HEARTBEAT_SECS = 300  # idle heartbeat while nothing changes
 
     def __init__(self, log_dir: Path, interval: int = 20):
         self.log_dir = log_dir
@@ -125,6 +139,7 @@ class StatusBoard:
         self._lock = threading.Lock()
         self._status: dict = {}       # key -> (status_text, updated_at)
         self._done: dict = {}         # key -> final result str
+        self._dirty = False           # something changed since last board print
         self._stop = threading.Event()
         self._start_ts = time.time()
         self.logfile = open(log_dir / "e2e.log", "a")
@@ -141,13 +156,19 @@ class StatusBoard:
 
     def update(self, key: str, status: str):
         with self._lock:
+            prev = self._status.get(key)
+            unchanged = prev is not None and prev[0] == status
             self._status[key] = (status, time.time())
+            if unchanged:
+                return  # silent poll — same state as before
+            self._dirty = True
         self.log(status, key=key)
 
     def finish(self, key: str, result: str):
         with self._lock:
             self._done[key] = result
             self._status.pop(key, None)
+            self._dirty = True
 
     def start_printer(self):
         self._printer.start()
@@ -155,16 +176,26 @@ class StatusBoard:
     def stop_printer(self):
         self._stop.set()
 
+    @staticmethod
+    def _fmt_age(secs: int) -> str:
+        return f"{secs // 60}m{secs % 60:02d}s" if secs >= 120 else f"{secs}s"
+
     def _print_loop(self):
+        last_print = time.time()
         while not self._stop.wait(self.interval):
             with self._lock:
                 if not self._status:
                     continue
+                idle = time.time() - last_print
+                if not self._dirty and idle < self.HEARTBEAT_SECS:
+                    continue  # nothing new — stay quiet
+                self._dirty = False
+                last_print = time.time()
                 elapsed = int(time.time() - self._start_ts)
                 lines = [f"――― progress @ {elapsed // 60}m{elapsed % 60:02d}s ―――"]
                 for key, (status, upd) in sorted(self._status.items()):
                     age = int(time.time() - upd)
-                    lines.append(f"  ⏳ {key}: {status} ({age}s ago)")
+                    lines.append(f"  ⏳ {key}: {status} ({self._fmt_age(age)} ago)")
                 for key, result in sorted(self._done.items()):
                     lines.append(f"  {'✅' if result == 'PASS' else '❌'} {key}: {result}")
                 print("\n".join(lines), flush=True)
@@ -429,6 +460,13 @@ class Infra:
         req = REPO_ROOT / "assets" / "requirements.txt"
         if req.exists():
             s3.upload_file(str(req), name, "requirements.txt")
+        # Seed the dags/ prefix with an example workload DAG. The DR
+        # framework DAGs (backup_metadata etc.) are deployed later by the
+        # CDK primary stack's BucketDeployment (prune=False, so this file
+        # survives).
+        example_dag = SCRIPT_DIR / "assets" / "e2e_example_dag.py"
+        if example_dag.exists():
+            s3.upload_file(str(example_dag), name, "dags/e2e_example_dag.py")
 
     def ensure_mwaa_role(self, role_name: str, region: str, bucket: str,
                          env_name: str) -> str:
@@ -545,23 +583,72 @@ def create_mwaa_env(ctx: Ctx, env_name: str, region: str, bucket: str,
     )
 
 
-def wait_mwaa_available(ctx: Ctx, env_name: str, region: str) -> bool:
-    mwaa = boto3.client("mwaa", region_name=region)
+def wait_mwaa_available(ctx: Ctx, targets: list) -> bool:
+    """Wait for MWAA environments to become AVAILABLE.
+
+    targets: list of (env_name, region). Both environments are created
+    up-front (CreateEnvironment is async), so this polls all of them in a
+    single loop and reports a combined status.
+    """
+    clients: dict = {}
+    pending = dict(targets)  # env_name -> region
     deadline = time.time() + ctx.cfg.mwaa_creation_mins * 60
-    while time.time() < deadline:
-        try:
-            status = mwaa.get_environment(Name=env_name)["Environment"]["Status"]
-        except ClientError:
-            status = "UNKNOWN"
-        if status == "AVAILABLE":
-            return True
-        if status in ("CREATE_FAILED", "UNAVAILABLE"):
-            ctx.errors.append(f"{env_name} reached status {status}")
-            return False
-        ctx.status(f"MWAA {env_name}: {status}")
-        time.sleep(60)
-    ctx.errors.append(f"{env_name} did not become AVAILABLE in time")
-    return False
+    ok = True
+    while pending and time.time() < deadline:
+        parts = []
+        for env_name, region in list(pending.items()):
+            mwaa = clients.setdefault(
+                region, boto3.client("mwaa", region_name=region))
+            try:
+                status = mwaa.get_environment(
+                    Name=env_name)["Environment"]["Status"]
+            except ClientError:
+                status = "UNKNOWN"
+            if status == "AVAILABLE":
+                pending.pop(env_name)
+                ctx.board.log(f"MWAA {env_name} AVAILABLE", key=ctx.key)
+                continue
+            if status in ("CREATE_FAILED", "UNAVAILABLE"):
+                ctx.errors.append(f"{env_name} reached status {status}")
+                pending.pop(env_name)
+                ok = False
+                continue
+            parts.append(f"{env_name}: {status}")
+        if parts:
+            ctx.status("MWAA " + " | ".join(sorted(parts)))
+            time.sleep(60)
+    for env_name in pending:
+        ctx.errors.append(f"{env_name} did not become AVAILABLE in time")
+    return ok and not pending
+
+
+def mwaa_env_status(env_name: str, region: str) -> str:
+    """Return the MWAA environment status, or 'ABSENT' if it doesn't exist."""
+    try:
+        mwaa = boto3.client("mwaa", region_name=region)
+        return mwaa.get_environment(Name=env_name)["Environment"]["Status"]
+    except ClientError:
+        return "ABSENT"
+
+
+def infra_ready(ctx: Ctx) -> bool:
+    """True if both MWAA environments for this version exist and are AVAILABLE."""
+    return (mwaa_env_status(ctx.primary_env, ctx.cfg.primary_region) == "AVAILABLE"
+            and mwaa_env_status(ctx.secondary_env, ctx.cfg.secondary_region) == "AVAILABLE")
+
+
+def adopt_existing_infra(ctx: Ctx):
+    """Populate ctx with details of already-provisioned infra (reuse mode)."""
+    iam = boto3.client("iam")
+    ctx.pri_role_arn = iam.get_role(RoleName=ctx.primary_role)["Role"]["Arn"]
+    ctx.sec_role_arn = iam.get_role(RoleName=ctx.secondary_role)["Role"]["Arn"]
+    # Make sure the example DAG is present (buckets aren't re-provisioned)
+    example_dag = SCRIPT_DIR / "assets" / "e2e_example_dag.py"
+    if example_dag.exists():
+        for bucket, region in ((ctx.primary_bucket, ctx.cfg.primary_region),
+                               (ctx.secondary_bucket, ctx.cfg.secondary_region)):
+            boto3.client("s3", region_name=region).upload_file(
+                str(example_dag), bucket, "dags/e2e_example_dag.py")
 
 
 def deploy_mwaa(ctx: Ctx, infra: Infra):
@@ -574,10 +661,12 @@ def deploy_mwaa(ctx: Ctx, infra: Infra):
                     ctx.secondary_bucket, ctx.sec_role_arn,
                     infra.vpc_info[cfg.secondary_region])
     ctx.status("waiting for MWAA envs (20-40 min)...")
-    ok1 = wait_mwaa_available(ctx, ctx.primary_env, cfg.primary_region)
-    ok2 = wait_mwaa_available(ctx, ctx.secondary_env, cfg.secondary_region)
+    ok = wait_mwaa_available(ctx, [
+        (ctx.primary_env, cfg.primary_region),
+        (ctx.secondary_env, cfg.secondary_region),
+    ])
     ctx.timed("mwaa_create", t0)
-    if not (ok1 and ok2):
+    if not ok:
         raise RuntimeError(f"MWAA creation failed: {ctx.errors}")
 
 
@@ -624,6 +713,7 @@ def cdk_deploy(ctx: Ctx, infra: Infra, simulate: bool = False):
     # Each version needs its own cdk.out to avoid clashes in parallel runs
     rc = run_cmd(
         ["npx", "cdk", "deploy", "--all", "--require-approval", "never",
+         "--app", CDK_APP,
          "--output", f"cdk.out.e2e-{ctx.slug}"],
         env=env, cwd=REPO_ROOT, log_path=log,
         timeout_secs=ctx.cfg.cdk_deploy_mins * 60)
@@ -637,6 +727,7 @@ def cdk_destroy(ctx: Ctx, infra: Infra):
     env = build_env_vars(ctx, infra, simulate=False)
     log = ctx.log_dir / f"cdk_destroy_{ctx.slug}.log"
     run_cmd(["npx", "cdk", "destroy", "--all", "--force",
+             "--app", CDK_APP,
              "--output", f"cdk.out.e2e-{ctx.slug}"],
             env=env, cwd=REPO_ROOT, log_path=log,
             timeout_secs=ctx.cfg.cdk_deploy_mins * 60)
@@ -1145,12 +1236,23 @@ def bedrock_summary(cfg: Config, results: list, board: StatusBoard):
 # Per-version test pipeline
 # ============================================================================
 
-def run_version(ctx: Ctx, infra: Infra, skip_cleanup: bool) -> dict:
+def run_version(ctx: Ctx, infra: Infra, skip_cleanup: bool,
+                provision: bool = True) -> dict:
     t0 = time.time()
     result = "PASS"
+    reused = False
     try:
-        infra.provision_for_version(ctx)
-        deploy_mwaa(ctx, infra)
+        if not provision and infra_ready(ctx):
+            ctx.board.log("Existing MWAA envs AVAILABLE — reusing infrastructure "
+                          "(redeploying DR solution only)", key=ctx.key)
+            adopt_existing_infra(ctx)
+            reused = True
+        else:
+            if not provision:
+                ctx.board.log("No reusable MWAA envs found — provisioning",
+                              key=ctx.key)
+            infra.provision_for_version(ctx)
+            deploy_mwaa(ctx, infra)
         cdk_deploy(ctx, infra)
         seed_test_data(ctx)
         trigger_and_wait_backup(ctx)
@@ -1164,7 +1266,10 @@ def run_version(ctx: Ctx, infra: Infra, skip_cleanup: bool) -> dict:
         ctx.errors.append(str(e))
         ctx.board.log(f"FAILED: {e}", key=ctx.key)
     finally:
-        if not skip_cleanup:
+        if reused:
+            ctx.board.log("Reused infrastructure kept (use --cleanup-only to "
+                          "remove everything)", key=ctx.key)
+        elif not skip_cleanup:
             try:
                 cleanup_version(ctx, infra)
             except Exception as e:
@@ -1174,6 +1279,7 @@ def run_version(ctx: Ctx, infra: Infra, skip_cleanup: bool) -> dict:
         "version": ctx.version,
         "strategy": ctx.strategy,
         "result": result,
+        "infra_reused": reused,
         "duration_secs": round(time.time() - t0, 1),
         "checks": ctx.checks,
         "errors": ctx.errors,
@@ -1216,6 +1322,12 @@ def main():
                     help="Delete all e2e resources and exit")
     ap.add_argument("--skip-cleanup", action="store_true",
                     help="Keep resources after tests (debugging)")
+    ap.add_argument("--provision-infrastructure", action="store_true",
+                    help="Force full infra provisioning (VPCs, buckets, roles, "
+                         "MWAA envs) even if they already exist. Without this "
+                         "flag, existing AVAILABLE MWAA envs are reused: only "
+                         "the DR solution is redeployed and retested, and the "
+                         "infra is kept afterwards.")
     ap.add_argument("--versions", nargs="+", help="Override versions to test")
     ap.add_argument("--sequential", action="store_true", help="Force sequential mode")
     ap.add_argument("--config", default=str(SCRIPT_DIR / "e2e_config.yaml"))
@@ -1242,9 +1354,24 @@ def main():
         return 0
 
     try:
+        # Preflight: the CDK app needs aws_cdk importable by the interpreter
+        # we pin via --app (this script's interpreter)
+        rc = subprocess.run([sys.executable, "-c", "import aws_cdk"],
+                            capture_output=True).returncode
+        if rc != 0:
+            board.log(f"ERROR: `{sys.executable}` cannot import aws_cdk — "
+                      "the CDK app (app.py) will fail to synth.")
+            board.log(f"Fix: {sys.executable} -m pip install -r requirements.txt   (from repo root)")
+            return 1
+        if subprocess.run(["npx", "cdk", "--version"],
+                          capture_output=True).returncode != 0:
+            board.log("ERROR: `npx cdk` not available. Install Node.js + CDK.")
+            return 1
+
         # CDK bootstrap
         board.log("CDK bootstrap...")
         rc = run_cmd(["npx", "cdk", "bootstrap",
+                      "--app", CDK_APP,
                       f"aws://{cfg.account_id}/{cfg.primary_region}",
                       f"aws://{cfg.account_id}/{cfg.secondary_region}"],
                      cwd=REPO_ROOT, log_path=log_dir / "bootstrap.log",
@@ -1270,19 +1397,22 @@ def main():
         if cfg.parallel and len(ctxs) > 1:
             board.log(f"Running {len(ctxs)} tests in PARALLEL")
             with concurrent.futures.ThreadPoolExecutor(max_workers=len(ctxs)) as ex:
-                futures = {ex.submit(run_version, c, infra, args.skip_cleanup): c
+                futures = {ex.submit(run_version, c, infra, args.skip_cleanup,
+                                     args.provision_infrastructure): c
                            for c in ctxs}
                 for fut in concurrent.futures.as_completed(futures):
                     results.append(fut.result())
         else:
             board.log(f"Running {len(ctxs)} tests SEQUENTIALLY")
             for c in ctxs:
-                results.append(run_version(c, infra, args.skip_cleanup))
+                results.append(run_version(c, infra, args.skip_cleanup,
+                                           args.provision_infrastructure))
 
         board.stop_printer()
 
         # Shared VPC cleanup (only when nothing was kept)
-        if not args.skip_cleanup:
+        any_reused = any(r.get("infra_reused") for r in results)
+        if not args.skip_cleanup and not any_reused:
             board.log("Deleting shared VPCs...")
             for region in (cfg.primary_region, cfg.secondary_region):
                 try:
@@ -1290,7 +1420,8 @@ def main():
                 except Exception as e:
                     board.log(f"WARN: shared VPC cleanup ({region}): {e}")
         else:
-            board.log(f"--skip-cleanup: resources kept. "
+            reason = "--skip-cleanup" if args.skip_cleanup else "infra reused"
+            board.log(f"{reason}: resources kept. "
                       f"Run './run_e2e.py --cleanup-only' later.")
 
         # Reporting
