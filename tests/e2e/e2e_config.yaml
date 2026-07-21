@@ -8,14 +8,14 @@ test_run:
   parallel: true
 
 aws:
-  primary_region: us-east-1
-  secondary_region: us-west-2
+  primary_region: eu-west-1
+  secondary_region: eu-west-2
 
 # MWAA versions to test (must be in config.py SUPPORTED_MWAA_VERSIONS)
 versions:
   - "2.10.3"
   - "2.11.0"
-  - "3.0.2"
+  - "3.0.6"
   - "3.2.1"
 
 # DR strategies to test per version: WARM_STANDBY, BACKUP_RESTORE
