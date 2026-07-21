@@ -20,7 +20,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import json
 import os
-import sys
 import types
 from unittest.mock import MagicMock, patch
 
@@ -131,23 +130,26 @@ class TestGlueDRFactory:
         result = factory.get_glue_role_name()
 
         expect(result).to.equal("arn:aws:iam::123456789:role/glue-role")
-        mock_variable.get.assert_called_once_with("GLUE_ROLE_ARN")
+        mock_variable.get.assert_called_once_with("GLUE_ROLE_ARN", default_var="")
 
     def test_get_script_location_with_s3_path(self):
         factory = ConcreteGlueDRFactory("test_dag")
-        with patch.dict(os.environ, {"DAGS_S3_PATH": "s3://my-bucket/dags"}):
+        with patch("mwaa_dr.framework.factory.glue_dr_factory.Variable") as mock_var:
+            mock_var.get.return_value = "my-bucket"
             result = factory.get_script_location("mwaa_metadb_export")
         expect(result).to.equal("s3://my-bucket/scripts/mwaa_metadb_export.py")
 
     def test_get_script_location_with_bucket_name_only(self):
         factory = ConcreteGlueDRFactory("test_dag")
-        with patch.dict(os.environ, {"DAGS_S3_PATH": "my-bucket"}):
+        with patch("mwaa_dr.framework.factory.glue_dr_factory.Variable") as mock_var:
+            mock_var.get.return_value = "my-bucket"
             result = factory.get_script_location("mwaa_metadb_import")
         expect(result).to.equal("s3://my-bucket/scripts/mwaa_metadb_import.py")
 
     def test_get_script_location_with_s3_path_no_prefix(self):
         factory = ConcreteGlueDRFactory("test_dag")
-        with patch.dict(os.environ, {"DAGS_S3_PATH": "s3://my-bucket"}):
+        with patch("mwaa_dr.framework.factory.glue_dr_factory.Variable") as mock_var:
+            mock_var.get.return_value = "my-bucket"
             result = factory.get_script_location("mwaa_metadb_cleanup")
         expect(result).to.equal("s3://my-bucket/scripts/mwaa_metadb_cleanup.py")
 
@@ -345,11 +347,11 @@ class TestGlueDRFactory:
         result = GlueDRFactory._detect_date_field(table)
         expect(result).to.be.none
 
-    # --- Tests for create_glue_connection (Req 2.1, 2.2, 2.3, 2.4) ---
+    # --- Tests for setup_glue_connection (Req 2.1, 2.2, 2.3, 2.4) ---
 
     @patch("mwaa_dr.framework.factory.glue_dr_factory.boto3")
-    def test_create_glue_connection_creates_with_correct_vpc_config(self, mock_boto3):
-        """Test that create_glue_connection creates a connection with correct VPC config.
+    def test_setup_glue_connection_creates_with_correct_vpc_config(self, mock_boto3):
+        """Test that setup_glue_connection creates a connection with correct VPC config.
         Validates: Requirements 2.1, 2.3, 2.4
         """
         # Set up mock clients
@@ -477,8 +479,8 @@ class TestGlueDRFactory:
         )
 
     @patch("mwaa_dr.framework.factory.glue_dr_factory.boto3")
-    def test_create_glue_connection_reuses_existing(self, mock_boto3):
-        """Test that create_glue_connection reuses an existing connection.
+    def test_setup_glue_connection_reuses_existing(self, mock_boto3):
+        """Test that setup_glue_connection reuses an existing connection.
         Validates: Requirements 2.2
         """
         mock_glue = MagicMock()
@@ -546,6 +548,7 @@ class TestGlueDRFactory:
             "DR_BACKUP_SCHEDULE": None,
             "DR_BACKUP_BUCKET": "backup-bucket",
             "DR_MAX_AGE_IN_DAYS": "30",
+            "DR_DAGS_BUCKET": "dags-bucket",
         }.get(key, kwargs.get("default_var", ""))
 
         env_vars = {
@@ -556,9 +559,9 @@ class TestGlueDRFactory:
 
         with (
             patch.dict(os.environ, env_vars),
-            patch.dict(
-                sys.modules,
-                {"airflow.providers.amazon.aws.operators.glue": mock_providers_module},
+            patch(
+                "mwaa_dr.framework.factory.glue_dr_factory.GlueJobOperator",
+                mock_glue_operator_class,
             ),
         ):
             factory = ConcreteGlueDRFactory("backup_dag")
@@ -569,8 +572,8 @@ class TestGlueDRFactory:
 
         # Verify key tasks exist
         task_ids = [t.task_id for t in dag.tasks]
-        expect(task_ids).to.contain("extract_credentials")
-        expect(task_ids).to.contain("create_glue_connection")
+        expect(task_ids).to.contain("setup_glue_connection")
+        expect(task_ids).to.contain("setup_glue_connection")
         expect(task_ids).to.contain("backup_variables_via_api")
         expect(task_ids).to.contain("backup_connections_via_api")
 
@@ -604,6 +607,7 @@ class TestGlueDRFactory:
             "DR_BACKUP_SCHEDULE": None,
             "DR_BACKUP_BUCKET": "backup-bucket",
             "DR_MAX_AGE_IN_DAYS": "30",
+            "DR_DAGS_BUCKET": "dags-bucket",
         }.get(key, kwargs.get("default_var", ""))
 
         env_vars = {
@@ -614,9 +618,9 @@ class TestGlueDRFactory:
 
         with (
             patch.dict(os.environ, env_vars),
-            patch.dict(
-                sys.modules,
-                {"airflow.providers.amazon.aws.operators.glue": mock_providers_module},
+            patch(
+                "mwaa_dr.framework.factory.glue_dr_factory.GlueJobOperator",
+                mock_glue_operator_class,
             ),
             patch("airflow.models.Variable.get", mock_variable.get),
         ):
@@ -684,9 +688,9 @@ class TestGlueDRFactory:
 
         with (
             patch.dict(os.environ, env_vars),
-            patch.dict(
-                sys.modules,
-                {"airflow.providers.amazon.aws.operators.glue": mock_providers_module},
+            patch(
+                "mwaa_dr.framework.factory.glue_dr_factory.GlueJobOperator",
+                mock_glue_operator_class,
             ),
         ):
             factory = ConcreteGlueDRFactory("restore_dag")
@@ -699,8 +703,8 @@ class TestGlueDRFactory:
 
         # Verify key tasks exist
         task_ids = [t.task_id for t in dag.tasks]
-        expect(task_ids).to.contain("extract_credentials")
-        expect(task_ids).to.contain("create_glue_connection")
+        expect(task_ids).to.contain("setup_glue_connection")
+        expect(task_ids).to.contain("setup_glue_connection")
         expect(task_ids).to.contain("restore_variables_via_api_task")
         expect(task_ids).to.contain("restore_connections_via_api_task")
         expect(task_ids).to.contain("notify_success_to_sfn")
@@ -742,9 +746,9 @@ class TestGlueDRFactory:
 
         with (
             patch.dict(os.environ, env_vars),
-            patch.dict(
-                sys.modules,
-                {"airflow.providers.amazon.aws.operators.glue": mock_providers_module},
+            patch(
+                "mwaa_dr.framework.factory.glue_dr_factory.GlueJobOperator",
+                mock_glue_operator_class,
             ),
             patch("airflow.models.Variable.get", mock_variable.get),
         ):
@@ -801,9 +805,9 @@ class TestGlueDRFactory:
 
         with (
             patch.dict(os.environ, env_vars),
-            patch.dict(
-                sys.modules,
-                {"airflow.providers.amazon.aws.operators.glue": mock_providers_module},
+            patch(
+                "mwaa_dr.framework.factory.glue_dr_factory.GlueJobOperator",
+                mock_glue_operator_class,
             ),
         ):
             factory = ConcreteGlueDRFactory("cleanup_dag")
@@ -816,8 +820,8 @@ class TestGlueDRFactory:
 
         # Verify key tasks exist
         task_ids = [t.task_id for t in dag.tasks]
-        expect(task_ids).to.contain("extract_credentials")
-        expect(task_ids).to.contain("create_glue_connection")
+        expect(task_ids).to.contain("setup_glue_connection")
+        expect(task_ids).to.contain("setup_glue_connection")
         expect(task_ids).to.contain("notify_success_to_sfn")
         expect(task_ids).to.contain("notify_failure_to_sfn")
 
@@ -857,9 +861,9 @@ class TestGlueDRFactory:
 
         with (
             patch.dict(os.environ, env_vars),
-            patch.dict(
-                sys.modules,
-                {"airflow.providers.amazon.aws.operators.glue": mock_providers_module},
+            patch(
+                "mwaa_dr.framework.factory.glue_dr_factory.GlueJobOperator",
+                mock_glue_operator_class,
             ),
         ):
             factory = ConcreteGlueDRFactory("cleanup_dag")

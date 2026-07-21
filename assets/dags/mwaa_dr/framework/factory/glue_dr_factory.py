@@ -31,7 +31,28 @@ from mwaa_dr.framework.factory.base_dr_factory import BaseDRFactory
 from mwaa_dr.framework.model.base_table import BaseTable
 from mwaa_dr.framework.mwaa_rest_api_client import MwaaRestApiClient
 
+from airflow.providers.amazon.aws.operators.glue import GlueJobOperator
+
 logger = logging.getLogger(__name__)
+
+
+def _get_vpc_requirements(env_name, region):
+    """Get VPC networking requirements for a Glue connection from the MWAA environment."""
+    mwaa_client = boto3.client("mwaa", region_name=region)
+    env_response = mwaa_client.get_environment(Name=env_name)
+    network_config = env_response["Environment"]["NetworkConfiguration"]
+    subnet_ids = network_config["SubnetIds"]
+    security_group_ids = network_config["SecurityGroupIds"]
+
+    ec2_client = boto3.client("ec2", region_name=region)
+    subnet_response = ec2_client.describe_subnets(SubnetIds=[subnet_ids[0]])
+    availability_zone = subnet_response["Subnets"][0]["AvailabilityZone"]
+
+    return {
+        "SubnetId": subnet_ids[0],
+        "SecurityGroupIdList": security_group_ids,
+        "AvailabilityZone": availability_zone,
+    }
 
 
 class GlueDRFactory(BaseDRFactory):
@@ -59,29 +80,22 @@ class GlueDRFactory(BaseDRFactory):
         Returns:
             str: The ARN of the IAM role for Glue jobs.
         """
-        return Variable.get("GLUE_ROLE_ARN")
+        return Variable.get("GLUE_ROLE_ARN", default_var="")
+
+    def get_glue_connection_name(self) -> str:
+        """Get the Glue JDBC connection name (deterministic: {env_name}_conn)."""
+        env_name = os.environ.get("MWAA_ENV_NAME", "") or Variable.get(
+            "DR_MWAA_ENV_NAME", default_var=""
+        )
+        return f"{env_name}_conn"
 
     def get_script_location(self, script_name: str) -> str:
         """Construct the S3 location for a Glue script.
 
-        The script is expected to be deployed at
-        ``s3://{dags_bucket}/scripts/{script_name}.py`` by the CDK stack.
-
-        Args:
-            script_name: The base name of the Glue script (without extension).
-
-        Returns:
-            str: The full S3 URI for the Glue script.
+        Uses the DR_DAGS_BUCKET Airflow variable (set by CDK).
+        No API calls at parse time to avoid silent failures.
         """
-        dags_s3_path = os.environ.get("DAGS_S3_PATH", "")
-        if dags_s3_path.startswith("s3://"):
-            # DAGS_S3_PATH is like "s3://bucket-name/dags" — extract bucket
-            parts = dags_s3_path.replace("s3://", "").split("/", 1)
-            bucket = parts[0]
-        else:
-            # Fall back: bucket name is the DAGS_S3_PATH itself or empty
-            bucket = dags_s3_path
-
+        bucket = Variable.get("DR_DAGS_BUCKET", default_var="")
         return f"s3://{bucket}/scripts/{script_name}.py"
 
     def get_table_definitions(self) -> list:
@@ -182,13 +196,15 @@ class GlueDRFactory(BaseDRFactory):
         """Create and return a configured MwaaRestApiClient.
 
         Reads the MWAA environment name from the ``MWAA_ENV_NAME`` environment
-        variable and the AWS region from ``AWS_REGION`` (falling back to
-        ``AWS_DEFAULT_REGION``).
+        variable (or ``DR_MWAA_ENV_NAME`` Airflow variable as fallback) and the
+        AWS region from ``AWS_REGION`` (falling back to ``AWS_DEFAULT_REGION``).
 
         Returns:
             MwaaRestApiClient: A client configured for the current MWAA environment.
         """
-        env_name = os.environ.get("MWAA_ENV_NAME", "")
+        env_name = os.environ.get("MWAA_ENV_NAME", "") or Variable.get(
+            "DR_MWAA_ENV_NAME", default_var=""
+        )
         region = os.environ.get("AWS_REGION", os.environ.get("AWS_DEFAULT_REGION", ""))
         return MwaaRestApiClient(env_name, region)
 
@@ -557,74 +573,41 @@ class GlueDRFactory(BaseDRFactory):
         with dag:
 
             @task
-            def extract_credentials():
-                """Extract database credentials from MWAA worker environment."""
-                creds = CredentialExtractor.extract()
-                return {
-                    "jdbc_url": creds.jdbc_url,
-                    "username": creds.username,
-                    "password": creds.password,
-                    "host": creds.host,
-                    "port": creds.port,
-                    "database": creds.database,
-                }
+            def setup_glue_connection():
+                """Extract credentials and create/reuse a Glue JDBC connection.
 
-            @task
-            def create_glue_connection(credentials):
-                """Create or reuse a Glue JDBC connection using MWAA VPC networking."""
-                env_name = os.environ.get("MWAA_ENV_NAME", "")
+                Credentials stay within this task — never exposed via XCom.
+                """
+                creds = CredentialExtractor.extract()
+                env_name = os.environ.get("MWAA_ENV_NAME", "") or Variable.get(
+                    "DR_MWAA_ENV_NAME", default_var=""
+                )
                 region = os.environ.get(
                     "AWS_REGION", os.environ.get("AWS_DEFAULT_REGION", "")
                 )
                 connection_name = f"{env_name}_conn"
-
                 glue_client = boto3.client("glue", region_name=region)
 
-                # Check if connection already exists
+                conn_input = {
+                    "Name": connection_name,
+                    "ConnectionType": "JDBC",
+                    "ConnectionProperties": {
+                        "JDBC_CONNECTION_URL": creds.jdbc_url,
+                        "USERNAME": creds.username,
+                        "PASSWORD": creds.password,
+                    },
+                    "PhysicalConnectionRequirements": _get_vpc_requirements(
+                        env_name, region
+                    ),
+                }
                 try:
                     glue_client.get_connection(Name=connection_name)
-                    logger.info(
-                        "Glue connection '%s' already exists, reusing.",
-                        connection_name,
+                    glue_client.update_connection(
+                        Name=connection_name, ConnectionInput=conn_input
                     )
-                    return connection_name
                 except glue_client.exceptions.EntityNotFoundException:
-                    logger.info(
-                        "Glue connection '%s' not found, creating new connection.",
-                        connection_name,
-                    )
-
-                # Get MWAA VPC config
-                mwaa_client = boto3.client("mwaa", region_name=region)
-                env_response = mwaa_client.get_environment(Name=env_name)
-                network_config = env_response["Environment"]["NetworkConfiguration"]
-                subnet_ids = network_config["SubnetIds"]
-                security_group_ids = network_config["SecurityGroupIds"]
-
-                # Get availability zone for the first subnet
-                ec2_client = boto3.client("ec2", region_name=region)
-                subnet_response = ec2_client.describe_subnets(SubnetIds=[subnet_ids[0]])
-                availability_zone = subnet_response["Subnets"][0]["AvailabilityZone"]
-
-                # Create the Glue connection
-                glue_client.create_connection(
-                    ConnectionInput={
-                        "Name": connection_name,
-                        "ConnectionType": "JDBC",
-                        "ConnectionProperties": {
-                            "JDBC_CONNECTION_URL": credentials["jdbc_url"],
-                            "USERNAME": credentials["username"],
-                            "PASSWORD": credentials["password"],
-                        },
-                        "PhysicalConnectionRequirements": {
-                            "SubnetId": subnet_ids[0],
-                            "SecurityGroupIdList": security_group_ids,
-                            "AvailabilityZone": availability_zone,
-                        },
-                    }
-                )
-                logger.info("Created Glue connection '%s'.", connection_name)
-                return connection_name
+                    glue_client.create_connection(ConnectionInput=conn_input)
+                logger.info("Glue connection '%s' ready.", connection_name)
 
             @task
             def backup_variables_via_api():
@@ -637,8 +620,7 @@ class GlueDRFactory(BaseDRFactory):
                 factory.backup_connections_via_api()
 
             # Build the DAG structure
-            creds = extract_credentials()
-            conn_name = create_glue_connection(creds)
+            setup_task = setup_glue_connection()
 
             # Filter out variable and connection from table definitions
             table_defs = [
@@ -651,17 +633,26 @@ class GlueDRFactory(BaseDRFactory):
             backup_bucket = factory.bucket()
             max_age = Variable.get("DR_MAX_AGE_IN_DAYS", default_var="0")
 
-            from airflow.providers.amazon.aws.operators.glue import GlueJobOperator
-
             export_job = GlueJobOperator(
                 task_id="glue_export",
                 job_name=f"{factory.dag_id}_export",
                 script_location=factory.get_script_location("mwaa_metadb_export"),
                 iam_role_name=factory.get_glue_role_name(),
+                update_config=True,
+                replace_script_file=True,
+                deferrable=False,
+                create_job_kwargs={
+                    "GlueVersion": "4.0",
+                    "NumberOfWorkers": 2,
+                    "WorkerType": "G.1X",
+                    "Connections": {
+                        "Connections": [factory.get_glue_connection_name()]
+                    },
+                },
                 script_args={
                     "--S3_OUTPUT_PATH": f"s3://{backup_bucket}/{factory.path_prefix}",
                     "--EXPORT_TABLES": json.dumps(table_defs),
-                    "--GLUE_CONNECTION_NAME": conn_name,
+                    "--GLUE_CONNECTION_NAME": factory.get_glue_connection_name(),
                     "--MAX_AGE_IN_DAYS": str(max_age),
                     "--TABLE_DEPENDENCY_ORDER": json.dumps(dependency_order),
                 },
@@ -670,7 +661,7 @@ class GlueDRFactory(BaseDRFactory):
                 ),
             )
 
-            conn_name >> export_job
+            setup_task >> export_job
 
             # Variables and connections backup run in parallel with the Glue job
             backup_variables_via_api()
@@ -713,74 +704,41 @@ class GlueDRFactory(BaseDRFactory):
         with dag:
 
             @task
-            def extract_credentials():
-                """Extract database credentials from MWAA worker environment."""
-                creds = CredentialExtractor.extract()
-                return {
-                    "jdbc_url": creds.jdbc_url,
-                    "username": creds.username,
-                    "password": creds.password,
-                    "host": creds.host,
-                    "port": creds.port,
-                    "database": creds.database,
-                }
+            def setup_glue_connection():
+                """Extract credentials and create/reuse a Glue JDBC connection.
 
-            @task
-            def create_glue_connection(credentials):
-                """Create or reuse a Glue JDBC connection using MWAA VPC networking."""
-                env_name = os.environ.get("MWAA_ENV_NAME", "")
+                Credentials stay within this task — never exposed via XCom.
+                """
+                creds = CredentialExtractor.extract()
+                env_name = os.environ.get("MWAA_ENV_NAME", "") or Variable.get(
+                    "DR_MWAA_ENV_NAME", default_var=""
+                )
                 region = os.environ.get(
                     "AWS_REGION", os.environ.get("AWS_DEFAULT_REGION", "")
                 )
                 connection_name = f"{env_name}_conn"
-
                 glue_client = boto3.client("glue", region_name=region)
 
-                # Check if connection already exists
+                conn_input = {
+                    "Name": connection_name,
+                    "ConnectionType": "JDBC",
+                    "ConnectionProperties": {
+                        "JDBC_CONNECTION_URL": creds.jdbc_url,
+                        "USERNAME": creds.username,
+                        "PASSWORD": creds.password,
+                    },
+                    "PhysicalConnectionRequirements": _get_vpc_requirements(
+                        env_name, region
+                    ),
+                }
                 try:
                     glue_client.get_connection(Name=connection_name)
-                    logger.info(
-                        "Glue connection '%s' already exists, reusing.",
-                        connection_name,
+                    glue_client.update_connection(
+                        Name=connection_name, ConnectionInput=conn_input
                     )
-                    return connection_name
                 except glue_client.exceptions.EntityNotFoundException:
-                    logger.info(
-                        "Glue connection '%s' not found, creating new connection.",
-                        connection_name,
-                    )
-
-                # Get MWAA VPC config
-                mwaa_client = boto3.client("mwaa", region_name=region)
-                env_response = mwaa_client.get_environment(Name=env_name)
-                network_config = env_response["Environment"]["NetworkConfiguration"]
-                subnet_ids = network_config["SubnetIds"]
-                security_group_ids = network_config["SecurityGroupIds"]
-
-                # Get availability zone for the first subnet
-                ec2_client = boto3.client("ec2", region_name=region)
-                subnet_response = ec2_client.describe_subnets(SubnetIds=[subnet_ids[0]])
-                availability_zone = subnet_response["Subnets"][0]["AvailabilityZone"]
-
-                # Create the Glue connection
-                glue_client.create_connection(
-                    ConnectionInput={
-                        "Name": connection_name,
-                        "ConnectionType": "JDBC",
-                        "ConnectionProperties": {
-                            "JDBC_CONNECTION_URL": credentials["jdbc_url"],
-                            "USERNAME": credentials["username"],
-                            "PASSWORD": credentials["password"],
-                        },
-                        "PhysicalConnectionRequirements": {
-                            "SubnetId": subnet_ids[0],
-                            "SecurityGroupIdList": security_group_ids,
-                            "AvailabilityZone": availability_zone,
-                        },
-                    }
-                )
-                logger.info("Created Glue connection '%s'.", connection_name)
-                return connection_name
+                    glue_client.create_connection(ConnectionInput=conn_input)
+                logger.info("Glue connection '%s' ready.", connection_name)
 
             @task
             def restore_variables_via_api_task():
@@ -806,12 +764,9 @@ class GlueDRFactory(BaseDRFactory):
                     )
                     return
 
-                task_instances = dag_run.get_task_instances()
-                task_states = [f"{ti.task_id} => {ti.state}" for ti in task_instances]
                 result = {
                     "dag": dag_run.dag_id,
                     "dag_run": dag_run.run_id,
-                    "tasks": task_states,
                     "status": "Success",
                     "location": f"s3://{factory.bucket()}/{factory.path_prefix}",
                 }
@@ -834,12 +789,9 @@ class GlueDRFactory(BaseDRFactory):
                     )
                     return
 
-                task_instances = dag_run.get_task_instances()
-                task_states = [f"{ti.task_id} => {ti.state}" for ti in task_instances]
                 result = {
                     "dag": dag_run.dag_id,
                     "dag_run": dag_run.run_id,
-                    "tasks": task_states,
                     "status": "Fail",
                 }
 
@@ -852,8 +804,7 @@ class GlueDRFactory(BaseDRFactory):
                 logger.info("Sent task failure to StepFunctions.")
 
             # Build the DAG structure
-            creds = extract_credentials()
-            conn_name = create_glue_connection(creds)
+            setup_task = setup_glue_connection()
 
             # Filter out variable and connection from table definitions
             table_defs = [
@@ -865,17 +816,26 @@ class GlueDRFactory(BaseDRFactory):
 
             backup_bucket = factory.bucket()
 
-            from airflow.providers.amazon.aws.operators.glue import GlueJobOperator
-
             import_job = GlueJobOperator(
                 task_id="glue_import",
                 job_name=f"{factory.dag_id}_import",
                 script_location=factory.get_script_location("mwaa_metadb_import"),
                 iam_role_name=factory.get_glue_role_name(),
+                update_config=True,
+                replace_script_file=True,
+                deferrable=False,
+                create_job_kwargs={
+                    "GlueVersion": "4.0",
+                    "NumberOfWorkers": 2,
+                    "WorkerType": "G.1X",
+                    "Connections": {
+                        "Connections": [factory.get_glue_connection_name()]
+                    },
+                },
                 script_args={
                     "--S3_INPUT_PATH": f"s3://{backup_bucket}/{factory.path_prefix}",
                     "--IMPORT_TABLES": json.dumps(table_defs),
-                    "--GLUE_CONNECTION_NAME": conn_name,
+                    "--GLUE_CONNECTION_NAME": factory.get_glue_connection_name(),
                     "--TABLE_DEPENDENCY_ORDER": json.dumps(dependency_order),
                 },
                 region_name=os.environ.get(
@@ -883,7 +843,7 @@ class GlueDRFactory(BaseDRFactory):
                 ),
             )
 
-            conn_name >> import_job
+            setup_task >> import_job
 
             # Variables and connections restore run in parallel with the Glue job
             restore_vars = restore_variables_via_api_task()
@@ -932,74 +892,41 @@ class GlueDRFactory(BaseDRFactory):
         with dag:
 
             @task
-            def extract_credentials():
-                """Extract database credentials from MWAA worker environment."""
-                creds = CredentialExtractor.extract()
-                return {
-                    "jdbc_url": creds.jdbc_url,
-                    "username": creds.username,
-                    "password": creds.password,
-                    "host": creds.host,
-                    "port": creds.port,
-                    "database": creds.database,
-                }
+            def setup_glue_connection():
+                """Extract credentials and create/reuse a Glue JDBC connection.
 
-            @task
-            def create_glue_connection(credentials):
-                """Create or reuse a Glue JDBC connection using MWAA VPC networking."""
-                env_name = os.environ.get("MWAA_ENV_NAME", "")
+                Credentials stay within this task — never exposed via XCom.
+                """
+                creds = CredentialExtractor.extract()
+                env_name = os.environ.get("MWAA_ENV_NAME", "") or Variable.get(
+                    "DR_MWAA_ENV_NAME", default_var=""
+                )
                 region = os.environ.get(
                     "AWS_REGION", os.environ.get("AWS_DEFAULT_REGION", "")
                 )
                 connection_name = f"{env_name}_conn"
-
                 glue_client = boto3.client("glue", region_name=region)
 
-                # Check if connection already exists
+                conn_input = {
+                    "Name": connection_name,
+                    "ConnectionType": "JDBC",
+                    "ConnectionProperties": {
+                        "JDBC_CONNECTION_URL": creds.jdbc_url,
+                        "USERNAME": creds.username,
+                        "PASSWORD": creds.password,
+                    },
+                    "PhysicalConnectionRequirements": _get_vpc_requirements(
+                        env_name, region
+                    ),
+                }
                 try:
                     glue_client.get_connection(Name=connection_name)
-                    logger.info(
-                        "Glue connection '%s' already exists, reusing.",
-                        connection_name,
+                    glue_client.update_connection(
+                        Name=connection_name, ConnectionInput=conn_input
                     )
-                    return connection_name
                 except glue_client.exceptions.EntityNotFoundException:
-                    logger.info(
-                        "Glue connection '%s' not found, creating new connection.",
-                        connection_name,
-                    )
-
-                # Get MWAA VPC config
-                mwaa_client = boto3.client("mwaa", region_name=region)
-                env_response = mwaa_client.get_environment(Name=env_name)
-                network_config = env_response["Environment"]["NetworkConfiguration"]
-                subnet_ids = network_config["SubnetIds"]
-                security_group_ids = network_config["SecurityGroupIds"]
-
-                # Get availability zone for the first subnet
-                ec2_client = boto3.client("ec2", region_name=region)
-                subnet_response = ec2_client.describe_subnets(SubnetIds=[subnet_ids[0]])
-                availability_zone = subnet_response["Subnets"][0]["AvailabilityZone"]
-
-                # Create the Glue connection
-                glue_client.create_connection(
-                    ConnectionInput={
-                        "Name": connection_name,
-                        "ConnectionType": "JDBC",
-                        "ConnectionProperties": {
-                            "JDBC_CONNECTION_URL": credentials["jdbc_url"],
-                            "USERNAME": credentials["username"],
-                            "PASSWORD": credentials["password"],
-                        },
-                        "PhysicalConnectionRequirements": {
-                            "SubnetId": subnet_ids[0],
-                            "SecurityGroupIdList": security_group_ids,
-                            "AvailabilityZone": availability_zone,
-                        },
-                    }
-                )
-                logger.info("Created Glue connection '%s'.", connection_name)
-                return connection_name
+                    glue_client.create_connection(ConnectionInput=conn_input)
+                logger.info("Glue connection '%s' ready.", connection_name)
 
             @task
             def notify_success_to_sfn(**context):
@@ -1015,12 +942,9 @@ class GlueDRFactory(BaseDRFactory):
                     )
                     return
 
-                task_instances = dag_run.get_task_instances()
-                task_states = [f"{ti.task_id} => {ti.state}" for ti in task_instances]
                 result = {
                     "dag": dag_run.dag_id,
                     "dag_run": dag_run.run_id,
-                    "tasks": task_states,
                     "status": "Success",
                 }
 
@@ -1042,12 +966,9 @@ class GlueDRFactory(BaseDRFactory):
                     )
                     return
 
-                task_instances = dag_run.get_task_instances()
-                task_states = [f"{ti.task_id} => {ti.state}" for ti in task_instances]
                 result = {
                     "dag": dag_run.dag_id,
                     "dag_run": dag_run.run_id,
-                    "tasks": task_states,
                     "status": "Fail",
                 }
 
@@ -1060,22 +981,30 @@ class GlueDRFactory(BaseDRFactory):
                 logger.info("Sent task failure to StepFunctions.")
 
             # Build the DAG structure
-            creds = extract_credentials()
-            conn_name = create_glue_connection(creds)
+            setup_task = setup_glue_connection()
 
             table_defs = factory.get_table_definitions()
             dependency_order = factory.get_table_dependency_order()
-
-            from airflow.providers.amazon.aws.operators.glue import GlueJobOperator
 
             cleanup_job = GlueJobOperator(
                 task_id="glue_cleanup",
                 job_name=f"{factory.dag_id}_cleanup",
                 script_location=factory.get_script_location("mwaa_metadb_cleanup"),
                 iam_role_name=factory.get_glue_role_name(),
+                update_config=True,
+                replace_script_file=True,
+                deferrable=False,
+                create_job_kwargs={
+                    "GlueVersion": "4.0",
+                    "NumberOfWorkers": 2,
+                    "WorkerType": "G.1X",
+                    "Connections": {
+                        "Connections": [factory.get_glue_connection_name()]
+                    },
+                },
                 script_args={
                     "--CLEANUP_TABLES": json.dumps(table_defs),
-                    "--GLUE_CONNECTION_NAME": conn_name,
+                    "--GLUE_CONNECTION_NAME": factory.get_glue_connection_name(),
                     "--TABLE_DEPENDENCY_ORDER": json.dumps(dependency_order),
                 },
                 region_name=os.environ.get(
@@ -1083,7 +1012,7 @@ class GlueDRFactory(BaseDRFactory):
                 ),
             )
 
-            conn_name >> cleanup_job
+            setup_task >> cleanup_job
 
             # Notify StepFunctions on success or failure
             success = notify_success_to_sfn()

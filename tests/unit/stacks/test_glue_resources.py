@@ -63,11 +63,13 @@ class TestGlueResourcesV3:
                                 [
                                     Match.object_like(
                                         {
-                                            "Action": [
-                                                "ec2:CreateNetworkInterface",
-                                                "ec2:DeleteNetworkInterface",
-                                                "ec2:DescribeNetworkInterfaces",
-                                            ],
+                                            "Action": Match.array_with(
+                                                [
+                                                    "ec2:CreateNetworkInterface",
+                                                    "ec2:DeleteNetworkInterface",
+                                                    "ec2:DescribeNetworkInterfaces",
+                                                ]
+                                            ),
                                             "Effect": "Allow",
                                         }
                                     )

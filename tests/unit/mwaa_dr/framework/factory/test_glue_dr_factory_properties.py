@@ -21,7 +21,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 
 import csv
-import os
 from io import StringIO
 from unittest.mock import MagicMock, patch
 
@@ -198,7 +197,8 @@ class TestS3PathConstructionProperty:
         """
         factory = ConcreteGlueDRFactory("test_dag")
 
-        with patch.dict(os.environ, {"DAGS_S3_PATH": f"s3://{bucket}/dags"}):
+        with patch("mwaa_dr.framework.factory.glue_dr_factory.Variable") as mock_var:
+            mock_var.get.return_value = bucket
             result = factory.get_script_location(script)
 
         expected = f"s3://{bucket}/scripts/{script}.py"
