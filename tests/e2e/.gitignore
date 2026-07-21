@@ -1,0 +1,21 @@
+# E2E test runtime artifacts - DO NOT COMMIT
+
+# Test run logs and state
+logs/
+
+# Generated reports
+reports/
+*.report.json
+test_report.json
+
+# Temporary .env files generated during CDK deploys
+.env.bak
+.env.e2e.*
+
+# Bedrock summary outputs
+*_summary.txt
+*_summary.json
+
+# Any downloaded/generated credentials or tokens
+*.credentials
+*.token
