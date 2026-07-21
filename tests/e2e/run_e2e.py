@@ -29,6 +29,7 @@ import subprocess
 import sys
 import threading
 import time
+import traceback
 import urllib.request
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -342,9 +343,19 @@ class Infra:
 
         else:
             self.board.log(f"Creating shared VPC in {region} (10.{octet}.0.0/16)")
-            vpc_id = ec2.create_vpc(
-                CidrBlock=f"10.{octet}.0.0/16",
-                TagSpecifications=self._tags(vpc_name, "vpc"))["Vpc"]["VpcId"]
+            try:
+                vpc_id = ec2.create_vpc(
+                    CidrBlock=f"10.{octet}.0.0/16",
+                    TagSpecifications=self._tags(vpc_name, "vpc"))["Vpc"]["VpcId"]
+            except ClientError as e:
+                if e.response["Error"]["Code"] == "VpcLimitExceeded":
+                    total = len(ec2.describe_vpcs()["Vpcs"])
+                    raise RuntimeError(
+                        f"VPC limit reached in {region} ({total} VPCs exist). "
+                        f"Free up a VPC (leftovers from previous runs? try "
+                        f"'./run_e2e.py --cleanup-only') or request a quota "
+                        f"increase (Service Quotas → VPC → VPCs per region).")
+                raise
             ec2.get_waiter("vpc_available").wait(VpcIds=[vpc_id])
             ec2.modify_vpc_attribute(VpcId=vpc_id, EnableDnsHostnames={"Value": True})
             ec2.modify_vpc_attribute(VpcId=vpc_id, EnableDnsSupport={"Value": True})
@@ -1340,6 +1351,10 @@ def main():
                          "the DR solution is redeployed and retested, and the "
                          "infra is kept afterwards.")
     ap.add_argument("--versions", nargs="+", help="Override versions to test")
+    ap.add_argument("--regions", nargs=2, metavar=("PRIMARY", "SECONDARY"),
+                    help="Override primary/secondary regions from the config. "
+                         "Handy with --cleanup-only to remove leftovers in "
+                         "previously used regions after a config change.")
     ap.add_argument("--sequential", action="store_true", help="Force sequential mode")
     ap.add_argument("--config", default=str(SCRIPT_DIR / "e2e_config.yaml"))
     args = ap.parse_args()
@@ -1347,6 +1362,8 @@ def main():
     cfg = Config.load(Path(args.config))
     if args.versions:
         cfg.versions = args.versions
+    if args.regions:
+        cfg.primary_region, cfg.secondary_region = args.regions
     if args.sequential:
         cfg.parallel = False
 
@@ -1450,6 +1467,17 @@ def main():
         print("[ABORT] Resources may be left running. "
               "Run './run_e2e.py --cleanup-only' to remove them.")
         return 130
+    except Exception as e:
+        # Graceful fatal: concise message on the console, full traceback
+        # only in the log file.
+        board.stop_printer()
+        board.logfile.write(traceback.format_exc())
+        board.logfile.flush()
+        board.log(f"FATAL: {e}")
+        board.log(f"Full traceback in {board.logfile.name}. Resources already "
+                  f"created are kept — './run_e2e.py --cleanup-only' removes them.")
+        kill_children()
+        return 1
 
 
 if __name__ == "__main__":
