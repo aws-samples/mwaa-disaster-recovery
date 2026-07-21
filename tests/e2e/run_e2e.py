@@ -600,16 +600,23 @@ def wait_mwaa_available(ctx: Ctx, targets: list) -> bool:
             mwaa = clients.setdefault(
                 region, boto3.client("mwaa", region_name=region))
             try:
-                status = mwaa.get_environment(
-                    Name=env_name)["Environment"]["Status"]
+                env = mwaa.get_environment(Name=env_name)["Environment"]
+                status = env["Status"]
             except ClientError:
-                status = "UNKNOWN"
+                env, status = {}, "UNKNOWN"
             if status == "AVAILABLE":
                 pending.pop(env_name)
                 ctx.board.log(f"MWAA {env_name} AVAILABLE", key=ctx.key)
                 continue
             if status in ("CREATE_FAILED", "UNAVAILABLE"):
-                ctx.errors.append(f"{env_name} reached status {status}")
+                # Capture WHY before cleanup deletes the evidence
+                reason = (env.get("LastUpdate", {}).get("Error", {})
+                          .get("ErrorMessage", "no error message provided"))
+                dump = ctx.log_dir / f"mwaa_failed_{env_name}.json"
+                dump.write_text(json.dumps(env, indent=2, default=str))
+                ctx.errors.append(f"{env_name} reached status {status}: {reason}")
+                ctx.board.log(f"MWAA {env_name} {status}: {reason} "
+                              f"(details: {dump.name})", key=ctx.key)
                 pending.pop(env_name)
                 ok = False
                 continue
