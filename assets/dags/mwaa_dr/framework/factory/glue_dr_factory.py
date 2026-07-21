@@ -98,12 +98,16 @@ class GlueDRFactory(BaseDRFactory):
     # --- Glue job helpers ---
 
     def get_glue_role_name(self) -> str:
-        """Get the Glue IAM role ARN from the GLUE_ROLE_ARN Airflow variable.
+        """Get the Glue IAM role name from the GLUE_ROLE_ARN Airflow variable.
 
-        Returns:
-            str: The ARN of the IAM role for Glue jobs.
+        The variable may contain a full ARN or just the role name.
+        GlueJobOperator expects the role name (not ARN) in newer provider versions.
         """
-        return Variable.get("GLUE_ROLE_ARN", default_var="")
+        role_value = Variable.get("GLUE_ROLE_ARN", default_var="")
+        # Extract role name from ARN if full ARN is provided
+        if role_value.startswith("arn:"):
+            return role_value.split("/")[-1]
+        return role_value
 
     def get_glue_connection_name(self) -> str:
         """Get the Glue JDBC connection name (deterministic: {env_name}_conn)."""

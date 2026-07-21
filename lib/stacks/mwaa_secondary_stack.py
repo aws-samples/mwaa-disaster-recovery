@@ -809,10 +809,12 @@ class MwaaSecondaryStack(MwaaBaseStack):
                 actions=[
                     "s3:GetObject",
                     "s3:PutObject",
+                    "s3:DeleteObject",
                 ],
                 resources=[
                     self._backup_bucket.arn_for_objects("*"),
                     self._source_bucket.arn_for_objects("scripts/*"),
+                    f"arn:aws:s3:::{conf.primary_dags_bucket_name}/*",
                 ],
             )
         )
@@ -825,6 +827,7 @@ class MwaaSecondaryStack(MwaaBaseStack):
                 resources=[
                     self._backup_bucket.bucket_arn,
                     self._source_bucket.bucket_arn,
+                    f"arn:aws:s3:::{conf.primary_dags_bucket_name}",
                 ],
             )
         )

@@ -129,7 +129,7 @@ class TestGlueDRFactory:
 
         result = factory.get_glue_role_name()
 
-        expect(result).to.equal("arn:aws:iam::123456789:role/glue-role")
+        expect(result).to.equal("glue-role")
         mock_variable.get.assert_called_once_with("GLUE_ROLE_ARN", default_var="")
 
     def test_get_script_location_with_s3_path(self):
@@ -653,7 +653,7 @@ class TestGlueDRFactory:
         expect(dep_order).to.be.a(list)
 
         # Verify IAM role
-        expect(glue_call_kwargs["iam_role_name"]).to.equal("arn:aws:iam::123:role/glue")
+        expect(glue_call_kwargs["iam_role_name"]).to.equal("glue")
 
     # --- Tests for create_restore_dag (Req 4.1, 4.5, 4.6) ---
 
