@@ -822,6 +822,17 @@ def airflow_get_variable(ctx: Ctx, env_name: str, region: str,
     return out
 
 
+def airflow_delete_variable(ctx: Ctx, env_name: str, region: str, key: str):
+    """Delete a variable; missing keys are fine."""
+    try:
+        if _is_airflow3(ctx.version):
+            _rest_api(env_name, region, "DELETE", f"/variables/{key}")
+        else:
+            airflow_cli(env_name, region, f"variables delete {key}")
+    except Exception:
+        pass  # variable didn't exist — nothing to clear
+
+
 def airflow_unpause_and_trigger(ctx: Ctx, env_name: str, region: str,
                                 dag_id: str):
     if _is_airflow3(ctx.version):
@@ -868,6 +879,12 @@ def seed_test_data(ctx: Ctx):
     try:
         airflow_set_variable(ctx, ctx.primary_env, ctx.cfg.primary_region,
                              MARKER_VAR, marker)
+        # The DR restore strategy is APPEND: existing variables are NOT
+        # overwritten. A leftover marker in the secondary env (previous
+        # test on reused infra) would mask the restore — remove it so the
+        # restored value can only come from this run's backup.
+        airflow_delete_variable(ctx, ctx.secondary_env,
+                                ctx.cfg.secondary_region, MARKER_VAR)
         ctx.marker = marker
         ctx.checks["seed_marker"] = "PASS"
         ctx.board.log(f"Seeded marker variable = {marker}", key=ctx.key)
