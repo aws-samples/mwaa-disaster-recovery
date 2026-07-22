@@ -829,6 +829,26 @@ def airflow_unpause_and_trigger(ctx: Ctx, env_name: str, region: str,
         airflow_cli(env_name, region, f"dags trigger {dag_id}")
 
 
+def airflow_dag_run_states(ctx: Ctx, env_name: str, region: str,
+                           dag_id: str, limit: int = 5) -> list:
+    """Return recent DAG run states (newest first), e.g. ['running', 'failed']."""
+    if _is_airflow3(ctx.version):
+        resp = _rest_api(env_name, region, "GET", f"/dags/{dag_id}/dagRuns",
+                         query={"limit": str(limit), "order_by": "-run_after"})
+        runs = resp.get("RestApiResponse", {}).get("dag_runs", [])
+        return [r.get("state") for r in runs]
+    out, _ = airflow_cli(env_name, region,
+                         f"dags list-runs -d {dag_id} -o json")
+    try:
+        start = out.index("[")
+        runs = json.loads(out[start:])
+    except (ValueError, json.JSONDecodeError):
+        return []
+    runs.sort(key=lambda r: r.get("execution_date") or
+              r.get("logical_date") or "", reverse=True)
+    return [r.get("state") for r in runs[:limit]]
+
+
 # ============================================================================
 # Test execution: seed → backup → simulate DR → verify
 # ============================================================================
@@ -864,18 +884,42 @@ def find_backup_bucket(ctx: Ctx, region: str, stack_suffix: str) -> str:
 
 
 def trigger_and_wait_backup(ctx: Ctx):
-    """Trigger the backup DAG and wait for backup data to land in S3."""
+    """Trigger the backup DAG and wait for backup data to land in S3.
+
+    Concurrency-aware: backup_metadata also runs on its own hourly schedule
+    and both point at one Glue job (max concurrency 1), so a blind trigger
+    can fail with ConcurrentRunsExceeded. If a run is already active we
+    just wait for it; if the latest run failed we retrigger with backoff.
+    """
     t0 = time.time()
     ctx.status("triggering backup_metadata DAG")
+    env, region = ctx.primary_env, ctx.cfg.primary_region
+
+    def run_states() -> list:
+        try:
+            return airflow_dag_run_states(ctx, env, region, "backup_metadata")
+        except Exception:
+            return []
+
+    def has_active(states) -> bool:
+        return any(s in ("queued", "running") for s in states)
+
     try:
-        airflow_unpause_and_trigger(ctx, ctx.primary_env,
-                                    ctx.cfg.primary_region, "backup_metadata")
+        if has_active(run_states()):
+            ctx.board.log("backup_metadata run already active — waiting for it "
+                          "instead of triggering (avoids Glue concurrency clash)",
+                          key=ctx.key)
+        else:
+            airflow_unpause_and_trigger(ctx, env, region, "backup_metadata")
     except Exception as e:
         ctx.board.log(f"DAG trigger failed ({e}); relying on schedule",
                       key=ctx.key)
-    bucket = find_backup_bucket(ctx, ctx.cfg.primary_region, "primary-stack")
-    s3 = boto3.client("s3", region_name=ctx.cfg.primary_region)
+
+    bucket = find_backup_bucket(ctx, region, "primary-stack")
+    s3 = boto3.client("s3", region_name=region)
     deadline = time.time() + ctx.cfg.backup_dag_wait_mins * 60
+    retriggers_left = 3
+    last_trigger = time.time()
     while time.time() < deadline:
         resp = s3.list_objects_v2(Bucket=bucket, Prefix="data/", MaxKeys=5)
         if resp.get("KeyCount", 0) > 0:
@@ -883,6 +927,21 @@ def trigger_and_wait_backup(ctx: Ctx):
             ctx.timed("backup", t0)
             ctx.board.log(f"Backup data found in s3://{bucket}/data/", key=ctx.key)
             return
+        # If the newest run failed and nothing is active, retrigger (bounded,
+        # spaced out — transient failures like Glue ConcurrentRunsExceeded
+        # clear once the competing run finishes).
+        states = run_states()
+        if (states and states[0] == "failed" and not has_active(states)
+                and retriggers_left > 0
+                and time.time() - last_trigger > 120):
+            retriggers_left -= 1
+            ctx.board.log(f"backup_metadata latest run failed — retriggering "
+                          f"({retriggers_left} retries left)", key=ctx.key)
+            try:
+                airflow_unpause_and_trigger(ctx, env, region, "backup_metadata")
+            except Exception as e:
+                ctx.board.log(f"retrigger failed ({e})", key=ctx.key)
+            last_trigger = time.time()
         ctx.status("waiting for backup data in S3...")
         time.sleep(30)
     ctx.checks["backup_created"] = "FAIL"
