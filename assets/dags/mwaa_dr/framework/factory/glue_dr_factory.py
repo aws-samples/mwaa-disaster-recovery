@@ -726,14 +726,19 @@ class GlueDRFactory(BaseDRFactory):
         default_args = {
             "owner": "airflow",
             "start_date": datetime(2022, 1, 1),
-            "on_failure_callback": self.notify_failure_to_sfn,
         }
 
+        # NOTE: the failure callback must be DAG-level, not in default_args.
+        # As a per-task callback it fires on task attempt failures even when
+        # the task will retry (observed on MWAA Airflow 3), sending a
+        # premature send_task_failure to Step Functions while the run is
+        # still recovering. DAG-level fires once, on terminal run failure.
         dag = DAG(
             dag_id=self.dag_id,
             schedule=None,
             catchup=False,
             default_args=default_args,
+            on_failure_callback=self.notify_failure_to_sfn,
         )
 
         with dag:
@@ -919,14 +924,19 @@ class GlueDRFactory(BaseDRFactory):
         default_args = {
             "owner": "airflow",
             "start_date": datetime(2022, 1, 1),
-            "on_failure_callback": self.notify_failure_to_sfn,
         }
 
+        # NOTE: the failure callback must be DAG-level, not in default_args.
+        # As a per-task callback it fires on task attempt failures even when
+        # the task will retry (observed on MWAA Airflow 3), sending a
+        # premature send_task_failure to Step Functions while the run is
+        # still recovering. DAG-level fires once, on terminal run failure.
         dag = DAG(
             dag_id=self.dag_id,
             schedule=None,
             catchup=False,
             default_args=default_args,
+            on_failure_callback=self.notify_failure_to_sfn,
         )
 
         with dag:
