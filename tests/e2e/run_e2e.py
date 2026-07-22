@@ -917,14 +917,10 @@ def trigger_and_wait_backup(ctx: Ctx):
     ctx.status("triggering backup_metadata DAG")
     env, region = ctx.primary_env, ctx.cfg.primary_region
 
-    # Freshness baselines for BOTH regions (replication check needs its own)
+    # Freshness baseline: newest pre-existing object in the primary bucket
     bucket = find_backup_bucket(ctx, region, "primary-stack")
     s3 = boto3.client("s3", region_name=region)
     baseline = _newest_object_ts(s3, bucket, "data/")
-    sec_bucket = find_backup_bucket(ctx, ctx.cfg.secondary_region,
-                                    "secondary-stack")
-    sec_s3 = boto3.client("s3", region_name=ctx.cfg.secondary_region)
-    ctx.replication_baseline = _newest_object_ts(sec_s3, sec_bucket, "data/")
     if baseline:
         ctx.board.log(f"Stale backup data present (newest {baseline:%H:%M:%S}) "
                       f"— waiting for FRESH objects only", key=ctx.key)
@@ -954,50 +950,76 @@ def trigger_and_wait_backup(ctx: Ctx):
     last_trigger = time.time()
     while time.time() < deadline:
         newest = _newest_object_ts(s3, bucket, "data/")
-        if newest and (baseline is None or newest > baseline):
+        fresh = newest is not None and (baseline is None or newest > baseline)
+        states = run_states()
+        # PASS only when the backup run COMPLETED and fresh data exists —
+        # the DAG writes many table files over minutes; passing on the
+        # first fresh object lets DR restore a half-written/stale set.
+        if fresh and states and states[0] == "success":
             ctx.checks["backup_created"] = "PASS"
             ctx.timed("backup", t0)
-            ctx.board.log(f"Fresh backup data found in s3://{bucket}/data/",
-                          key=ctx.key)
+            ctx.board.log(f"Backup run succeeded; fresh data in "
+                          f"s3://{bucket}/data/", key=ctx.key)
             return
-        # If the newest run failed and nothing is active, retrigger (bounded,
-        # spaced out — transient failures like Glue ConcurrentRunsExceeded
-        # clear once the competing run finishes).
-        states = run_states()
-        if (states and states[0] == "failed" and not has_active(states)
+        # If nothing is active and no fresh data materialized, retrigger
+        # (bounded, spaced out — covers failed runs and lost triggers).
+        if (not fresh and states and not has_active(states)
                 and retriggers_left > 0
                 and time.time() - last_trigger > 120):
             retriggers_left -= 1
-            ctx.board.log(f"backup_metadata latest run failed — retriggering "
-                          f"({retriggers_left} retries left)", key=ctx.key)
+            ctx.board.log(f"no active backup run and no fresh data — "
+                          f"retriggering ({retriggers_left} retries left)",
+                          key=ctx.key)
             try:
                 airflow_unpause_and_trigger(ctx, env, region, "backup_metadata")
             except Exception as e:
                 ctx.board.log(f"retrigger failed ({e})", key=ctx.key)
             last_trigger = time.time()
-        ctx.status("waiting for fresh backup data in S3...")
+        ctx.status("waiting for backup run to complete...")
         time.sleep(30)
     ctx.checks["backup_created"] = "FAIL"
-    raise RuntimeError("Fresh backup data never appeared in the backup bucket")
+    raise RuntimeError("Backup run did not complete with fresh data in time")
+
+
+def _list_data_objects(s3, bucket: str) -> dict:
+    """Map of key -> (LastModified, Size) under data/."""
+    out = {}
+    for page in s3.get_paginator("list_objects_v2").paginate(
+            Bucket=bucket, Prefix="data/"):
+        for o in page.get("Contents", []):
+            out[o["Key"]] = (o["LastModified"], o["Size"])
+    return out
 
 
 def wait_replication(ctx: Ctx):
-    """Wait for FRESH backup data to replicate to the secondary bucket
-    (objects newer than the pre-trigger baseline, so stale replicas from
-    previous runs don't satisfy the check)."""
-    bucket = find_backup_bucket(ctx, ctx.cfg.secondary_region, "secondary-stack")
-    s3 = boto3.client("s3", region_name=ctx.cfg.secondary_region)
-    baseline = getattr(ctx, "replication_baseline", None)
+    """Wait until EVERY backup object is replicated to the secondary bucket.
+
+    Passing on the first fresh replica is not enough: DR restore reads
+    specific files (e.g. variable.csv), so a partially replicated set makes
+    it restore stale data. Requires each primary data/ object to exist in
+    the secondary with the same size and a timestamp that is not older.
+    """
+    p_bucket = find_backup_bucket(ctx, ctx.cfg.primary_region, "primary-stack")
+    s_bucket = find_backup_bucket(ctx, ctx.cfg.secondary_region,
+                                  "secondary-stack")
+    s3p = boto3.client("s3", region_name=ctx.cfg.primary_region)
+    s3s = boto3.client("s3", region_name=ctx.cfg.secondary_region)
     deadline = time.time() + 10 * 60
     while time.time() < deadline:
-        newest = _newest_object_ts(s3, bucket, "data/")
-        if newest and (baseline is None or newest > baseline):
+        pk = _list_data_objects(s3p, p_bucket)
+        sk = _list_data_objects(s3s, s_bucket)
+        pending = [k for k, (lm, size) in pk.items()
+                   if k not in sk or sk[k][1] != size or sk[k][0] < lm]
+        if pk and not pending:
             ctx.checks["replication"] = "PASS"
+            ctx.board.log(f"All {len(pk)} backup objects replicated",
+                          key=ctx.key)
             return
-        ctx.status("waiting for cross-region replication...")
-        time.sleep(30)
+        ctx.status(f"waiting for replication ({len(pending)}/{len(pk)} "
+                   f"objects pending)...")
+        time.sleep(20)
     ctx.checks["replication"] = "FAIL"
-    raise RuntimeError("Fresh backup data never replicated to secondary region")
+    raise RuntimeError("Backup data never fully replicated to secondary region")
 
 
 def simulate_dr(ctx: Ctx):
