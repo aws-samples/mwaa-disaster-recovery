@@ -863,20 +863,25 @@ class MwaaSecondaryStack(MwaaBaseStack):
             )
         )
 
-        # Grant MWAA execution role permission to pass the Glue role
+        # Grant MWAA execution role permission to read and pass the Glue role
+        # (the Glue hook calls iam:GetRole before creating the job)
         mwaa_role.add_to_principal_policy(
             iam.PolicyStatement(
-                actions=["iam:PassRole"],
+                actions=["iam:GetRole", "iam:PassRole"],
                 resources=[glue_role.role_arn],
             )
         )
 
-        # Grant MWAA execution role MWAA and EC2 permissions
+        # Grant MWAA execution role MWAA and EC2 permissions.
+        # airflow:InvokeRestApi is used by the v3.x restore path to write
+        # variables/connections; it authorizes against the Airflow role
+        # sub-resource (arn:...:role/{env}/{airflow-role}), covered by "*".
         mwaa_role.add_to_principal_policy(
             iam.PolicyStatement(
                 actions=[
                     "airflow:GetEnvironment",
                     "airflow:CreateWebLoginToken",
+                    "airflow:InvokeRestApi",
                     "ec2:DescribeSubnets",
                     "ec2:DescribeSecurityGroups",
                 ],
