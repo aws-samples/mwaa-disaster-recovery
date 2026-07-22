@@ -16,6 +16,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 
 import json
+import time
 from datetime import datetime, timezone
 
 import boto3
@@ -65,23 +66,41 @@ def handler(event, context):
 
 
 def _trigger_via_rest_api(env_name, dag_id, conf):
-    """Trigger a DAG via MWAA InvokeRestApi."""
+    """Trigger a DAG via MWAA InvokeRestApi.
+
+    Retries transient webserver errors (RestApiServerException / 5xx) —
+    the MWAA webserver briefly returns 5xx after deployments update
+    requirements or DAGs.
+    """
     client = boto3.client("mwaa")
     logical_date = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    response = client.invoke_rest_api(
-        Name=env_name,
-        Method="POST",
-        Path=f"/dags/{dag_id}/dagRuns",
-        Body={"conf": conf, "logical_date": logical_date},
-    )
-    status = response.get("RestApiStatusCode", 0)
-    data = response.get("RestApiResponse", {})
-
-    if status >= 400:
-        raise Exception(f"Failed to trigger DAG {dag_id}: {status} {data}")
-
-    print(
-        f"DAG {dag_id} triggered: run_id={data.get('dag_run_id')}, state={data.get('state')}"
-    )
-    return data
+    attempts = 6
+    for attempt in range(1, attempts + 1):
+        try:
+            response = client.invoke_rest_api(
+                Name=env_name,
+                Method="POST",
+                Path=f"/dags/{dag_id}/dagRuns",
+                Body={"conf": conf, "logical_date": logical_date},
+            )
+        except client.exceptions.RestApiServerException as e:
+            if attempt == attempts:
+                raise
+            print(f"Transient webserver error triggering {dag_id} "
+                  f"(attempt {attempt}/{attempts}): {e}; retrying in 20s")
+            time.sleep(20)
+            continue
+        status = response.get("RestApiStatusCode", 0)
+        data = response.get("RestApiResponse", {})
+        if status >= 500 and attempt < attempts:
+            print(f"Webserver 5xx triggering {dag_id} "
+                  f"(attempt {attempt}/{attempts}): {status} {data}; retrying in 20s")
+            time.sleep(20)
+            continue
+        if status >= 400:
+            raise Exception(f"Failed to trigger DAG {dag_id}: {status} {data}")
+        print(
+            f"DAG {dag_id} triggered: run_id={data.get('dag_run_id')}, state={data.get('state')}"
+        )
+        return data
