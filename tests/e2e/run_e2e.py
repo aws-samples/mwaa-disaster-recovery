@@ -1309,9 +1309,40 @@ def delete_shared_vpc(cfg: Config, board: StatusBoard, region: str):
         ec2.delete_vpc_endpoints(
             VpcEndpointIds=[v["VpcEndpointId"] for v in vpces])
 
-    # Subnets
-    for sub in ec2.describe_subnets(Filters=vpc_filter)["Subnets"]:
-        ec2.delete_subnet(SubnetId=sub["SubnetId"])
+    # Subnets. Lingering ENIs (Lambda VPC ENIs from destroyed stacks, MWAA
+    # leftovers) block deletion for up to ~20 min after their owner is gone.
+    # Delete available ENIs ourselves, and retry while AWS releases in-use ones.
+    deadline = time.time() + 25 * 60
+    pending_subnets = [s["SubnetId"]
+                       for s in ec2.describe_subnets(Filters=vpc_filter)["Subnets"]]
+    logged_wait = False
+    while pending_subnets and time.time() < deadline:
+        for subnet_id in list(pending_subnets):
+            for eni in ec2.describe_network_interfaces(Filters=[
+                    {"Name": "subnet-id", "Values": [subnet_id]}])["NetworkInterfaces"]:
+                if eni["Status"] == "available":
+                    try:
+                        ec2.delete_network_interface(
+                            NetworkInterfaceId=eni["NetworkInterfaceId"])
+                    except ClientError:
+                        pass
+            try:
+                ec2.delete_subnet(SubnetId=subnet_id)
+                pending_subnets.remove(subnet_id)
+            except ClientError as e:
+                if e.response["Error"]["Code"] != "DependencyViolation":
+                    board.log(f"WARN: subnet {subnet_id}: {e}")
+                    pending_subnets.remove(subnet_id)
+        if pending_subnets:
+            if not logged_wait:
+                board.log(f"Waiting for lingering ENIs to release in {region} "
+                          f"({len(pending_subnets)} subnets blocked, "
+                          f"can take ~20 min for Lambda ENIs)...")
+                logged_wait = True
+            time.sleep(30)
+    for subnet_id in pending_subnets:
+        board.log(f"WARN: subnet {subnet_id} still blocked by ENIs; "
+                  f"rerun --cleanup-only later")
 
     # Security groups (non-default)
     for sg in ec2.describe_security_groups(Filters=vpc_filter)["SecurityGroups"]:
@@ -1329,8 +1360,12 @@ def delete_shared_vpc(cfg: Config, board: StatusBoard, region: str):
             except ClientError as e2:
                 board.log(f"WARN: SG {sg['GroupId']}: {e2}")
 
-    ec2.delete_vpc(VpcId=vpc_id)
-    board.log(f"Deleted shared VPC {vpc_id} in {region}")
+    try:
+        ec2.delete_vpc(VpcId=vpc_id)
+        board.log(f"Deleted shared VPC {vpc_id} in {region}")
+    except ClientError as e:
+        board.log(f"WARN: VPC {vpc_id} not deleted ({e.response['Error']['Code']}); "
+                  f"rerun --cleanup-only after lingering ENIs are released")
 
 
 def cleanup_version(ctx: Ctx, infra: Infra):
@@ -1414,7 +1449,10 @@ def cleanup_everything(cfg: Config, board: StatusBoard):
 
     # Shared VPCs (and any leftover per-version VPCs by name prefix)
     for region in (cfg.primary_region, cfg.secondary_region):
-        delete_shared_vpc(cfg, board, region)
+        try:
+            delete_shared_vpc(cfg, board, region)
+        except Exception as e:
+            board.log(f"WARN: shared VPC cleanup ({region}): {e}")
         # legacy per-version VPCs from old runs
         ec2 = boto3.client("ec2", region_name=region)
         for vpc in ec2.describe_vpcs(Filters=[
@@ -1675,8 +1713,19 @@ def main():
               f"versions={cfg.versions} | parallel={cfg.parallel} | logs={log_dir}")
 
     if args.cleanup_only:
-        cleanup_everything(cfg, board)
-        return 0
+        try:
+            cleanup_everything(cfg, board)
+            return 0
+        except KeyboardInterrupt:
+            print("\n[ABORT] Cleanup interrupted — rerun --cleanup-only to finish.")
+            return 130
+        except Exception as e:
+            board.logfile.write(traceback.format_exc())
+            board.logfile.flush()
+            board.log(f"FATAL during cleanup: {e}")
+            board.log("Rerun './run_e2e.py --cleanup-only' to remove what's left "
+                      f"(full traceback in {board.logfile.name}).")
+            return 1
 
     try:
         # Preflight: the CDK app needs aws_cdk importable by the interpreter
