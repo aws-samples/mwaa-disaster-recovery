@@ -14,24 +14,25 @@ cd tests/e2e
 ./run_e2e.py                      # full end-to-end run (all configured versions)
 ./run_e2e.py --versions 2.11.0    # test a single version
 ./run_e2e.py --sequential         # force sequential even if config says parallel
-./run_e2e.py --skip-cleanup       # keep resources after tests (debugging)
+./run_e2e.py --teardown           # remove a version's resources after it PASSES
 ./run_e2e.py --provision-infrastructure  # force re-provisioning of all infra
 ./run_e2e.py --cleanup-only       # delete ALL framework resources and exit
 ```
 
-Rerun behavior: if the MWAA environments for a version already exist and are
-AVAILABLE (e.g. after a `--skip-cleanup` run or an interrupted run), the
-framework reuses them automatically — it only redeploys the DR solution and
-reruns the test checks, and keeps the infrastructure afterwards. Pass
-`--provision-infrastructure` to force the full provisioning path instead.
+Iterate-by-default: the framework exists to help develop the DR solution, so
+infrastructure is KEPT after every run — pass or fail. The first run
+provisions MWAA environments (~1 h); every subsequent `./run_e2e.py` adopts
+the existing AVAILABLE environments, redeploys the DR solution, and reruns
+all checks in minutes. Use `--teardown` for CI-style runs that should remove
+a version's resources on PASS (shared VPCs go when everything passed), and
+`--cleanup-only` to remove everything at any time. Pass
+`--provision-infrastructure` to force the full provisioning path.
 
-Failure behavior: when a version FAILS, its resources are KEPT (not torn
-down) so you can fix the problem and simply rerun `./run_e2e.py` to resume —
-provisioning is idempotent: existing buckets/roles/envs are reused, envs
-stuck in CREATE_FAILED are deleted and recreated, and AVAILABLE envs are
-adopted directly. Cleanup only happens automatically on PASS; use
-`--cleanup-only` to remove everything after a failed run you don't want to
-resume.
+Failure behavior: a FAILed version's resources are always kept (even with
+`--teardown`) so you can fix the problem and rerun — provisioning is
+idempotent: existing buckets/roles/envs are reused, envs stuck in
+CREATE_FAILED are deleted and recreated, and AVAILABLE envs are adopted
+directly.
 
 Ctrl+C terminates all child processes (CDK subprocesses included) — no
 zombies. Resources already created stay; remove them with `--cleanup-only`.

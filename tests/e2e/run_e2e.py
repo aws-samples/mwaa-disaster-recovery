@@ -12,7 +12,7 @@ Usage:
     ./run_e2e.py --dry-run           # show the plan, touch nothing
     ./run_e2e.py --cleanup-only      # delete all e2e resources and exit
     ./run_e2e.py --versions 2.11.0 3.2.1
-    ./run_e2e.py --skip-cleanup      # keep resources for debugging
+    ./run_e2e.py --teardown          # remove a version's resources after PASS
     ./run_e2e.py --sequential        # force sequential even if config says parallel
 
 The script only READS the repository (CDK app, DAG framework); it never
@@ -1597,7 +1597,7 @@ def bedrock_summary(cfg: Config, results: list, board: StatusBoard):
 # Per-version test pipeline
 # ============================================================================
 
-def run_version(ctx: Ctx, infra: Infra, skip_cleanup: bool,
+def run_version(ctx: Ctx, infra: Infra, teardown: bool = False,
                 provision: bool = True) -> dict:
     t0 = time.time()
     result = "PASS"
@@ -1628,23 +1628,23 @@ def run_version(ctx: Ctx, infra: Infra, skip_cleanup: bool,
         ctx.board.log(f"FAILED: {e}", key=ctx.key)
     finally:
         cleaned = False
-        if reused:
-            ctx.board.log("Reused infrastructure kept (use --cleanup-only to "
-                          "remove everything)", key=ctx.key)
-        elif skip_cleanup:
-            pass  # user asked to keep everything
-        elif result == "FAIL":
-            # Keep resources so a rerun can resume from where it left off:
-            # provisioning is idempotent and AVAILABLE envs are adopted.
-            ctx.board.log("FAIL — resources KEPT for resume. Fix the issue and "
-                          "rerun ./run_e2e.py to continue; use --cleanup-only "
-                          "to remove everything instead.", key=ctx.key)
-        else:
+        if teardown and result == "PASS":
             try:
                 cleanup_version(ctx, infra)
                 cleaned = True
             except Exception as e:
                 ctx.board.log(f"WARN cleanup: {e}", key=ctx.key)
+        elif teardown:
+            ctx.board.log("FAIL — resources KEPT despite --teardown so you "
+                          "can fix and rerun; use --cleanup-only to remove.",
+                          key=ctx.key)
+        else:
+            # Default: keep everything. The framework exists to iterate on
+            # the DR solution — reruns adopt these envs and retest in
+            # minutes instead of re-provisioning for ~1h.
+            ctx.board.log(f"{result} — infrastructure kept. Rerun "
+                          f"./run_e2e.py to test again on the same envs; "
+                          f"--cleanup-only removes everything.", key=ctx.key)
     ctx.board.finish(ctx.key, result)
     return {
         "version": ctx.version,
@@ -1681,7 +1681,8 @@ def dry_run_plan(cfg: Config):
             print("7. Seed marker variable → trigger backup → wait replication")
             print("8. Start recovery SFN with simulate_dr=YES → wait success")
             print("9. Verify marker variable restored in secondary env")
-            print("10. Cleanup: destroy stacks, MWAA envs, buckets, roles")
+            print("10. Keep infra for reruns (pass --teardown to destroy "
+                  "stacks, MWAA envs, buckets, roles on PASS)")
     print("\nFinal: delete shared VPCs, write JSON report, print table, Bedrock summary")
     print("──────────────────────────────────────────────\n")
 
@@ -1692,8 +1693,12 @@ def main():
     ap.add_argument("--dry-run", action="store_true", help="Show plan, do nothing")
     ap.add_argument("--cleanup-only", action="store_true",
                     help="Delete all e2e resources and exit")
-    ap.add_argument("--skip-cleanup", action="store_true",
-                    help="Keep resources after tests (debugging)")
+    ap.add_argument("--teardown", action="store_true",
+                    help="Tear down a version's resources after it PASSES "
+                         "(and shared VPCs when everything passed). Default "
+                         "is to KEEP all infrastructure so the script can be "
+                         "rerun repeatedly against the same MWAA envs; use "
+                         "--cleanup-only to remove everything.")
     ap.add_argument("--provision-infrastructure", action="store_true",
                     help="Force full infra provisioning (VPCs, buckets, roles, "
                          "MWAA envs) even if they already exist. Without this "
@@ -1786,7 +1791,7 @@ def main():
         if cfg.parallel and len(ctxs) > 1:
             board.log(f"Running {len(ctxs)} tests in PARALLEL")
             with concurrent.futures.ThreadPoolExecutor(max_workers=len(ctxs)) as ex:
-                futures = {ex.submit(run_version, c, infra, args.skip_cleanup,
+                futures = {ex.submit(run_version, c, infra, args.teardown,
                                      args.provision_infrastructure): c
                            for c in ctxs}
                 for fut in concurrent.futures.as_completed(futures):
@@ -1794,15 +1799,14 @@ def main():
         else:
             board.log(f"Running {len(ctxs)} tests SEQUENTIALLY")
             for c in ctxs:
-                results.append(run_version(c, infra, args.skip_cleanup,
+                results.append(run_version(c, infra, args.teardown,
                                            args.provision_infrastructure))
 
         board.stop_printer()
 
-        # Shared VPC cleanup — only when every version tore its resources
-        # down; anything kept (failure resume, reuse, --skip-cleanup) still
-        # needs the VPCs.
-        if not args.skip_cleanup and results and all(r.get("cleaned") for r in results):
+        # Shared VPC cleanup — only with --teardown and when every version
+        # actually tore its resources down; anything kept still needs them.
+        if args.teardown and results and all(r.get("cleaned") for r in results):
             board.log("Deleting shared VPCs...")
             for region in (cfg.primary_region, cfg.secondary_region):
                 try:
@@ -1810,8 +1814,8 @@ def main():
                 except Exception as e:
                     board.log(f"WARN: shared VPC cleanup ({region}): {e}")
         else:
-            board.log("Resources kept (failed/reused/skip-cleanup). "
-                      "Rerun './run_e2e.py' to resume, or "
+            board.log("Infrastructure kept. Rerun './run_e2e.py' to test "
+                      "again on the same envs, or "
                       "'./run_e2e.py --cleanup-only' to remove everything.")
 
         # Reporting
