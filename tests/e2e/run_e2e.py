@@ -764,7 +764,8 @@ def cdk_destroy(ctx: Ctx, infra: Infra):
 # ============================================================================
 
 def airflow_cli(env_name: str, region: str, command: str) -> tuple:
-    """Run an Airflow CLI command via MWAA's CLI token endpoint.
+    """Run an Airflow CLI command via MWAA's CLI token endpoint (Airflow 2.x
+    only — the /aws_mwaa/cli endpoint does not exist on Airflow 3 envs).
     Returns (stdout, stderr)."""
     mwaa = boto3.client("mwaa", region_name=region)
     tok = mwaa.create_cli_token(Name=env_name)
@@ -781,6 +782,53 @@ def airflow_cli(env_name: str, region: str, command: str) -> tuple:
     return out, err
 
 
+def _is_airflow3(version: str) -> bool:
+    return version.split(".")[0] == "3"
+
+
+def _rest_api(env_name: str, region: str, method: str, path: str,
+              body: dict = None, query: dict = None) -> dict:
+    """Call the Airflow stable REST API through MWAA InvokeRestApi."""
+    mwaa = boto3.client("mwaa", region_name=region)
+    kwargs = {"Name": env_name, "Method": method, "Path": path}
+    if body is not None:
+        kwargs["Body"] = body
+    if query is not None:
+        kwargs["QueryParameters"] = query
+    return mwaa.invoke_rest_api(**kwargs)
+
+
+def airflow_set_variable(ctx: Ctx, env_name: str, region: str,
+                         key: str, value: str):
+    if _is_airflow3(ctx.version):
+        _rest_api(env_name, region, "POST", "/variables",
+                  body={"key": key, "value": value})
+    else:
+        airflow_cli(env_name, region, f"variables set {key} {value}")
+
+
+def airflow_get_variable(ctx: Ctx, env_name: str, region: str,
+                         key: str) -> str:
+    if _is_airflow3(ctx.version):
+        resp = _rest_api(env_name, region, "GET", f"/variables/{key}")
+        return str(resp.get("RestApiResponse", {}).get("value", ""))
+    out, _ = airflow_cli(env_name, region, f"variables get {key}")
+    return out
+
+
+def airflow_unpause_and_trigger(ctx: Ctx, env_name: str, region: str,
+                                dag_id: str):
+    if _is_airflow3(ctx.version):
+        _rest_api(env_name, region, "PATCH", f"/dags/{dag_id}",
+                  body={"is_paused": False},
+                  query={"update_mask": "is_paused"})
+        _rest_api(env_name, region, "POST", f"/dags/{dag_id}/dagRuns",
+                  body={"logical_date": None})
+    else:
+        airflow_cli(env_name, region, f"dags unpause {dag_id}")
+        airflow_cli(env_name, region, f"dags trigger {dag_id}")
+
+
 # ============================================================================
 # Test execution: seed → backup → simulate DR → verify
 # ============================================================================
@@ -792,8 +840,8 @@ def seed_test_data(ctx: Ctx):
     """Create a marker Airflow variable in the primary env to verify after DR."""
     marker = f"e2e-{ctx.slug}-{int(time.time())}"
     try:
-        airflow_cli(ctx.primary_env, ctx.cfg.primary_region,
-                    f"variables set {MARKER_VAR} {marker}")
+        airflow_set_variable(ctx, ctx.primary_env, ctx.cfg.primary_region,
+                             MARKER_VAR, marker)
         ctx.marker = marker
         ctx.checks["seed_marker"] = "PASS"
         ctx.board.log(f"Seeded marker variable = {marker}", key=ctx.key)
@@ -820,12 +868,10 @@ def trigger_and_wait_backup(ctx: Ctx):
     t0 = time.time()
     ctx.status("triggering backup_metadata DAG")
     try:
-        airflow_cli(ctx.primary_env, ctx.cfg.primary_region,
-                    "dags unpause backup_metadata")
-        airflow_cli(ctx.primary_env, ctx.cfg.primary_region,
-                    "dags trigger backup_metadata")
+        airflow_unpause_and_trigger(ctx, ctx.primary_env,
+                                    ctx.cfg.primary_region, "backup_metadata")
     except Exception as e:
-        ctx.board.log(f"DAG trigger via CLI failed ({e}); relying on schedule",
+        ctx.board.log(f"DAG trigger failed ({e}); relying on schedule",
                       key=ctx.key)
     bucket = find_backup_bucket(ctx, ctx.cfg.primary_region, "primary-stack")
     s3 = boto3.client("s3", region_name=ctx.cfg.primary_region)
@@ -864,15 +910,24 @@ def simulate_dr(ctx: Ctx):
     (documented manual-trigger method) and wait for completion."""
     t0 = time.time()
     sfn = boto3.client("stepfunctions", region_name=ctx.cfg.secondary_region)
-    machines = []
-    paginator = sfn.get_paginator("list_state_machines")
-    for page in paginator.paginate():
-        machines.extend(m for m in page["stateMachines"]
-                        if m["name"].startswith(ctx.stack_prefix))
-    if not machines:
-        raise RuntimeError(f"No state machine found with prefix {ctx.stack_prefix}")
-    arn = machines[0]["stateMachineArn"]
-    ctx.board.log(f"Starting DR simulation on {machines[0]['name']}", key=ctx.key)
+    # CloudFormation strips hyphens from CDK construct ids, so the deployed
+    # name looks like 'mwaae2e2103statemachine<hash>' — resolve it from the
+    # secondary stack's resources instead of matching on a name prefix.
+    cfn = boto3.client("cloudformation", region_name=ctx.cfg.secondary_region)
+    stack = f"{ctx.stack_prefix}-secondary-stack"
+    arn = None
+    paginator = cfn.get_paginator("list_stack_resources")
+    for page in paginator.paginate(StackName=stack):
+        for res in page["StackResourceSummaries"]:
+            if res["ResourceType"] == "AWS::StepFunctions::StateMachine":
+                arn = res["PhysicalResourceId"]
+                break
+        if arn:
+            break
+    if not arn:
+        raise RuntimeError(f"No state machine found in stack {stack}")
+    ctx.board.log(f"Starting DR simulation on {arn.rsplit(':', 1)[-1]}",
+                  key=ctx.key)
     execution = sfn.start_execution(
         stateMachineArn=arn,
         input=json.dumps({"simulate_dr": "YES"}))["executionArn"]
@@ -898,8 +953,8 @@ def verify_restore(ctx: Ctx):
         ctx.checks["marker_restored"] = "SKIP (no marker seeded)"
         return
     try:
-        out, _ = airflow_cli(ctx.secondary_env, ctx.cfg.secondary_region,
-                             f"variables get {MARKER_VAR}")
+        out = airflow_get_variable(ctx, ctx.secondary_env,
+                                   ctx.cfg.secondary_region, MARKER_VAR)
         if ctx.marker in out:
             ctx.checks["marker_restored"] = "PASS"
         else:
