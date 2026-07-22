@@ -755,8 +755,8 @@ class MwaaPrimaryStack(MwaaBaseStack):
         mwaa_role.add_to_principal_policy(
             iam.PolicyStatement(
                 actions=[
-                    "mwaa:GetEnvironment",
-                    "mwaa:CreateWebLoginToken",
+                    "airflow:GetEnvironment",
+                    "airflow:CreateWebLoginToken",
                     "ec2:DescribeSubnets",
                     "ec2:DescribeSecurityGroups",
                 ],
