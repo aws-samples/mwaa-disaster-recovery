@@ -19,7 +19,7 @@ import csv
 import json
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from io import StringIO
 
 import boto3
@@ -665,6 +665,11 @@ class GlueDRFactory(BaseDRFactory):
 
             export_job = GlueJobOperator(
                 task_id="glue_export",
+                # A lingering Glue run (job max concurrency is 1) fails
+                # StartJobRun with ConcurrentRunsExceeded — retry instead
+                # of failing the whole workflow.
+                retries=4,
+                retry_delay=timedelta(minutes=2),
                 job_name=f"{factory.dag_id}_export",
                 script_location=factory.get_script_location("mwaa_metadb_export"),
                 iam_role_name=factory.get_glue_role_name(),
@@ -848,6 +853,11 @@ class GlueDRFactory(BaseDRFactory):
 
             import_job = GlueJobOperator(
                 task_id="glue_import",
+                # A lingering Glue run (job max concurrency is 1) fails
+                # StartJobRun with ConcurrentRunsExceeded — retry instead
+                # of failing the whole workflow.
+                retries=4,
+                retry_delay=timedelta(minutes=2),
                 job_name=f"{factory.dag_id}_import",
                 script_location=factory.get_script_location("mwaa_metadb_import"),
                 iam_role_name=factory.get_glue_role_name(),
@@ -1018,6 +1028,11 @@ class GlueDRFactory(BaseDRFactory):
 
             cleanup_job = GlueJobOperator(
                 task_id="glue_cleanup",
+                # A lingering Glue run (job max concurrency is 1) fails
+                # StartJobRun with ConcurrentRunsExceeded — retry instead
+                # of failing the whole workflow.
+                retries=4,
+                retry_delay=timedelta(minutes=2),
                 job_name=f"{factory.dag_id}_cleanup",
                 script_location=factory.get_script_location("mwaa_metadb_cleanup"),
                 iam_role_name=factory.get_glue_role_name(),
