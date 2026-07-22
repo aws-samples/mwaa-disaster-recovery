@@ -964,11 +964,9 @@ def find_backup_bucket(ctx: Ctx, region: str, stack_suffix: str) -> str:
 # The DR solution's Glue job names are NOT namespaced per deployment
 # (backup_metadata_export, restore_metadata_import, cleanup_metadata_cleanup),
 # so parallel version tests in the same account+region share the same Glue
-# jobs (max concurrency 1) and clash with ConcurrentRunsExceeded. Serialize
-# the backup and DR-simulation phases across version threads. This is purely
-# an e2e concern — a real deployment is one per account/region.
-_backup_phase_lock = threading.Lock()
-_dr_phase_lock = threading.Lock()
+# jobs (max concurrency 1). The GlueJobOperators now have retries=4 with
+# retry_delay=2min which ride out ConcurrentRunsExceeded transients — the
+# framework no longer serializes these phases.
 
 
 def _newest_object_ts(s3, bucket: str, prefix: str):
@@ -983,18 +981,6 @@ def _newest_object_ts(s3, bucket: str, prefix: str):
 
 
 def trigger_and_wait_backup(ctx: Ctx):
-    """Serialized wrapper: see _backup_phase_lock/_dr_phase_lock note."""
-    if not _backup_phase_lock.acquire(blocking=False):
-        ctx.status("waiting for backup slot (serialized across versions "
-                   "— shared Glue jobs)...")
-        _backup_phase_lock.acquire()
-    try:
-        _trigger_and_wait_backup_impl(ctx)
-    finally:
-        _backup_phase_lock.release()
-
-
-def _trigger_and_wait_backup_impl(ctx: Ctx):
     """Trigger the backup DAG and wait for FRESH backup data in S3.
 
     Freshness: stale CSVs from a previous run must not satisfy the check
@@ -1072,7 +1058,10 @@ def _trigger_and_wait_backup_impl(ctx: Ctx):
         ctx.status("waiting for backup run to complete...")
         time.sleep(30)
     ctx.checks["backup_created"] = "FAIL"
-    raise RuntimeError("Backup run did not complete with fresh data in time")
+    final_states = run_states()
+    state_str = final_states[0] if final_states else "unknown"
+    raise RuntimeError(f"Backup run did not complete with fresh data in time "
+                       f"(latest run state: {state_str})")
 
 
 def _list_data_objects(s3, bucket: str) -> dict:
@@ -1117,18 +1106,6 @@ def wait_replication(ctx: Ctx):
 
 
 def simulate_dr(ctx: Ctx):
-    """Serialized wrapper: see _backup_phase_lock/_dr_phase_lock note."""
-    if not _dr_phase_lock.acquire(blocking=False):
-        ctx.status("waiting for DR simulation slot (serialized across versions "
-                   "— shared Glue jobs)...")
-        _dr_phase_lock.acquire()
-    try:
-        _simulate_dr_impl(ctx)
-    finally:
-        _dr_phase_lock.release()
-
-
-def _simulate_dr_impl(ctx: Ctx):
     """Manually start the recovery StepFunctions with simulate_dr=YES
     (documented manual-trigger method) and wait for completion."""
     t0 = time.time()

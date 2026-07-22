@@ -38,7 +38,7 @@ timeouts:
   # eu-west-2 has been observed taking 60+ min to create envs (eu-west-1
   # takes ~35 min with identical config) — give MWAA plenty of headroom
   mwaa_creation_mins: 75
-  backup_dag_wait_mins: 15
+  backup_dag_wait_mins: 30
   dr_simulation_mins: 45
   cdk_deploy_mins: 30
   poll_interval_secs: 30
