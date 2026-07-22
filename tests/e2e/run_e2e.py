@@ -316,6 +316,33 @@ class Infra:
                      {"Key": TAG_KEY, "Value": self.cfg.id_prefix}],
         }]
 
+    @staticmethod
+    def _private_egress_ok(ec2, vpc_id: str, subnet_ids: list) -> bool:
+        """True if every subnet has an active 0.0.0.0/0 route to an
+        available NAT gateway via an explicitly associated route table."""
+        try:
+            rtbs = ec2.describe_route_tables(Filters=[
+                {"Name": "vpc-id", "Values": [vpc_id]}])["RouteTables"]
+            for subnet_id in subnet_ids:
+                rtb = next((r for r in rtbs if any(
+                    a.get("SubnetId") == subnet_id for a in r["Associations"])),
+                    None)
+                if rtb is None:
+                    return False
+                nat_id = next((rt.get("NatGatewayId") for rt in rtb["Routes"]
+                               if rt.get("DestinationCidrBlock") == "0.0.0.0/0"
+                               and rt.get("State") == "active"
+                               and rt.get("NatGatewayId")), None)
+                if not nat_id:
+                    return False
+                nat = ec2.describe_nat_gateways(
+                    NatGatewayIds=[nat_id])["NatGateways"][0]
+                if nat["State"] != "available":
+                    return False
+            return True
+        except ClientError:
+            return False
+
     def ensure_shared_vpc(self, region: str, octet: int) -> dict:
         """Create (or find) the shared VPC for a region. Returns network info."""
         ec2 = boto3.client("ec2", region_name=region)
@@ -334,12 +361,19 @@ class Infra:
                 {"Name": "vpc-id", "Values": [vpc_id]},
                 {"Name": "group-name", "Values": [f"{vpc_name}-mwaa-sg"]}])["SecurityGroups"]
             if len(subnets) >= 2 and sgs:
-                info = {"vpc_id": vpc_id,
-                        "subnet_ids": [s["SubnetId"] for s in subnets[:2]],
-                        "sg_id": sgs[0]["GroupId"]}
-                self.vpc_info[region] = info
-                return info
-            self.board.log(f"Existing VPC {vpc_id} incomplete; recreating pieces")
+                # An interrupted cleanup can leave subnets+SG but delete the
+                # route tables / NAT — envs created there have no egress and
+                # die with CREATE_FAILED. Only reuse if the private subnets
+                # actually route 0.0.0.0/0 to an available NAT gateway.
+                subnet_ids = [s["SubnetId"] for s in subnets[:2]]
+                if self._private_egress_ok(ec2, vpc_id, subnet_ids):
+                    info = {"vpc_id": vpc_id,
+                            "subnet_ids": subnet_ids,
+                            "sg_id": sgs[0]["GroupId"]}
+                    self.vpc_info[region] = info
+                    return info
+            self.board.log(f"Existing VPC {vpc_id} incomplete "
+                           f"(missing routes/NAT/subnets/SG); repairing")
 
         else:
             self.board.log(f"Creating shared VPC in {region} (10.{octet}.0.0/16)")
@@ -411,7 +445,28 @@ class Infra:
                 {"Name": "vpc-id", "Values": [vpc_id]},
                 {"Name": "tag:Name", "Values": [name]}])["RouteTables"]
             if existing:
-                rtb_id = existing[0]["RouteTableId"]
+                rtb = existing[0]
+                rtb_id = rtb["RouteTableId"]
+                # Repair path: a surviving route table may have lost its
+                # default route, or reference recreated subnets that are no
+                # longer associated. Restore both.
+                has_default = any(
+                    r.get("DestinationCidrBlock") == "0.0.0.0/0"
+                    and r.get("State") == "active" for r in rtb["Routes"])
+                if not has_default:
+                    try:
+                        ec2.delete_route(RouteTableId=rtb_id,
+                                         DestinationCidrBlock="0.0.0.0/0")
+                    except ClientError:
+                        pass  # no stale route to remove
+                    ec2.create_route(RouteTableId=rtb_id,
+                                     DestinationCidrBlock="0.0.0.0/0",
+                                     **target_kwargs)
+                associated = {a.get("SubnetId") for a in rtb["Associations"]}
+                for s in subnet_ids:
+                    if s not in associated:
+                        ec2.associate_route_table(RouteTableId=rtb_id,
+                                                  SubnetId=s)
             else:
                 rtb_id = ec2.create_route_table(
                     VpcId=vpc_id, TagSpecifications=self._tags(name, "route-table")
