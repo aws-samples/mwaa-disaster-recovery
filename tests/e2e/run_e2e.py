@@ -1395,6 +1395,45 @@ def cleanup_everything(cfg: Config, board: StatusBoard):
     """--cleanup-only: discover and delete ALL framework resources by prefix/tag."""
     board.log("Discovering resources to clean up...")
 
+    # CloudFormation stacks FIRST — the stacks' custom resources (e.g. the
+    # airflow-cli unpause CR) run against the MWAA envs on Delete; deleting
+    # the envs first makes stacks end up DELETE_FAILED and leak resources.
+    for region in (cfg.primary_region, cfg.secondary_region):
+        cfn = boto3.client("cloudformation", region_name=region)
+        to_delete = []
+        pages = cfn.get_paginator("list_stacks").paginate(
+            StackStatusFilter=["CREATE_COMPLETE", "UPDATE_COMPLETE",
+                               "ROLLBACK_COMPLETE", "UPDATE_ROLLBACK_COMPLETE",
+                               "CREATE_FAILED", "DELETE_FAILED"])
+        for page in pages:
+            for st in page["StackSummaries"]:
+                if st["StackName"].startswith(cfg.id_prefix):
+                    board.log(f"Deleting stack {st['StackName']} ({region}, "
+                              f"{st['StackStatus']})")
+                    if st["StackStatus"] == "DELETE_FAILED":
+                        # Retry, retaining the resources that blocked the
+                        # previous attempt (typically CRs whose target env
+                        # is already gone) so the rest of the stack goes.
+                        stuck = [e["LogicalResourceId"] for e in
+                                 cfn.describe_stack_events(
+                                     StackName=st["StackName"])["StackEvents"]
+                                 if e["ResourceStatus"] == "DELETE_FAILED"
+                                 and e["LogicalResourceId"] != st["StackName"]]
+                        cfn.delete_stack(StackName=st["StackName"],
+                                         RetainResources=sorted(set(stuck)))
+                    else:
+                        cfn.delete_stack(StackName=st["StackName"])
+                    to_delete.append(st["StackName"])
+        for name in to_delete:
+            try:
+                cfn.get_waiter("stack_delete_complete").wait(
+                    StackName=name,
+                    WaiterConfig={"Delay": 30, "MaxAttempts": 60})
+                board.log(f"Stack {name} deleted")
+            except WaiterError:
+                board.log(f"WARN: stack {name} delete did not finish; "
+                          f"rerun --cleanup-only")
+
     # MWAA environments
     ctxs = []
     for region in (cfg.primary_region, cfg.secondary_region):
@@ -1407,30 +1446,6 @@ def cleanup_everything(cfg: Config, board: StatusBoard):
         futures = [ex.submit(delete_mwaa_env, cfg, board, n, r) for n, r in ctxs]
         for f in futures:
             f.result()
-
-    # CloudFormation stacks (DR stacks deployed by CDK)
-    for region in (cfg.primary_region, cfg.secondary_region):
-        cfn = boto3.client("cloudformation", region_name=region)
-        pages = cfn.get_paginator("list_stacks").paginate(
-            StackStatusFilter=["CREATE_COMPLETE", "UPDATE_COMPLETE",
-                               "ROLLBACK_COMPLETE", "UPDATE_ROLLBACK_COMPLETE",
-                               "CREATE_FAILED"])
-        for page in pages:
-            for st in page["StackSummaries"]:
-                if st["StackName"].startswith(cfg.id_prefix):
-                    board.log(f"Deleting stack {st['StackName']} ({region})")
-                    cfn.delete_stack(StackName=st["StackName"])
-        # wait for them
-        for page in cfn.get_paginator("list_stacks").paginate(
-                StackStatusFilter=["DELETE_IN_PROGRESS"]):
-            for st in page["StackSummaries"]:
-                if st["StackName"].startswith(cfg.id_prefix):
-                    try:
-                        cfn.get_waiter("stack_delete_complete").wait(
-                            StackName=st["StackName"],
-                            WaiterConfig={"Delay": 30, "MaxAttempts": 60})
-                    except WaiterError:
-                        board.log(f"WARN: stack {st['StackName']} delete timed out")
 
     # S3 buckets
     s3 = boto3.client("s3")
