@@ -960,7 +960,7 @@ class GlueDRFactory(BaseDRFactory):
             # with trigger_rule doesn't fire reliably on Airflow 3.x.
             join = EmptyOperator(
                 task_id="join_all_done",
-                trigger_rule="all_done",
+                trigger_rule="all_success",
             )
             success = notify_success_to_sfn()
             failure = notify_failure_to_sfn()
@@ -1178,7 +1178,7 @@ class GlueDRFactory(BaseDRFactory):
             # with trigger_rule doesn't fire reliably on Airflow 3.x.
             join = EmptyOperator(
                 task_id="join_all_done",
-                trigger_rule="all_done",
+                trigger_rule="all_success",
             )
             success = notify_success_to_sfn()
             failure = notify_failure_to_sfn()
