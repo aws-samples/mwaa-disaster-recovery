@@ -898,15 +898,24 @@ def airflow_delete_variable(ctx: Ctx, env_name: str, region: str, key: str):
 
 def airflow_unpause_and_trigger(ctx: Ctx, env_name: str, region: str,
                                 dag_id: str):
-    if _is_airflow3(ctx.version):
-        _rest_api(env_name, region, "PATCH", f"/dags/{dag_id}",
-                  body={"is_paused": False},
-                  query={"update_mask": "is_paused"})
-        _rest_api(env_name, region, "POST", f"/dags/{dag_id}/dagRuns",
-                  body={"logical_date": None})
-    else:
-        airflow_cli(env_name, region, f"dags unpause {dag_id}")
-        airflow_cli(env_name, region, f"dags trigger {dag_id}")
+    """Unpause and trigger a DAG. Retries up to 3 times on transient errors
+    (the webserver briefly 5xxs after CDK deploys update the DAGs)."""
+    for attempt in range(4):
+        try:
+            if _is_airflow3(ctx.version):
+                _rest_api(env_name, region, "PATCH", f"/dags/{dag_id}",
+                          body={"is_paused": False},
+                          query={"update_mask": "is_paused"})
+                _rest_api(env_name, region, "POST", f"/dags/{dag_id}/dagRuns",
+                          body={"logical_date": None})
+            else:
+                airflow_cli(env_name, region, f"dags unpause {dag_id}")
+                airflow_cli(env_name, region, f"dags trigger {dag_id}")
+            return  # success
+        except Exception:
+            if attempt == 3:
+                raise
+            time.sleep(15)
 
 
 def airflow_dag_run_states(ctx: Ctx, env_name: str, region: str,
@@ -1058,7 +1067,7 @@ def trigger_and_wait_backup(ctx: Ctx):
             return
         # If nothing is active and no fresh data materialized, retrigger
         # (bounded, spaced out — covers failed runs and lost triggers).
-        if (not fresh and states and not has_active(states)
+        if (not fresh and not has_active(states)
                 and retriggers_left > 0
                 and time.time() - last_trigger > 120):
             retriggers_left -= 1
