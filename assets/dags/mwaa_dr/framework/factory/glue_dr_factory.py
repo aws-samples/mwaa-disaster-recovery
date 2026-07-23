@@ -119,6 +119,18 @@ class GlueDRFactory(BaseDRFactory):
         )
         return f"{env_name}_conn"
 
+    def get_glue_job_name(self, suffix: str) -> str:
+        """Construct a Glue job name namespaced by the MWAA environment.
+
+        Format: {env_name}_{dag_id}_{suffix}
+        This ensures multiple deployments in the same account/region don't
+        share or overwrite each other's Glue jobs.
+        """
+        env_name = os.environ.get("MWAA_ENV_NAME", "") or Variable.get(
+            "DR_MWAA_ENV_NAME", default_var=""
+        )
+        return f"{env_name}_{self.dag_id}_{suffix}"
+
     def get_script_location(self, script_name: str) -> str:
         """Construct the S3 location for a Glue script.
 
@@ -670,7 +682,7 @@ class GlueDRFactory(BaseDRFactory):
                 # of failing the whole workflow.
                 retries=4,
                 retry_delay=timedelta(minutes=2),
-                job_name=f"{factory.dag_id}_export",
+                job_name=factory.get_glue_job_name("export"),
                 script_location=factory.get_script_location("mwaa_metadb_export"),
                 iam_role_name=factory.get_glue_role_name(),
                 update_config=True,
@@ -863,7 +875,7 @@ class GlueDRFactory(BaseDRFactory):
                 # of failing the whole workflow.
                 retries=4,
                 retry_delay=timedelta(minutes=2),
-                job_name=f"{factory.dag_id}_import",
+                job_name=factory.get_glue_job_name("import"),
                 script_location=factory.get_script_location("mwaa_metadb_import"),
                 iam_role_name=factory.get_glue_role_name(),
                 update_config=True,
@@ -1043,7 +1055,7 @@ class GlueDRFactory(BaseDRFactory):
                 # of failing the whole workflow.
                 retries=4,
                 retry_delay=timedelta(minutes=2),
-                job_name=f"{factory.dag_id}_cleanup",
+                job_name=factory.get_glue_job_name("cleanup"),
                 script_location=factory.get_script_location("mwaa_metadb_cleanup"),
                 iam_role_name=factory.get_glue_role_name(),
                 update_config=True,

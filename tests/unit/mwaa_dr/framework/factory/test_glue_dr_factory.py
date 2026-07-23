@@ -581,7 +581,7 @@ class TestGlueDRFactory:
         mock_glue_operator_class.assert_called_once()
         glue_call_kwargs = mock_glue_operator_class.call_args
         expect(glue_call_kwargs.kwargs["task_id"]).to.equal("glue_export")
-        expect(glue_call_kwargs.kwargs["job_name"]).to.equal("backup_dag_export")
+        expect(glue_call_kwargs.kwargs["job_name"]).to.equal("test-env_backup_dag_export")
         expect(glue_call_kwargs.kwargs["script_location"]).to.contain(
             "mwaa_metadb_export"
         )
@@ -714,7 +714,7 @@ class TestGlueDRFactory:
         mock_glue_operator_class.assert_called_once()
         glue_call_kwargs = mock_glue_operator_class.call_args.kwargs
         expect(glue_call_kwargs["task_id"]).to.equal("glue_import")
-        expect(glue_call_kwargs["job_name"]).to.equal("restore_dag_import")
+        expect(glue_call_kwargs["job_name"]).to.equal("test-env_restore_dag_import")
         expect(glue_call_kwargs["script_location"]).to.contain("mwaa_metadb_import")
 
     @patch("mwaa_dr.framework.factory.glue_dr_factory.Variable")
@@ -829,7 +829,7 @@ class TestGlueDRFactory:
         mock_glue_operator_class.assert_called_once()
         glue_call_kwargs = mock_glue_operator_class.call_args.kwargs
         expect(glue_call_kwargs["task_id"]).to.equal("glue_cleanup")
-        expect(glue_call_kwargs["job_name"]).to.equal("cleanup_dag_cleanup")
+        expect(glue_call_kwargs["job_name"]).to.equal("test-env_cleanup_dag_cleanup")
         expect(glue_call_kwargs["script_location"]).to.contain("mwaa_metadb_cleanup")
 
     @patch("mwaa_dr.framework.factory.glue_dr_factory.Variable")

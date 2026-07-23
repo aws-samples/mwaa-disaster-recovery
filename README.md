@@ -62,7 +62,6 @@
         - [Using the Metadata Backup and Restore DAGs Independently](#using-the-metadata-backup-and-restore-dags-independently)
         - [May Need to Restart Environment for Plugins to Work](#may-need-to-restart-environment-for-plugins-to-work)
         - [Airflow 3.0 Specific Considerations](#airflow-30-specific-considerations)
-        - [One Deployment Per Account and Region (Airflow 3.x)](#one-deployment-per-account-and-region-airflow-3x)
 - [Frequently Asked Questions](#frequently-asked-questions)
     - [FAQ-1: Failure to Read Environment Backup](#faq-1-failure-to-read-environment-backup)
     - [FAQ-2: Failure to Create New Environment](#faq-2-failure-to-create-new-environment)
@@ -790,15 +789,6 @@ The CDK stacks automatically provision the following when `MWAA_VERSION` starts 
 
 > [!IMPORTANT]
 > All Airflow 2.x behavior remains completely unchanged. The Glue-based approach is only activated when the Airflow version starts with `3.`.
-
-### One Deployment Per Account and Region (Airflow 3.x)
-
-For Airflow 3.x, the Glue jobs created by the framework DAGs use fixed names derived from the DAG ids (`backup_metadata_export`, `restore_metadata_import`, `cleanup_metadata_cleanup`) that are not namespaced by the stack name prefix. Glue job names are unique per account and region, and the jobs are created with the default maximum concurrency of 1. As a consequence:
-
-- Deploying the solution more than once in the same AWS account and region (e.g., for two different MWAA environment pairs) will cause the deployments to share — and reconfigure — each other's Glue jobs (`update_config=True` rewrites the script location, IAM role, and JDBC connection on every run).
-- Concurrent backup or restore executions across such deployments will fail with `ConcurrentRunsExceededException`.
-
-The framework DAGs retry Glue job submission to ride out transient concurrency conflicts, but the supported model remains **one deployment of this solution per account and region**. If you need multiple deployments side by side (e.g., for testing), serialize their backup/restore activity or deploy them to different accounts or regions.
 
 # Frequently Asked Questions
 
