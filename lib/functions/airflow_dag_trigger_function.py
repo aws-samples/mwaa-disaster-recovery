@@ -46,10 +46,21 @@ def handler(event, context):
     is_v3 = int(sem_ver[0]) >= 3
 
     # Unpause the DAG first
-    airflow_cli = AirflowCliClient(mwaa_env_name, mwaa_env_version)
-    print(f"Unpausing DAG {dag} ...")
-    result = airflow_cli.unpause_dag(dag)
-    print(f"Unpausing result: {result}")
+    if is_v3:
+        # AF 3.x: CLI unpause output format varies and may contain warnings
+        # that break stdout parsing — use the REST API instead.
+        print(f"Unpausing DAG {dag} via InvokeRestApi ...")
+        client = boto3.client("mwaa")
+        client.invoke_rest_api(
+            Name=mwaa_env_name, Method="PATCH",
+            Path=f"/dags/{dag}",
+            Body={"is_paused": False},
+            QueryParameters={"update_mask": "is_paused"})
+    else:
+        airflow_cli = AirflowCliClient(mwaa_env_name, mwaa_env_version)
+        print(f"Unpausing DAG {dag} ...")
+        result = airflow_cli.unpause_dag(dag)
+        print(f"Unpausing result: {result}")
 
     if is_v3:
         # AF 3.x: Use InvokeRestApi to trigger DAGs (CLI triggers don't persist)
