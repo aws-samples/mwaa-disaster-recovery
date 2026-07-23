@@ -1161,19 +1161,30 @@ def simulate_dr(ctx: Ctx):
 
 
 def verify_restore(ctx: Ctx):
-    """Verify the marker variable was restored into the secondary environment."""
+    """Verify the marker variable was restored into the secondary environment.
+
+    The secondary env's webserver may briefly return 5xx/transient errors
+    right after DR recovery completes (environment updating, webserver
+    restarting). Retry a few times before giving up.
+    """
     if not getattr(ctx, "marker", None):
         ctx.checks["marker_restored"] = "SKIP (no marker seeded)"
         return
-    try:
-        out = airflow_get_variable(ctx, ctx.secondary_env,
-                                   ctx.cfg.secondary_region, MARKER_VAR)
-        if ctx.marker in out:
-            ctx.checks["marker_restored"] = "PASS"
-        else:
-            ctx.checks["marker_restored"] = f"FAIL (got: {out.strip()[:80]})"
-    except Exception as e:
-        ctx.checks["marker_restored"] = f"FAIL ({e})"
+    for attempt in range(6):
+        try:
+            out = airflow_get_variable(ctx, ctx.secondary_env,
+                                       ctx.cfg.secondary_region, MARKER_VAR)
+            if ctx.marker in out:
+                ctx.checks["marker_restored"] = "PASS"
+                return
+            else:
+                ctx.checks["marker_restored"] = f"FAIL (got: {out.strip()[:80]})"
+                return
+        except Exception as e:
+            if attempt < 5:
+                time.sleep(20)
+                continue
+            ctx.checks["marker_restored"] = f"FAIL ({e})"
 
 
 # ============================================================================
