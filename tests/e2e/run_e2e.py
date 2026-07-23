@@ -871,8 +871,16 @@ def airflow_set_variable(ctx: Ctx, env_name: str, region: str,
 def airflow_get_variable(ctx: Ctx, env_name: str, region: str,
                          key: str) -> str:
     if _is_airflow3(ctx.version):
-        resp = _rest_api(env_name, region, "GET", f"/variables/{key}")
-        return str(resp.get("RestApiResponse", {}).get("value", ""))
+        try:
+            resp = _rest_api(env_name, region, "GET", f"/variables/{key}")
+            return str(resp.get("RestApiResponse", {}).get("value", ""))
+        except ClientError as e:
+            # 404 = variable doesn't exist; return empty so callers detect
+            # "not found" vs transient errors
+            if "RestApiClientException" in str(type(e).__name__) or \
+               e.response.get("RestApiStatusCode") == 404:
+                return ""
+            raise
     out, _ = airflow_cli(env_name, region, f"variables get {key}")
     return out
 
