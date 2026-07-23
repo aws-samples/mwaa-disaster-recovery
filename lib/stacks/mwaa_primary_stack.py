@@ -692,6 +692,7 @@ class MwaaPrimaryStack(MwaaBaseStack):
                 actions=[
                     "s3:GetObject",
                     "s3:PutObject",
+                    "s3:DeleteObject",
                 ],
                 resources=[
                     self._backup_bucket.arn_for_objects("*"),
