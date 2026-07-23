@@ -970,13 +970,20 @@ def find_backup_bucket(ctx: Ctx, region: str, stack_suffix: str) -> str:
 
 
 def _newest_object_ts(s3, bucket: str, prefix: str):
-    """Newest LastModified under a prefix, or None if empty."""
+    """Newest LastModified under a prefix, or None if empty/unreachable."""
     newest = None
-    paginator = s3.get_paginator("list_objects_v2")
-    for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
-        for obj in page.get("Contents", []):
-            if newest is None or obj["LastModified"] > newest:
-                newest = obj["LastModified"]
+    try:
+        paginator = s3.get_paginator("list_objects_v2")
+        for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
+            for obj in page.get("Contents", []):
+                if newest is None or obj["LastModified"] > newest:
+                    newest = obj["LastModified"]
+    except (ClientError, Exception) as e:
+        # Transient S3 errors (DNS, network, throttle) — return None so the
+        # poll loop retries on the next cycle instead of crashing the test.
+        if "Could not connect" in str(e) or "EndpointConnectionError" in str(type(e).__name__):
+            return None
+        raise
     return newest
 
 
@@ -1065,12 +1072,18 @@ def trigger_and_wait_backup(ctx: Ctx):
 
 
 def _list_data_objects(s3, bucket: str) -> dict:
-    """Map of key -> (LastModified, Size) under data/."""
+    """Map of key -> (LastModified, Size) under data/.
+    Returns empty dict on transient S3 errors (retry on next poll cycle)."""
     out = {}
-    for page in s3.get_paginator("list_objects_v2").paginate(
-            Bucket=bucket, Prefix="data/"):
-        for o in page.get("Contents", []):
-            out[o["Key"]] = (o["LastModified"], o["Size"])
+    try:
+        for page in s3.get_paginator("list_objects_v2").paginate(
+                Bucket=bucket, Prefix="data/"):
+            for o in page.get("Contents", []):
+                out[o["Key"]] = (o["LastModified"], o["Size"])
+    except Exception as e:
+        if "Could not connect" in str(e) or "EndpointConnectionError" in str(type(e).__name__):
+            return {}
+        raise
     return out
 
 
