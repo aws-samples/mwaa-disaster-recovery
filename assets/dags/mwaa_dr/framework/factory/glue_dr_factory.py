@@ -26,6 +26,8 @@ import boto3
 from airflow import DAG
 from airflow.decorators import task
 from airflow.models import Variable
+from airflow.operators.empty import EmptyOperator
+from airflow.operators.python import PythonOperator
 from mwaa_dr.framework.credential_extractor import CredentialExtractor
 from mwaa_dr.framework.factory.base_dr_factory import BaseDRFactory
 from mwaa_dr.framework.model.base_table import BaseTable
@@ -803,7 +805,7 @@ class GlueDRFactory(BaseDRFactory):
                 """Restore Airflow connections via the MWAA REST API from S3."""
                 factory.restore_connections_via_api(context=context)
 
-            @task(trigger_rule="all_done")
+            @task
             def notify_success_to_sfn(**context):
                 """Send success callback to StepFunctions if all upstreams passed."""
                 dag_run = context.get("dag_run")
@@ -852,7 +854,7 @@ class GlueDRFactory(BaseDRFactory):
                 sfn.send_task_success(taskToken=task_token, output=json.dumps(result))
                 logger.info("Sent task success to StepFunctions.")
 
-            @task(trigger_rule="all_done")
+            @task
             def notify_failure_to_sfn(**context):
                 """Send failure callback to StepFunctions if any upstream failed."""
                 dag_run = context.get("dag_run")
@@ -953,12 +955,19 @@ class GlueDRFactory(BaseDRFactory):
             restore_vars = restore_variables_via_api_task()
             restore_conns = restore_connections_via_api_task()
 
-            # All restore tasks must complete before success notification
+            # All restore tasks must complete before success notification.
+            # Use an EmptyOperator with all_done as a join point — @task
+            # with trigger_rule doesn't fire reliably on Airflow 3.x.
+            join = EmptyOperator(
+                task_id="join_all_done",
+                trigger_rule="all_done",
+            )
             success = notify_success_to_sfn()
             failure = notify_failure_to_sfn()
 
-            [import_job, restore_vars, restore_conns] >> success
-            [import_job, restore_vars, restore_conns] >> failure
+            [import_job, restore_vars, restore_conns] >> join
+            join >> success
+            join >> failure
 
         return dag
 
@@ -1037,7 +1046,7 @@ class GlueDRFactory(BaseDRFactory):
                     glue_client.create_connection(ConnectionInput=conn_input)
                 logger.info("Glue connection '%s' ready.", connection_name)
 
-            @task(trigger_rule="all_done")
+            @task
             def notify_success_to_sfn(**context):
                 """Send success callback to StepFunctions if all upstreams passed."""
                 dag_run = context.get("dag_run")
@@ -1079,7 +1088,7 @@ class GlueDRFactory(BaseDRFactory):
                 sfn.send_task_success(taskToken=task_token, output=json.dumps(result))
                 logger.info("Sent task success to StepFunctions.")
 
-            @task(trigger_rule="all_done")
+            @task
             def notify_failure_to_sfn(**context):
                 """Send failure callback to StepFunctions if any upstream failed."""
                 dag_run = context.get("dag_run")
@@ -1164,12 +1173,19 @@ class GlueDRFactory(BaseDRFactory):
 
             setup_task >> cleanup_job
 
-            # Notify StepFunctions on success or failure
+            # Notify StepFunctions on success or failure.
+            # Use an EmptyOperator with all_done as a join point — @task
+            # with trigger_rule doesn't fire reliably on Airflow 3.x.
+            join = EmptyOperator(
+                task_id="join_all_done",
+                trigger_rule="all_done",
+            )
             success = notify_success_to_sfn()
             failure = notify_failure_to_sfn()
 
-            cleanup_job >> success
-            cleanup_job >> failure
+            cleanup_job >> join
+            join >> success
+            join >> failure
 
         return dag
 
