@@ -803,9 +803,9 @@ class GlueDRFactory(BaseDRFactory):
                 """Restore Airflow connections via the MWAA REST API from S3."""
                 factory.restore_connections_via_api(context=context)
 
-            @task
+            @task(trigger_rule="all_done")
             def notify_success_to_sfn(**context):
-                """Send success callback to StepFunctions."""
+                """Send success callback to StepFunctions if all upstreams passed."""
                 dag_run = context.get("dag_run")
                 task_token = (
                     dag_run.conf.get("task_token") if dag_run and dag_run.conf else None
@@ -814,6 +814,20 @@ class GlueDRFactory(BaseDRFactory):
                 if not task_token:
                     logger.warning(
                         "No task_token found in dag_run.conf, skipping SFN callback."
+                    )
+                    return
+
+                # Check upstream states — only send success if everything passed
+                ti = context.get("task_instance") or context.get("ti")
+                upstream_tis = ti.get_direct_relatives(upstream=True) if ti else []
+                failed = [
+                    t.task_id for t in upstream_tis
+                    if t.state not in ("success", "skipped")
+                ]
+                if failed:
+                    logger.info(
+                        "Skipping success callback — upstream tasks not all "
+                        "successful: %s", failed
                     )
                     return
 
@@ -828,9 +842,9 @@ class GlueDRFactory(BaseDRFactory):
                 sfn.send_task_success(taskToken=task_token, output=json.dumps(result))
                 logger.info("Sent task success to StepFunctions.")
 
-            @task(trigger_rule="one_failed")
+            @task(trigger_rule="all_done")
             def notify_failure_to_sfn(**context):
-                """Send failure callback to StepFunctions on any upstream failure."""
+                """Send failure callback to StepFunctions if any upstream failed."""
                 dag_run = context.get("dag_run")
                 task_token = (
                     dag_run.conf.get("task_token") if dag_run and dag_run.conf else None
@@ -842,9 +856,23 @@ class GlueDRFactory(BaseDRFactory):
                     )
                     return
 
+                # Only send failure if at least one upstream genuinely failed
+                ti = context.get("task_instance") or context.get("ti")
+                upstream_tis = ti.get_direct_relatives(upstream=True) if ti else []
+                failed = [
+                    t.task_id for t in upstream_tis
+                    if t.state not in ("success", "skipped")
+                ]
+                if not failed:
+                    logger.info(
+                        "Skipping failure callback — all upstream tasks succeeded."
+                    )
+                    return
+
                 result = {
                     "dag": dag_run.dag_id,
                     "dag_run": dag_run.run_id,
+                    "tasks": failed,
                     "status": "Fail",
                 }
 
@@ -991,9 +1019,9 @@ class GlueDRFactory(BaseDRFactory):
                     glue_client.create_connection(ConnectionInput=conn_input)
                 logger.info("Glue connection '%s' ready.", connection_name)
 
-            @task
+            @task(trigger_rule="all_done")
             def notify_success_to_sfn(**context):
-                """Send success callback to StepFunctions."""
+                """Send success callback to StepFunctions if all upstreams passed."""
                 dag_run = context.get("dag_run")
                 task_token = (
                     dag_run.conf.get("task_token") if dag_run and dag_run.conf else None
@@ -1002,6 +1030,19 @@ class GlueDRFactory(BaseDRFactory):
                 if not task_token:
                     logger.warning(
                         "No task_token found in dag_run.conf, skipping SFN callback."
+                    )
+                    return
+
+                ti = context.get("task_instance") or context.get("ti")
+                upstream_tis = ti.get_direct_relatives(upstream=True) if ti else []
+                failed = [
+                    t.task_id for t in upstream_tis
+                    if t.state not in ("success", "skipped")
+                ]
+                if failed:
+                    logger.info(
+                        "Skipping success callback — upstream tasks not all "
+                        "successful: %s", failed
                     )
                     return
 
@@ -1015,9 +1056,9 @@ class GlueDRFactory(BaseDRFactory):
                 sfn.send_task_success(taskToken=task_token, output=json.dumps(result))
                 logger.info("Sent task success to StepFunctions.")
 
-            @task(trigger_rule="one_failed")
+            @task(trigger_rule="all_done")
             def notify_failure_to_sfn(**context):
-                """Send failure callback to StepFunctions on any upstream failure."""
+                """Send failure callback to StepFunctions if any upstream failed."""
                 dag_run = context.get("dag_run")
                 task_token = (
                     dag_run.conf.get("task_token") if dag_run and dag_run.conf else None
@@ -1029,9 +1070,22 @@ class GlueDRFactory(BaseDRFactory):
                     )
                     return
 
+                ti = context.get("task_instance") or context.get("ti")
+                upstream_tis = ti.get_direct_relatives(upstream=True) if ti else []
+                failed = [
+                    t.task_id for t in upstream_tis
+                    if t.state not in ("success", "skipped")
+                ]
+                if not failed:
+                    logger.info(
+                        "Skipping failure callback — all upstream tasks succeeded."
+                    )
+                    return
+
                 result = {
                     "dag": dag_run.dag_id,
                     "dag_run": dag_run.run_id,
+                    "tasks": failed,
                     "status": "Fail",
                 }
 
