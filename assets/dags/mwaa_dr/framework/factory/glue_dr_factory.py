@@ -342,7 +342,7 @@ class GlueDRFactory(BaseDRFactory):
 
     # --- REST API restore helpers ---
 
-    def restore_variables_via_api(self):
+    def restore_variables_via_api(self, context=None):
         """Restore Airflow variables from a CSV backup in S3 via the MWAA REST API.
 
         Reads the pipe-delimited CSV file at
@@ -365,8 +365,9 @@ class GlueDRFactory(BaseDRFactory):
 
         client = self.get_mwaa_rest_api_client()
 
-        # Read backup CSV from S3
-        backup_bucket = self.bucket()
+        # Read backup CSV from S3 — use dag_run conf bucket when available
+        # (Step Functions passes the correct backup bucket in conf)
+        backup_bucket = self.bucket(context)
         s3_key = f"{self.path_prefix}/variable.csv"
         s3_client = boto3.client("s3")
 
@@ -438,7 +439,7 @@ class GlueDRFactory(BaseDRFactory):
 
         logger.info("Variable restore complete (strategy=%s).", strategy)
 
-    def restore_connections_via_api(self):
+    def restore_connections_via_api(self, context=None):
         """Restore Airflow connections from a CSV backup in S3 via the MWAA REST API.
 
         Reads the pipe-delimited CSV file at
@@ -461,8 +462,8 @@ class GlueDRFactory(BaseDRFactory):
 
         client = self.get_mwaa_rest_api_client()
 
-        # Read backup CSV from S3
-        backup_bucket = self.bucket()
+        # Read backup CSV from S3 — use dag_run conf bucket when available
+        backup_bucket = self.bucket(context)
         s3_key = f"{self.path_prefix}/connection.csv"
         s3_client = boto3.client("s3")
 
@@ -793,14 +794,14 @@ class GlueDRFactory(BaseDRFactory):
                 logger.info("Glue connection '%s' ready.", connection_name)
 
             @task
-            def restore_variables_via_api_task():
+            def restore_variables_via_api_task(**context):
                 """Restore Airflow variables via the MWAA REST API from S3."""
-                factory.restore_variables_via_api()
+                factory.restore_variables_via_api(context=context)
 
             @task
-            def restore_connections_via_api_task():
+            def restore_connections_via_api_task(**context):
                 """Restore Airflow connections via the MWAA REST API from S3."""
-                factory.restore_connections_via_api()
+                factory.restore_connections_via_api(context=context)
 
             @task
             def notify_success_to_sfn(**context):
