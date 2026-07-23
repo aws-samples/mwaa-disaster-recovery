@@ -40,5 +40,5 @@ timeouts:
   mwaa_creation_mins: 75
   backup_dag_wait_mins: 30
   dr_simulation_mins: 45
-  cdk_deploy_mins: 30
+  cdk_deploy_mins: 45
   poll_interval_secs: 30
