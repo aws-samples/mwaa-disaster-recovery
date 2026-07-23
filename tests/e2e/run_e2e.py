@@ -1456,20 +1456,43 @@ def cleanup_everything(cfg: Config, board: StatusBoard):
         for f in futures:
             f.result()
 
-    # S3 buckets
-    s3 = boto3.client("s3")
-    for b in s3.list_buckets()["Buckets"]:
-        if b["Name"].startswith(cfg.id_prefix):
-            region = s3.get_bucket_location(Bucket=b["Name"]).get(
-                "LocationConstraint") or "us-east-1"
-            empty_and_delete_bucket(board, b["Name"], region)
-
     # IAM roles
     iam = boto3.client("iam")
     for page in iam.get_paginator("list_roles").paginate():
         for role in page["Roles"]:
             if role["RoleName"].startswith(cfg.id_prefix):
                 delete_role(board, role["RoleName"])
+
+    # Glue jobs and connections (created by the DR DAGs, namespaced by
+    # env name: {env_name}_{dag}_{suffix} and {env_name}_conn)
+    for region in (cfg.primary_region, cfg.secondary_region):
+        glue = boto3.client("glue", region_name=region)
+        try:
+            jobs = glue.get_jobs(MaxResults=200).get("Jobs", [])
+            for job in jobs:
+                if job["Name"].startswith(cfg.id_prefix):
+                    glue.delete_job(JobName=job["Name"])
+                    board.log(f"Deleted Glue job {job['Name']} ({region})")
+        except ClientError as e:
+            board.log(f"WARN: Glue jobs cleanup ({region}): {e}")
+        try:
+            conns = glue.get_connections().get("ConnectionList", [])
+            for conn in conns:
+                if conn["Name"].startswith(cfg.id_prefix):
+                    glue.delete_connection(ConnectionName=conn["Name"])
+                    board.log(f"Deleted Glue connection {conn['Name']} ({region})")
+        except ClientError as e:
+            board.log(f"WARN: Glue connections cleanup ({region}): {e}")
+
+    # S3 buckets created by CDK stacks (backup, replication-report buckets
+    # have CDK-generated names starting with the stack prefix)
+    s3_client = boto3.client("s3")
+    for b in s3_client.list_buckets()["Buckets"]:
+        name = b["Name"]
+        if name.startswith(cfg.id_prefix):
+            region = s3_client.get_bucket_location(Bucket=name).get(
+                "LocationConstraint") or "us-east-1"
+            empty_and_delete_bucket(board, name, region)
 
     # Shared VPCs (and any leftover per-version VPCs by name prefix)
     for region in (cfg.primary_region, cfg.secondary_region):
