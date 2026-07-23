@@ -817,19 +817,29 @@ class GlueDRFactory(BaseDRFactory):
                     )
                     return
 
-                # Check upstream states — only send success if everything passed
-                ti = context.get("task_instance") or context.get("ti")
-                upstream_tis = ti.get_direct_relatives(upstream=True) if ti else []
-                failed = [
-                    t.task_id for t in upstream_tis
-                    if t.state not in ("success", "skipped")
-                ]
-                if failed:
-                    logger.info(
-                        "Skipping success callback — upstream tasks not all "
-                        "successful: %s", failed
-                    )
-                    return
+                # Check if any upstream task failed. Use dag_run.get_task_instances
+                # where available (AF 2.x), otherwise fall through to send success
+                # (with all_done trigger_rule, if we're running then everything
+                # finished — the failure callback handles the unhappy path).
+                try:
+                    all_tis = dag_run.get_task_instances()
+                    our_id = context.get("task_instance").task_id if context.get("task_instance") else "notify_success_to_sfn"
+                    failed = [
+                        ti.task_id for ti in all_tis
+                        if ti.task_id not in (our_id, "notify_failure_to_sfn")
+                        and ti.state not in ("success", "skipped", None)
+                    ]
+                    if failed:
+                        logger.info(
+                            "Skipping success callback — tasks not all "
+                            "successful: %s", failed
+                        )
+                        return
+                except Exception as e:
+                    # AF 3.x RuntimeTaskInstance may not support this — fall
+                    # through and send success (failure task handles the inverse)
+                    logger.info("Could not inspect upstream states (%s), "
+                                "proceeding with success callback.", e)
 
                 result = {
                     "dag": dag_run.dag_id,
@@ -856,13 +866,21 @@ class GlueDRFactory(BaseDRFactory):
                     )
                     return
 
-                # Only send failure if at least one upstream genuinely failed
-                ti = context.get("task_instance") or context.get("ti")
-                upstream_tis = ti.get_direct_relatives(upstream=True) if ti else []
-                failed = [
-                    t.task_id for t in upstream_tis
-                    if t.state not in ("success", "skipped")
-                ]
+                # Check if any upstream task actually failed
+                try:
+                    all_tis = dag_run.get_task_instances()
+                    our_id = context.get("task_instance").task_id if context.get("task_instance") else "notify_failure_to_sfn"
+                    failed = [
+                        ti.task_id for ti in all_tis
+                        if ti.task_id not in (our_id, "notify_success_to_sfn")
+                        and ti.state not in ("success", "skipped", None)
+                    ]
+                except Exception:
+                    # AF 3.x — can't inspect states; assume failure since this
+                    # task's trigger_rule is all_done and the dag-level
+                    # on_failure_callback also fires on terminal failure.
+                    failed = ["unknown (state inspection unavailable)"]
+
                 if not failed:
                     logger.info(
                         "Skipping failure callback — all upstream tasks succeeded."
@@ -1033,18 +1051,23 @@ class GlueDRFactory(BaseDRFactory):
                     )
                     return
 
-                ti = context.get("task_instance") or context.get("ti")
-                upstream_tis = ti.get_direct_relatives(upstream=True) if ti else []
-                failed = [
-                    t.task_id for t in upstream_tis
-                    if t.state not in ("success", "skipped")
-                ]
-                if failed:
-                    logger.info(
-                        "Skipping success callback — upstream tasks not all "
-                        "successful: %s", failed
-                    )
-                    return
+                try:
+                    all_tis = dag_run.get_task_instances()
+                    our_id = context.get("task_instance").task_id if context.get("task_instance") else "notify_success_to_sfn"
+                    failed = [
+                        ti.task_id for ti in all_tis
+                        if ti.task_id not in (our_id, "notify_failure_to_sfn")
+                        and ti.state not in ("success", "skipped", None)
+                    ]
+                    if failed:
+                        logger.info(
+                            "Skipping success callback — tasks not all "
+                            "successful: %s", failed
+                        )
+                        return
+                except Exception as e:
+                    logger.info("Could not inspect upstream states (%s), "
+                                "proceeding with success callback.", e)
 
                 result = {
                     "dag": dag_run.dag_id,
@@ -1070,12 +1093,17 @@ class GlueDRFactory(BaseDRFactory):
                     )
                     return
 
-                ti = context.get("task_instance") or context.get("ti")
-                upstream_tis = ti.get_direct_relatives(upstream=True) if ti else []
-                failed = [
-                    t.task_id for t in upstream_tis
-                    if t.state not in ("success", "skipped")
-                ]
+                try:
+                    all_tis = dag_run.get_task_instances()
+                    our_id = context.get("task_instance").task_id if context.get("task_instance") else "notify_failure_to_sfn"
+                    failed = [
+                        ti.task_id for ti in all_tis
+                        if ti.task_id not in (our_id, "notify_success_to_sfn")
+                        and ti.state not in ("success", "skipped", None)
+                    ]
+                except Exception:
+                    failed = ["unknown (state inspection unavailable)"]
+
                 if not failed:
                     logger.info(
                         "Skipping failure callback — all upstream tasks succeeded."
