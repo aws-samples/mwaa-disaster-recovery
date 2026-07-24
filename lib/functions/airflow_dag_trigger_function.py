@@ -52,10 +52,12 @@ def handler(event, context):
         print(f"Unpausing DAG {dag} via InvokeRestApi ...")
         client = boto3.client("mwaa")
         client.invoke_rest_api(
-            Name=mwaa_env_name, Method="PATCH",
+            Name=mwaa_env_name,
+            Method="PATCH",
             Path=f"/dags/{dag}",
             Body={"is_paused": False},
-            QueryParameters={"update_mask": "is_paused"})
+            QueryParameters={"update_mask": "is_paused"},
+        )
     else:
         airflow_cli = AirflowCliClient(mwaa_env_name, mwaa_env_version)
         print(f"Unpausing DAG {dag} ...")
@@ -98,15 +100,19 @@ def _trigger_via_rest_api(env_name, dag_id, conf):
         except client.exceptions.RestApiServerException as e:
             if attempt == attempts:
                 raise
-            print(f"Transient webserver error triggering {dag_id} "
-                  f"(attempt {attempt}/{attempts}): {e}; retrying in 20s")
+            print(
+                f"Transient webserver error triggering {dag_id} "
+                f"(attempt {attempt}/{attempts}): {e}; retrying in 20s"
+            )
             time.sleep(20)
             continue
         status = response.get("RestApiStatusCode", 0)
         data = response.get("RestApiResponse", {})
         if status >= 500 and attempt < attempts:
-            print(f"Webserver 5xx triggering {dag_id} "
-                  f"(attempt {attempt}/{attempts}): {status} {data}; retrying in 20s")
+            print(
+                f"Webserver 5xx triggering {dag_id} "
+                f"(attempt {attempt}/{attempts}): {status} {data}; retrying in 20s"
+            )
             time.sleep(20)
             continue
         if status >= 400:

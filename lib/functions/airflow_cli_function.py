@@ -78,8 +78,10 @@ def on_delete(event):
         results = execute_commands(cli_input.delete)
         reason = "Successfully executed Airflow CLI commands"
     except Exception as e:  # noqa: BLE001 - never block stack deletion
-        print(f"Ignoring Airflow CLI failure on Delete "
-              f"(environment likely deleted): {e}")
+        print(
+            f"Ignoring Airflow CLI failure on Delete "
+            f"(environment likely deleted): {e}"
+        )
         results = {"count": 0}
         reason = f"Skipped Airflow CLI commands on delete: {e}"
 

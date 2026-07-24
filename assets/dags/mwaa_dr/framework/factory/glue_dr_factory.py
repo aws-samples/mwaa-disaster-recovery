@@ -27,7 +27,6 @@ from airflow import DAG
 from airflow.decorators import task
 from airflow.models import Variable
 from airflow.operators.empty import EmptyOperator
-from airflow.operators.python import PythonOperator
 from mwaa_dr.framework.credential_extractor import CredentialExtractor
 from mwaa_dr.framework.factory.base_dr_factory import BaseDRFactory
 from mwaa_dr.framework.model.base_table import BaseTable
@@ -825,23 +824,32 @@ class GlueDRFactory(BaseDRFactory):
                 # finished — the failure callback handles the unhappy path).
                 try:
                     all_tis = dag_run.get_task_instances()
-                    our_id = context.get("task_instance").task_id if context.get("task_instance") else "notify_success_to_sfn"
+                    our_id = (
+                        context.get("task_instance").task_id
+                        if context.get("task_instance")
+                        else "notify_success_to_sfn"
+                    )
                     failed = [
-                        ti.task_id for ti in all_tis
+                        ti.task_id
+                        for ti in all_tis
                         if ti.task_id not in (our_id, "notify_failure_to_sfn")
                         and ti.state not in ("success", "skipped", None)
                     ]
                     if failed:
                         logger.info(
                             "Skipping success callback — tasks not all "
-                            "successful: %s", failed
+                            "successful: %s",
+                            failed,
                         )
                         return
                 except Exception as e:
                     # AF 3.x RuntimeTaskInstance may not support this — fall
                     # through and send success (failure task handles the inverse)
-                    logger.info("Could not inspect upstream states (%s), "
-                                "proceeding with success callback.", e)
+                    logger.info(
+                        "Could not inspect upstream states (%s), "
+                        "proceeding with success callback.",
+                        e,
+                    )
 
                 result = {
                     "dag": dag_run.dag_id,
@@ -852,12 +860,16 @@ class GlueDRFactory(BaseDRFactory):
 
                 sfn = boto3.client("stepfunctions")
                 try:
-                    sfn.send_task_success(taskToken=task_token, output=json.dumps(result))
+                    sfn.send_task_success(
+                        taskToken=task_token, output=json.dumps(result)
+                    )
                     logger.info("Sent task success to StepFunctions.")
                 except sfn.exceptions.TaskTimedOut:
-                    logger.warning("SFN task token expired (TaskTimedOut) — the "
-                                   "Step Functions execution already completed or "
-                                   "timed out. The restore itself succeeded.")
+                    logger.warning(
+                        "SFN task token expired (TaskTimedOut) — the "
+                        "Step Functions execution already completed or "
+                        "timed out. The restore itself succeeded."
+                    )
 
             @task
             def notify_failure_to_sfn(**context):
@@ -876,16 +888,23 @@ class GlueDRFactory(BaseDRFactory):
                 # Check if any upstream task actually failed
                 try:
                     all_tis = dag_run.get_task_instances()
-                    our_id = context.get("task_instance").task_id if context.get("task_instance") else "notify_failure_to_sfn"
+                    our_id = (
+                        context.get("task_instance").task_id
+                        if context.get("task_instance")
+                        else "notify_failure_to_sfn"
+                    )
                     failed = [
-                        ti.task_id for ti in all_tis
+                        ti.task_id
+                        for ti in all_tis
                         if ti.task_id not in (our_id, "notify_success_to_sfn")
                         and ti.state not in ("success", "skipped", None)
                     ]
                 except Exception:
-                    logger.info("Could not inspect upstream states on AF 3.x, "
-                                "skipping failure callback (success callback "
-                                "handles the happy path).")
+                    logger.info(
+                        "Could not inspect upstream states on AF 3.x, "
+                        "skipping failure callback (success callback "
+                        "handles the happy path)."
+                    )
                     return
 
                 if not failed:
@@ -910,9 +929,11 @@ class GlueDRFactory(BaseDRFactory):
                     )
                     logger.info("Sent task failure to StepFunctions.")
                 except sfn.exceptions.TaskTimedOut:
-                    logger.warning("SFN task token expired (TaskTimedOut) — the "
-                                   "Step Functions execution already completed or "
-                                   "timed out.")
+                    logger.warning(
+                        "SFN task token expired (TaskTimedOut) — the "
+                        "Step Functions execution already completed or "
+                        "timed out."
+                    )
 
             # Build the DAG structure
             setup_task = setup_glue_connection()
@@ -1072,21 +1093,30 @@ class GlueDRFactory(BaseDRFactory):
 
                 try:
                     all_tis = dag_run.get_task_instances()
-                    our_id = context.get("task_instance").task_id if context.get("task_instance") else "notify_success_to_sfn"
+                    our_id = (
+                        context.get("task_instance").task_id
+                        if context.get("task_instance")
+                        else "notify_success_to_sfn"
+                    )
                     failed = [
-                        ti.task_id for ti in all_tis
+                        ti.task_id
+                        for ti in all_tis
                         if ti.task_id not in (our_id, "notify_failure_to_sfn")
                         and ti.state not in ("success", "skipped", None)
                     ]
                     if failed:
                         logger.info(
                             "Skipping success callback — tasks not all "
-                            "successful: %s", failed
+                            "successful: %s",
+                            failed,
                         )
                         return
                 except Exception as e:
-                    logger.info("Could not inspect upstream states (%s), "
-                                "proceeding with success callback.", e)
+                    logger.info(
+                        "Could not inspect upstream states (%s), "
+                        "proceeding with success callback.",
+                        e,
+                    )
 
                 result = {
                     "dag": dag_run.dag_id,
@@ -1096,12 +1126,16 @@ class GlueDRFactory(BaseDRFactory):
 
                 sfn = boto3.client("stepfunctions")
                 try:
-                    sfn.send_task_success(taskToken=task_token, output=json.dumps(result))
+                    sfn.send_task_success(
+                        taskToken=task_token, output=json.dumps(result)
+                    )
                     logger.info("Sent task success to StepFunctions.")
                 except sfn.exceptions.TaskTimedOut:
-                    logger.warning("SFN task token expired (TaskTimedOut) — the "
-                                   "Step Functions execution already completed or "
-                                   "timed out. The restore itself succeeded.")
+                    logger.warning(
+                        "SFN task token expired (TaskTimedOut) — the "
+                        "Step Functions execution already completed or "
+                        "timed out. The restore itself succeeded."
+                    )
 
             @task
             def notify_failure_to_sfn(**context):
@@ -1119,16 +1153,23 @@ class GlueDRFactory(BaseDRFactory):
 
                 try:
                     all_tis = dag_run.get_task_instances()
-                    our_id = context.get("task_instance").task_id if context.get("task_instance") else "notify_failure_to_sfn"
+                    our_id = (
+                        context.get("task_instance").task_id
+                        if context.get("task_instance")
+                        else "notify_failure_to_sfn"
+                    )
                     failed = [
-                        ti.task_id for ti in all_tis
+                        ti.task_id
+                        for ti in all_tis
                         if ti.task_id not in (our_id, "notify_success_to_sfn")
                         and ti.state not in ("success", "skipped", None)
                     ]
                 except Exception:
-                    logger.info("Could not inspect upstream states on AF 3.x, "
-                                "skipping failure callback (success callback "
-                                "handles the happy path).")
+                    logger.info(
+                        "Could not inspect upstream states on AF 3.x, "
+                        "skipping failure callback (success callback "
+                        "handles the happy path)."
+                    )
                     return
 
                 if not failed:
@@ -1153,9 +1194,11 @@ class GlueDRFactory(BaseDRFactory):
                     )
                     logger.info("Sent task failure to StepFunctions.")
                 except sfn.exceptions.TaskTimedOut:
-                    logger.warning("SFN task token expired (TaskTimedOut) — the "
-                                   "Step Functions execution already completed or "
-                                   "timed out.")
+                    logger.warning(
+                        "SFN task token expired (TaskTimedOut) — the "
+                        "Step Functions execution already completed or "
+                        "timed out."
+                    )
 
             # Build the DAG structure
             setup_task = setup_glue_connection()
