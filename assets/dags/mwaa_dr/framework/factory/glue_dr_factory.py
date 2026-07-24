@@ -851,8 +851,13 @@ class GlueDRFactory(BaseDRFactory):
                 }
 
                 sfn = boto3.client("stepfunctions")
-                sfn.send_task_success(taskToken=task_token, output=json.dumps(result))
-                logger.info("Sent task success to StepFunctions.")
+                try:
+                    sfn.send_task_success(taskToken=task_token, output=json.dumps(result))
+                    logger.info("Sent task success to StepFunctions.")
+                except sfn.exceptions.TaskTimedOut:
+                    logger.warning("SFN task token expired (TaskTimedOut) — the "
+                                   "Step Functions execution already completed or "
+                                   "timed out. The restore itself succeeded.")
 
             @task
             def notify_failure_to_sfn(**context):
@@ -897,12 +902,17 @@ class GlueDRFactory(BaseDRFactory):
                 }
 
                 sfn = boto3.client("stepfunctions")
-                sfn.send_task_failure(
-                    taskToken=task_token,
-                    error="Restore Failure",
-                    cause=json.dumps(result),
-                )
-                logger.info("Sent task failure to StepFunctions.")
+                try:
+                    sfn.send_task_failure(
+                        taskToken=task_token,
+                        error="Restore Failure",
+                        cause=json.dumps(result),
+                    )
+                    logger.info("Sent task failure to StepFunctions.")
+                except sfn.exceptions.TaskTimedOut:
+                    logger.warning("SFN task token expired (TaskTimedOut) — the "
+                                   "Step Functions execution already completed or "
+                                   "timed out.")
 
             # Build the DAG structure
             setup_task = setup_glue_connection()
@@ -1085,8 +1095,13 @@ class GlueDRFactory(BaseDRFactory):
                 }
 
                 sfn = boto3.client("stepfunctions")
-                sfn.send_task_success(taskToken=task_token, output=json.dumps(result))
-                logger.info("Sent task success to StepFunctions.")
+                try:
+                    sfn.send_task_success(taskToken=task_token, output=json.dumps(result))
+                    logger.info("Sent task success to StepFunctions.")
+                except sfn.exceptions.TaskTimedOut:
+                    logger.warning("SFN task token expired (TaskTimedOut) — the "
+                                   "Step Functions execution already completed or "
+                                   "timed out. The restore itself succeeded.")
 
             @task
             def notify_failure_to_sfn(**context):
@@ -1127,12 +1142,17 @@ class GlueDRFactory(BaseDRFactory):
                 }
 
                 sfn = boto3.client("stepfunctions")
-                sfn.send_task_failure(
-                    taskToken=task_token,
-                    error="Cleanup Failure",
-                    cause=json.dumps(result),
-                )
-                logger.info("Sent task failure to StepFunctions.")
+                try:
+                    sfn.send_task_failure(
+                        taskToken=task_token,
+                        error="Cleanup Failure",
+                        cause=json.dumps(result),
+                    )
+                    logger.info("Sent task failure to StepFunctions.")
+                except sfn.exceptions.TaskTimedOut:
+                    logger.warning("SFN task token expired (TaskTimedOut) — the "
+                                   "Step Functions execution already completed or "
+                                   "timed out.")
 
             # Build the DAG structure
             setup_task = setup_glue_connection()
