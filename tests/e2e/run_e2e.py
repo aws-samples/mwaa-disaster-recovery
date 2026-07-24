@@ -62,13 +62,16 @@ _child_procs_lock = threading.Lock()
 # Configuration
 # ============================================================================
 
+
 @dataclass
 class Config:
     id_prefix: str = "mwaa-e2e"
     parallel: bool = True
     primary_region: str = "us-east-1"
     secondary_region: str = "us-west-2"
-    versions: list = field(default_factory=lambda: ["2.10.3", "2.11.0", "3.0.2", "3.2.1"])
+    versions: list = field(
+        default_factory=lambda: ["2.10.3", "2.11.0", "3.0.2", "3.2.1"]
+    )
     dr_strategies: list = field(default_factory=lambda: ["WARM_STANDBY"])
     environment_class: str = "mw1.small"
     max_workers: int = 2
@@ -105,11 +108,19 @@ class Config:
             cfg.bedrock_model_id = br.get("model_id", cfg.bedrock_model_id)
             cfg.bedrock_region = br.get("region", cfg.bedrock_region)
             to = raw.get("timeouts", {})
-            cfg.mwaa_creation_mins = int(to.get("mwaa_creation_mins", cfg.mwaa_creation_mins))
-            cfg.backup_dag_wait_mins = int(to.get("backup_dag_wait_mins", cfg.backup_dag_wait_mins))
-            cfg.dr_simulation_mins = int(to.get("dr_simulation_mins", cfg.dr_simulation_mins))
+            cfg.mwaa_creation_mins = int(
+                to.get("mwaa_creation_mins", cfg.mwaa_creation_mins)
+            )
+            cfg.backup_dag_wait_mins = int(
+                to.get("backup_dag_wait_mins", cfg.backup_dag_wait_mins)
+            )
+            cfg.dr_simulation_mins = int(
+                to.get("dr_simulation_mins", cfg.dr_simulation_mins)
+            )
             cfg.cdk_deploy_mins = int(to.get("cdk_deploy_mins", cfg.cdk_deploy_mins))
-            cfg.poll_interval_secs = int(to.get("poll_interval_secs", cfg.poll_interval_secs))
+            cfg.poll_interval_secs = int(
+                to.get("poll_interval_secs", cfg.poll_interval_secs)
+            )
         # Account is ALWAYS auto-detected from active credentials.
         cfg.account_id = boto3.client("sts").get_caller_identity()["Account"]
         return cfg
@@ -122,6 +133,7 @@ def slug(version: str) -> str:
 # ============================================================================
 # Status board — live progress on the main terminal
 # ============================================================================
+
 
 class StatusBoard:
     """Thread-safe status tracking with a background printer.
@@ -138,9 +150,9 @@ class StatusBoard:
         self.log_dir = log_dir
         self.interval = interval
         self._lock = threading.Lock()
-        self._status: dict = {}       # key -> (status_text, updated_at)
-        self._done: dict = {}         # key -> final result str
-        self._dirty = False           # something changed since last board print
+        self._status: dict = {}  # key -> (status_text, updated_at)
+        self._done: dict = {}  # key -> final result str
+        self._dirty = False  # something changed since last board print
         self._stop = threading.Event()
         self._start_ts = time.time()
         self.logfile = open(log_dir / "e2e.log", "a")
@@ -198,7 +210,9 @@ class StatusBoard:
                     age = int(time.time() - upd)
                     lines.append(f"  ⏳ {key}: {status} ({self._fmt_age(age)} ago)")
                 for key, result in sorted(self._done.items()):
-                    lines.append(f"  {'✅' if result == 'PASS' else '❌'} {key}: {result}")
+                    lines.append(
+                        f"  {'✅' if result == 'PASS' else '❌'} {key}: {result}"
+                    )
                 print("\n".join(lines), flush=True)
 
 
@@ -206,15 +220,26 @@ class StatusBoard:
 # Subprocess helper (tracked for clean Ctrl+C)
 # ============================================================================
 
-def run_cmd(cmd: list, env: dict = None, cwd: Path = None, log_path: Path = None,
-            timeout_secs: int = 1800) -> int:
+
+def run_cmd(
+    cmd: list,
+    env: dict = None,
+    cwd: Path = None,
+    log_path: Path = None,
+    timeout_secs: int = 1800,
+) -> int:
     """Run a subprocess, streaming output to a log file. Returns exit code."""
     full_env = dict(os.environ)
     if env:
         full_env.update(env)
     out = open(log_path, "a") if log_path else subprocess.DEVNULL
-    proc = subprocess.Popen(cmd, env=full_env, cwd=str(cwd or REPO_ROOT),
-                            stdout=out, stderr=subprocess.STDOUT)
+    proc = subprocess.Popen(
+        cmd,
+        env=full_env,
+        cwd=str(cwd or REPO_ROOT),
+        stdout=out,
+        stderr=subprocess.STDOUT,
+    )
     with _child_procs_lock:
         _child_procs.append(proc)
     try:
@@ -242,6 +267,7 @@ def kill_children():
 # ============================================================================
 # Per-version test context
 # ============================================================================
+
 
 @dataclass
 class Ctx:
@@ -301,6 +327,7 @@ class Ctx:
 # Infrastructure: shared VPCs (one per region), buckets, IAM roles
 # ============================================================================
 
+
 class Infra:
     """Idempotent infrastructure provisioning. All resources tagged for cleanup."""
 
@@ -310,33 +337,52 @@ class Infra:
         self.vpc_info: dict = {}  # region -> {vpc_id, subnet_ids, sg_id}
 
     def _tags(self, name: str, rtype: str) -> list:
-        return [{
-            "ResourceType": rtype,
-            "Tags": [{"Key": "Name", "Value": name},
-                     {"Key": TAG_KEY, "Value": self.cfg.id_prefix}],
-        }]
+        return [
+            {
+                "ResourceType": rtype,
+                "Tags": [
+                    {"Key": "Name", "Value": name},
+                    {"Key": TAG_KEY, "Value": self.cfg.id_prefix},
+                ],
+            }
+        ]
 
     @staticmethod
     def _private_egress_ok(ec2, vpc_id: str, subnet_ids: list) -> bool:
         """True if every subnet has an active 0.0.0.0/0 route to an
         available NAT gateway via an explicitly associated route table."""
         try:
-            rtbs = ec2.describe_route_tables(Filters=[
-                {"Name": "vpc-id", "Values": [vpc_id]}])["RouteTables"]
+            rtbs = ec2.describe_route_tables(
+                Filters=[{"Name": "vpc-id", "Values": [vpc_id]}]
+            )["RouteTables"]
             for subnet_id in subnet_ids:
-                rtb = next((r for r in rtbs if any(
-                    a.get("SubnetId") == subnet_id for a in r["Associations"])),
-                    None)
+                rtb = next(
+                    (
+                        r
+                        for r in rtbs
+                        if any(
+                            a.get("SubnetId") == subnet_id for a in r["Associations"]
+                        )
+                    ),
+                    None,
+                )
                 if rtb is None:
                     return False
-                nat_id = next((rt.get("NatGatewayId") for rt in rtb["Routes"]
-                               if rt.get("DestinationCidrBlock") == "0.0.0.0/0"
-                               and rt.get("State") == "active"
-                               and rt.get("NatGatewayId")), None)
+                nat_id = next(
+                    (
+                        rt.get("NatGatewayId")
+                        for rt in rtb["Routes"]
+                        if rt.get("DestinationCidrBlock") == "0.0.0.0/0"
+                        and rt.get("State") == "active"
+                        and rt.get("NatGatewayId")
+                    ),
+                    None,
+                )
                 if not nat_id:
                     return False
-                nat = ec2.describe_nat_gateways(
-                    NatGatewayIds=[nat_id])["NatGateways"][0]
+                nat = ec2.describe_nat_gateways(NatGatewayIds=[nat_id])["NatGateways"][
+                    0
+                ]
                 if nat["State"] != "available":
                     return False
             return True
@@ -349,17 +395,24 @@ class Infra:
         vpc_name = f"{self.cfg.id_prefix}-shared-vpc"
 
         # Idempotency: find existing by Name tag
-        vpcs = ec2.describe_vpcs(
-            Filters=[{"Name": "tag:Name", "Values": [vpc_name]}])["Vpcs"]
+        vpcs = ec2.describe_vpcs(Filters=[{"Name": "tag:Name", "Values": [vpc_name]}])[
+            "Vpcs"
+        ]
         if vpcs:
             vpc_id = vpcs[0]["VpcId"]
             self.board.log(f"Reusing shared VPC {vpc_id} in {region}")
-            subnets = ec2.describe_subnets(Filters=[
-                {"Name": "vpc-id", "Values": [vpc_id]},
-                {"Name": "tag:Name", "Values": [f"{vpc_name}-priv-*"]}])["Subnets"]
-            sgs = ec2.describe_security_groups(Filters=[
-                {"Name": "vpc-id", "Values": [vpc_id]},
-                {"Name": "group-name", "Values": [f"{vpc_name}-mwaa-sg"]}])["SecurityGroups"]
+            subnets = ec2.describe_subnets(
+                Filters=[
+                    {"Name": "vpc-id", "Values": [vpc_id]},
+                    {"Name": "tag:Name", "Values": [f"{vpc_name}-priv-*"]},
+                ]
+            )["Subnets"]
+            sgs = ec2.describe_security_groups(
+                Filters=[
+                    {"Name": "vpc-id", "Values": [vpc_id]},
+                    {"Name": "group-name", "Values": [f"{vpc_name}-mwaa-sg"]},
+                ]
+            )["SecurityGroups"]
             if len(subnets) >= 2 and sgs:
                 # An interrupted cleanup can leave subnets+SG but delete the
                 # route tables / NAT — envs created there have no egress and
@@ -367,20 +420,25 @@ class Infra:
                 # actually route 0.0.0.0/0 to an available NAT gateway.
                 subnet_ids = [s["SubnetId"] for s in subnets[:2]]
                 if self._private_egress_ok(ec2, vpc_id, subnet_ids):
-                    info = {"vpc_id": vpc_id,
-                            "subnet_ids": subnet_ids,
-                            "sg_id": sgs[0]["GroupId"]}
+                    info = {
+                        "vpc_id": vpc_id,
+                        "subnet_ids": subnet_ids,
+                        "sg_id": sgs[0]["GroupId"],
+                    }
                     self.vpc_info[region] = info
                     return info
-            self.board.log(f"Existing VPC {vpc_id} incomplete "
-                           f"(missing routes/NAT/subnets/SG); repairing")
+            self.board.log(
+                f"Existing VPC {vpc_id} incomplete "
+                f"(missing routes/NAT/subnets/SG); repairing"
+            )
 
         else:
             self.board.log(f"Creating shared VPC in {region} (10.{octet}.0.0/16)")
             try:
                 vpc_id = ec2.create_vpc(
                     CidrBlock=f"10.{octet}.0.0/16",
-                    TagSpecifications=self._tags(vpc_name, "vpc"))["Vpc"]["VpcId"]
+                    TagSpecifications=self._tags(vpc_name, "vpc"),
+                )["Vpc"]["VpcId"]
             except ClientError as e:
                 if e.response["Error"]["Code"] == "VpcLimitExceeded":
                     total = len(ec2.describe_vpcs()["Vpcs"])
@@ -388,24 +446,35 @@ class Infra:
                         f"VPC limit reached in {region} ({total} VPCs exist). "
                         f"Free up a VPC (leftovers from previous runs? try "
                         f"'./run_e2e.py --cleanup-only') or request a quota "
-                        f"increase (Service Quotas → VPC → VPCs per region).")
+                        f"increase (Service Quotas → VPC → VPCs per region)."
+                    )
                 raise
             ec2.get_waiter("vpc_available").wait(VpcIds=[vpc_id])
             ec2.modify_vpc_attribute(VpcId=vpc_id, EnableDnsHostnames={"Value": True})
             ec2.modify_vpc_attribute(VpcId=vpc_id, EnableDnsSupport={"Value": True})
 
-        azs = [z["ZoneName"] for z in ec2.describe_availability_zones(
-            Filters=[{"Name": "state", "Values": ["available"]}])["AvailabilityZones"][:2]]
+        azs = [
+            z["ZoneName"]
+            for z in ec2.describe_availability_zones(
+                Filters=[{"Name": "state", "Values": ["available"]}]
+            )["AvailabilityZones"][:2]
+        ]
 
         def ensure_subnet(cidr, az, name):
-            existing = ec2.describe_subnets(Filters=[
-                {"Name": "vpc-id", "Values": [vpc_id]},
-                {"Name": "tag:Name", "Values": [name]}])["Subnets"]
+            existing = ec2.describe_subnets(
+                Filters=[
+                    {"Name": "vpc-id", "Values": [vpc_id]},
+                    {"Name": "tag:Name", "Values": [name]},
+                ]
+            )["Subnets"]
             if existing:
                 return existing[0]["SubnetId"]
             return ec2.create_subnet(
-                VpcId=vpc_id, CidrBlock=cidr, AvailabilityZone=az,
-                TagSpecifications=self._tags(name, "subnet"))["Subnet"]["SubnetId"]
+                VpcId=vpc_id,
+                CidrBlock=cidr,
+                AvailabilityZone=az,
+                TagSpecifications=self._tags(name, "subnet"),
+            )["Subnet"]["SubnetId"]
 
         pub1 = ensure_subnet(f"10.{octet}.1.0/24", azs[0], f"{vpc_name}-pub-1")
         pub2 = ensure_subnet(f"10.{octet}.2.0/24", azs[1], f"{vpc_name}-pub-2")
@@ -413,8 +482,9 @@ class Infra:
         priv2 = ensure_subnet(f"10.{octet}.11.0/24", azs[1], f"{vpc_name}-priv-2")
 
         # IGW
-        igws = ec2.describe_internet_gateways(Filters=[
-            {"Name": "attachment.vpc-id", "Values": [vpc_id]}])["InternetGateways"]
+        igws = ec2.describe_internet_gateways(
+            Filters=[{"Name": "attachment.vpc-id", "Values": [vpc_id]}]
+        )["InternetGateways"]
         if igws:
             igw_id = igws[0]["InternetGatewayId"]
         else:
@@ -424,26 +494,34 @@ class Infra:
             ec2.attach_internet_gateway(InternetGatewayId=igw_id, VpcId=vpc_id)
 
         # NAT gateway (in pub1)
-        nats = ec2.describe_nat_gateways(Filters=[
-            {"Name": "vpc-id", "Values": [vpc_id]},
-            {"Name": "state", "Values": ["available", "pending"]}])["NatGateways"]
+        nats = ec2.describe_nat_gateways(
+            Filters=[
+                {"Name": "vpc-id", "Values": [vpc_id]},
+                {"Name": "state", "Values": ["available", "pending"]},
+            ]
+        )["NatGateways"]
         if nats:
             nat_id = nats[0]["NatGatewayId"]
         else:
             eip = ec2.allocate_address(
                 Domain="vpc",
-                TagSpecifications=self._tags(f"{vpc_name}-eip", "elastic-ip"))
+                TagSpecifications=self._tags(f"{vpc_name}-eip", "elastic-ip"),
+            )
             nat_id = ec2.create_nat_gateway(
-                SubnetId=pub1, AllocationId=eip["AllocationId"],
-                TagSpecifications=self._tags(f"{vpc_name}-nat", "natgateway")
+                SubnetId=pub1,
+                AllocationId=eip["AllocationId"],
+                TagSpecifications=self._tags(f"{vpc_name}-nat", "natgateway"),
             )["NatGateway"]["NatGatewayId"]
         self.board.log(f"Waiting for NAT gateway {nat_id} in {region}...")
         ec2.get_waiter("nat_gateway_available").wait(NatGatewayIds=[nat_id])
 
         def ensure_rtb(name, target_kwargs, subnet_ids):
-            existing = ec2.describe_route_tables(Filters=[
-                {"Name": "vpc-id", "Values": [vpc_id]},
-                {"Name": "tag:Name", "Values": [name]}])["RouteTables"]
+            existing = ec2.describe_route_tables(
+                Filters=[
+                    {"Name": "vpc-id", "Values": [vpc_id]},
+                    {"Name": "tag:Name", "Values": [name]},
+                ]
+            )["RouteTables"]
             if existing:
                 rtb = existing[0]
                 rtb_id = rtb["RouteTableId"]
@@ -452,27 +530,34 @@ class Infra:
                 # longer associated. Restore both.
                 has_default = any(
                     r.get("DestinationCidrBlock") == "0.0.0.0/0"
-                    and r.get("State") == "active" for r in rtb["Routes"])
+                    and r.get("State") == "active"
+                    for r in rtb["Routes"]
+                )
                 if not has_default:
                     try:
-                        ec2.delete_route(RouteTableId=rtb_id,
-                                         DestinationCidrBlock="0.0.0.0/0")
+                        ec2.delete_route(
+                            RouteTableId=rtb_id, DestinationCidrBlock="0.0.0.0/0"
+                        )
                     except ClientError:
                         pass  # no stale route to remove
-                    ec2.create_route(RouteTableId=rtb_id,
-                                     DestinationCidrBlock="0.0.0.0/0",
-                                     **target_kwargs)
+                    ec2.create_route(
+                        RouteTableId=rtb_id,
+                        DestinationCidrBlock="0.0.0.0/0",
+                        **target_kwargs,
+                    )
                 associated = {a.get("SubnetId") for a in rtb["Associations"]}
                 for s in subnet_ids:
                     if s not in associated:
-                        ec2.associate_route_table(RouteTableId=rtb_id,
-                                                  SubnetId=s)
+                        ec2.associate_route_table(RouteTableId=rtb_id, SubnetId=s)
             else:
                 rtb_id = ec2.create_route_table(
                     VpcId=vpc_id, TagSpecifications=self._tags(name, "route-table")
                 )["RouteTable"]["RouteTableId"]
-                ec2.create_route(RouteTableId=rtb_id,
-                                 DestinationCidrBlock="0.0.0.0/0", **target_kwargs)
+                ec2.create_route(
+                    RouteTableId=rtb_id,
+                    DestinationCidrBlock="0.0.0.0/0",
+                    **target_kwargs,
+                )
                 for s in subnet_ids:
                     ec2.associate_route_table(RouteTableId=rtb_id, SubnetId=s)
             return rtb_id
@@ -481,21 +566,27 @@ class Infra:
         ensure_rtb(f"{vpc_name}-priv-rtb", {"NatGatewayId": nat_id}, [priv1, priv2])
 
         # Security group with self-referencing rule (MWAA requirement)
-        sgs = ec2.describe_security_groups(Filters=[
-            {"Name": "vpc-id", "Values": [vpc_id]},
-            {"Name": "group-name", "Values": [f"{vpc_name}-mwaa-sg"]}])["SecurityGroups"]
+        sgs = ec2.describe_security_groups(
+            Filters=[
+                {"Name": "vpc-id", "Values": [vpc_id]},
+                {"Name": "group-name", "Values": [f"{vpc_name}-mwaa-sg"]},
+            ]
+        )["SecurityGroups"]
         if sgs:
             sg_id = sgs[0]["GroupId"]
         else:
             sg_id = ec2.create_security_group(
                 GroupName=f"{vpc_name}-mwaa-sg",
-                Description="MWAA E2E shared SG", VpcId=vpc_id,
-                TagSpecifications=self._tags(f"{vpc_name}-mwaa-sg", "security-group")
+                Description="MWAA E2E shared SG",
+                VpcId=vpc_id,
+                TagSpecifications=self._tags(f"{vpc_name}-mwaa-sg", "security-group"),
             )["GroupId"]
             ec2.authorize_security_group_ingress(
                 GroupId=sg_id,
-                IpPermissions=[{"IpProtocol": "-1",
-                                "UserIdGroupPairs": [{"GroupId": sg_id}]}])
+                IpPermissions=[
+                    {"IpProtocol": "-1", "UserIdGroupPairs": [{"GroupId": sg_id}]}
+                ],
+            )
 
         info = {"vpc_id": vpc_id, "subnet_ids": [priv1, priv2], "sg_id": sg_id}
         self.vpc_info[region] = info
@@ -513,15 +604,22 @@ class Infra:
                 kwargs["CreateBucketConfiguration"] = {"LocationConstraint": region}
             s3.create_bucket(**kwargs)
             self.board.log(f"Created bucket {name}")
-        s3.put_bucket_versioning(Bucket=name,
-                                 VersioningConfiguration={"Status": "Enabled"})
+        s3.put_bucket_versioning(
+            Bucket=name, VersioningConfiguration={"Status": "Enabled"}
+        )
         s3.put_public_access_block(
             Bucket=name,
             PublicAccessBlockConfiguration={
-                "BlockPublicAcls": True, "IgnorePublicAcls": True,
-                "BlockPublicPolicy": True, "RestrictPublicBuckets": True})
-        s3.put_bucket_tagging(Bucket=name, Tagging={
-            "TagSet": [{"Key": TAG_KEY, "Value": self.cfg.id_prefix}]})
+                "BlockPublicAcls": True,
+                "IgnorePublicAcls": True,
+                "BlockPublicPolicy": True,
+                "RestrictPublicBuckets": True,
+            },
+        )
+        s3.put_bucket_tagging(
+            Bucket=name,
+            Tagging={"TagSet": [{"Key": TAG_KEY, "Value": self.cfg.id_prefix}]},
+        )
         # Upload the repo's requirements file for MWAA
         req = REPO_ROOT / "assets" / "requirements.txt"
         if req.exists():
@@ -534,20 +632,34 @@ class Infra:
         if example_dag.exists():
             s3.upload_file(str(example_dag), name, "dags/e2e_example_dag.py")
 
-    def ensure_mwaa_role(self, role_name: str, region: str, bucket: str,
-                         env_name: str) -> str:
+    def ensure_mwaa_role(
+        self, role_name: str, region: str, bucket: str, env_name: str
+    ) -> str:
         iam = boto3.client("iam")
         acct = self.cfg.account_id
-        trust = json.dumps({
-            "Version": "2012-10-17",
-            "Statement": [{"Effect": "Allow",
-                           "Principal": {"Service": ["airflow.amazonaws.com",
-                                                     "airflow-env.amazonaws.com"]},
-                           "Action": "sts:AssumeRole"}]})
+        trust = json.dumps(
+            {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": {
+                            "Service": [
+                                "airflow.amazonaws.com",
+                                "airflow-env.amazonaws.com",
+                            ]
+                        },
+                        "Action": "sts:AssumeRole",
+                    }
+                ],
+            }
+        )
         try:
             arn = iam.create_role(
-                RoleName=role_name, AssumeRolePolicyDocument=trust,
-                Tags=[{"Key": TAG_KEY, "Value": self.cfg.id_prefix}])["Role"]["Arn"]
+                RoleName=role_name,
+                AssumeRolePolicyDocument=trust,
+                Tags=[{"Key": TAG_KEY, "Value": self.cfg.id_prefix}],
+            )["Role"]["Arn"]
             self.board.log(f"Created role {role_name}")
         except ClientError as e:
             if e.response["Error"]["Code"] != "EntityAlreadyExists":
@@ -558,38 +670,82 @@ class Infra:
         policy = {
             "Version": "2012-10-17",
             "Statement": [
-                {"Effect": "Allow", "Action": "airflow:PublishMetrics",
-                 "Resource": f"arn:aws:airflow:{region}:{acct}:environment/{env_name}"},
-                {"Effect": "Allow",
-                 "Action": ["s3:GetObject*", "s3:GetBucket*", "s3:List*",
-                            "s3:PutObject*", "s3:DeleteObject*"],
-                 "Resource": [f"arn:aws:s3:::{bucket}", f"arn:aws:s3:::{bucket}/*",
-                              f"arn:aws:s3:::{self.cfg.id_prefix}-*"]},
-                {"Effect": "Allow",
-                 "Action": ["logs:CreateLogStream", "logs:CreateLogGroup",
-                            "logs:PutLogEvents", "logs:GetLogEvents",
-                            "logs:GetLogRecord", "logs:GetLogGroupFields",
-                            "logs:GetQueryResults"],
-                 "Resource": [f"arn:aws:logs:{region}:{acct}:log-group:airflow-*"]},
-                {"Effect": "Allow",
-                 "Action": ["logs:DescribeLogGroups", "cloudwatch:PutMetricData",
-                            "s3:GetAccountPublicAccessBlock"],
-                 "Resource": ["*"]},
-                {"Effect": "Allow",
-                 "Action": ["sqs:ChangeMessageVisibility", "sqs:DeleteMessage",
-                            "sqs:GetQueueAttributes", "sqs:GetQueueUrl",
-                            "sqs:ReceiveMessage", "sqs:SendMessage"],
-                 "Resource": f"arn:aws:sqs:{region}:*:airflow-celery-*"},
-                {"Effect": "Allow",
-                 "Action": ["kms:Decrypt", "kms:DescribeKey",
-                            "kms:GenerateDataKey*", "kms:Encrypt"],
-                 "NotResource": f"arn:aws:kms:*:{acct}:key/*",
-                 "Condition": {"StringLike": {
-                     "kms:ViaService": [f"sqs.{region}.amazonaws.com"]}}},
+                {
+                    "Effect": "Allow",
+                    "Action": "airflow:PublishMetrics",
+                    "Resource": f"arn:aws:airflow:{region}:{acct}:environment/{env_name}",
+                },
+                {
+                    "Effect": "Allow",
+                    "Action": [
+                        "s3:GetObject*",
+                        "s3:GetBucket*",
+                        "s3:List*",
+                        "s3:PutObject*",
+                        "s3:DeleteObject*",
+                    ],
+                    "Resource": [
+                        f"arn:aws:s3:::{bucket}",
+                        f"arn:aws:s3:::{bucket}/*",
+                        f"arn:aws:s3:::{self.cfg.id_prefix}-*",
+                    ],
+                },
+                {
+                    "Effect": "Allow",
+                    "Action": [
+                        "logs:CreateLogStream",
+                        "logs:CreateLogGroup",
+                        "logs:PutLogEvents",
+                        "logs:GetLogEvents",
+                        "logs:GetLogRecord",
+                        "logs:GetLogGroupFields",
+                        "logs:GetQueryResults",
+                    ],
+                    "Resource": [f"arn:aws:logs:{region}:{acct}:log-group:airflow-*"],
+                },
+                {
+                    "Effect": "Allow",
+                    "Action": [
+                        "logs:DescribeLogGroups",
+                        "cloudwatch:PutMetricData",
+                        "s3:GetAccountPublicAccessBlock",
+                    ],
+                    "Resource": ["*"],
+                },
+                {
+                    "Effect": "Allow",
+                    "Action": [
+                        "sqs:ChangeMessageVisibility",
+                        "sqs:DeleteMessage",
+                        "sqs:GetQueueAttributes",
+                        "sqs:GetQueueUrl",
+                        "sqs:ReceiveMessage",
+                        "sqs:SendMessage",
+                    ],
+                    "Resource": f"arn:aws:sqs:{region}:*:airflow-celery-*",
+                },
+                {
+                    "Effect": "Allow",
+                    "Action": [
+                        "kms:Decrypt",
+                        "kms:DescribeKey",
+                        "kms:GenerateDataKey*",
+                        "kms:Encrypt",
+                    ],
+                    "NotResource": f"arn:aws:kms:*:{acct}:key/*",
+                    "Condition": {
+                        "StringLike": {
+                            "kms:ViaService": [f"sqs.{region}.amazonaws.com"]
+                        }
+                    },
+                },
             ],
         }
-        iam.put_role_policy(RoleName=role_name, PolicyName="mwaa-exec",
-                            PolicyDocument=json.dumps(policy))
+        iam.put_role_policy(
+            RoleName=role_name,
+            PolicyName="mwaa-exec",
+            PolicyDocument=json.dumps(policy),
+        )
         return arn
 
     def provision_for_version(self, ctx: Ctx):
@@ -598,11 +754,17 @@ class Infra:
         self.ensure_bucket(ctx.primary_bucket, self.cfg.primary_region)
         self.ensure_bucket(ctx.secondary_bucket, self.cfg.secondary_region)
         ctx.pri_role_arn = self.ensure_mwaa_role(
-            ctx.primary_role, self.cfg.primary_region,
-            ctx.primary_bucket, ctx.primary_env)
+            ctx.primary_role,
+            self.cfg.primary_region,
+            ctx.primary_bucket,
+            ctx.primary_env,
+        )
         ctx.sec_role_arn = self.ensure_mwaa_role(
-            ctx.secondary_role, self.cfg.secondary_region,
-            ctx.secondary_bucket, ctx.secondary_env)
+            ctx.secondary_role,
+            self.cfg.secondary_region,
+            ctx.secondary_bucket,
+            ctx.secondary_env,
+        )
         # IAM eventual consistency
         time.sleep(10)
         ctx.timed("infra", t0)
@@ -612,20 +774,23 @@ class Infra:
 # MWAA environment lifecycle
 # ============================================================================
 
-def create_mwaa_env(ctx: Ctx, env_name: str, region: str, bucket: str,
-                    role_arn: str, net: dict):
+
+def create_mwaa_env(
+    ctx: Ctx, env_name: str, region: str, bucket: str, role_arn: str, net: dict
+):
     mwaa = boto3.client("mwaa", region_name=region)
     try:
         status = mwaa.get_environment(Name=env_name)["Environment"]["Status"]
         if status == "CREATE_FAILED":
             # Resume after a failed run: a CREATE_FAILED env can only be
             # deleted, so remove it and recreate below.
-            ctx.board.log(f"MWAA env {env_name} is CREATE_FAILED — deleting "
-                          f"before recreate", key=ctx.key)
+            ctx.board.log(
+                f"MWAA env {env_name} is CREATE_FAILED — deleting " f"before recreate",
+                key=ctx.key,
+            )
             delete_mwaa_env(ctx.cfg, ctx.board, env_name, region)
         else:
-            ctx.board.log(f"MWAA env {env_name} already exists "
-                          f"({status}), reusing")
+            ctx.board.log(f"MWAA env {env_name} already exists " f"({status}), reusing")
             return
     except ClientError as e:
         if e.response["Error"]["Code"] != "ResourceNotFoundException":
@@ -671,8 +836,7 @@ def wait_mwaa_available(ctx: Ctx, targets: list) -> bool:
     while pending and time.time() < deadline:
         parts = []
         for env_name, region in list(pending.items()):
-            mwaa = clients.setdefault(
-                region, boto3.client("mwaa", region_name=region))
+            mwaa = clients.setdefault(region, boto3.client("mwaa", region_name=region))
             try:
                 env = mwaa.get_environment(Name=env_name)["Environment"]
                 status = env["Status"]
@@ -684,13 +848,18 @@ def wait_mwaa_available(ctx: Ctx, targets: list) -> bool:
                 continue
             if status in ("CREATE_FAILED", "UNAVAILABLE"):
                 # Capture WHY before cleanup deletes the evidence
-                reason = (env.get("LastUpdate", {}).get("Error", {})
-                          .get("ErrorMessage", "no error message provided"))
+                reason = (
+                    env.get("LastUpdate", {})
+                    .get("Error", {})
+                    .get("ErrorMessage", "no error message provided")
+                )
                 dump = ctx.log_dir / f"mwaa_failed_{env_name}.json"
                 dump.write_text(json.dumps(env, indent=2, default=str))
                 ctx.errors.append(f"{env_name} reached status {status}: {reason}")
-                ctx.board.log(f"MWAA {env_name} {status}: {reason} "
-                              f"(details: {dump.name})", key=ctx.key)
+                ctx.board.log(
+                    f"MWAA {env_name} {status}: {reason} " f"(details: {dump.name})",
+                    key=ctx.key,
+                )
                 pending.pop(env_name)
                 ok = False
                 continue
@@ -714,8 +883,10 @@ def mwaa_env_status(env_name: str, region: str) -> str:
 
 def infra_ready(ctx: Ctx) -> bool:
     """True if both MWAA environments for this version exist and are AVAILABLE."""
-    return (mwaa_env_status(ctx.primary_env, ctx.cfg.primary_region) == "AVAILABLE"
-            and mwaa_env_status(ctx.secondary_env, ctx.cfg.secondary_region) == "AVAILABLE")
+    return (
+        mwaa_env_status(ctx.primary_env, ctx.cfg.primary_region) == "AVAILABLE"
+        and mwaa_env_status(ctx.secondary_env, ctx.cfg.secondary_region) == "AVAILABLE"
+    )
 
 
 def adopt_existing_infra(ctx: Ctx):
@@ -726,26 +897,42 @@ def adopt_existing_infra(ctx: Ctx):
     # Make sure the example DAG is present (buckets aren't re-provisioned)
     example_dag = SCRIPT_DIR / "assets" / "e2e_example_dag.py"
     if example_dag.exists():
-        for bucket, region in ((ctx.primary_bucket, ctx.cfg.primary_region),
-                               (ctx.secondary_bucket, ctx.cfg.secondary_region)):
+        for bucket, region in (
+            (ctx.primary_bucket, ctx.cfg.primary_region),
+            (ctx.secondary_bucket, ctx.cfg.secondary_region),
+        ):
             boto3.client("s3", region_name=region).upload_file(
-                str(example_dag), bucket, "dags/e2e_example_dag.py")
+                str(example_dag), bucket, "dags/e2e_example_dag.py"
+            )
 
 
 def deploy_mwaa(ctx: Ctx, infra: Infra):
     t0 = time.time()
     cfg = ctx.cfg
-    create_mwaa_env(ctx, ctx.primary_env, cfg.primary_region,
-                    ctx.primary_bucket, ctx.pri_role_arn,
-                    infra.vpc_info[cfg.primary_region])
-    create_mwaa_env(ctx, ctx.secondary_env, cfg.secondary_region,
-                    ctx.secondary_bucket, ctx.sec_role_arn,
-                    infra.vpc_info[cfg.secondary_region])
+    create_mwaa_env(
+        ctx,
+        ctx.primary_env,
+        cfg.primary_region,
+        ctx.primary_bucket,
+        ctx.pri_role_arn,
+        infra.vpc_info[cfg.primary_region],
+    )
+    create_mwaa_env(
+        ctx,
+        ctx.secondary_env,
+        cfg.secondary_region,
+        ctx.secondary_bucket,
+        ctx.sec_role_arn,
+        infra.vpc_info[cfg.secondary_region],
+    )
     ctx.status("waiting for MWAA envs (20-40 min)...")
-    ok = wait_mwaa_available(ctx, [
-        (ctx.primary_env, cfg.primary_region),
-        (ctx.secondary_env, cfg.secondary_region),
-    ])
+    ok = wait_mwaa_available(
+        ctx,
+        [
+            (ctx.primary_env, cfg.primary_region),
+            (ctx.secondary_env, cfg.secondary_region),
+        ],
+    )
     ctx.timed("mwaa_create", t0)
     if not ok:
         raise RuntimeError(f"MWAA creation failed: {ctx.errors}")
@@ -754,6 +941,7 @@ def deploy_mwaa(ctx: Ctx, infra: Infra):
 # ============================================================================
 # CDK deployment of the DR solution
 # ============================================================================
+
 
 def build_env_vars(ctx: Ctx, infra: Infra, simulate: bool) -> dict:
     cfg = ctx.cfg
@@ -793,11 +981,23 @@ def cdk_deploy(ctx: Ctx, infra: Infra, simulate: bool = False):
     log = ctx.log_dir / f"cdk_deploy_{ctx.slug}.log"
     # Each version needs its own cdk.out to avoid clashes in parallel runs
     rc = run_cmd(
-        ["npx", "cdk", "deploy", "--all", "--require-approval", "never",
-         "--app", CDK_APP,
-         "--output", f"cdk.out.e2e-{ctx.slug}"],
-        env=env, cwd=REPO_ROOT, log_path=log,
-        timeout_secs=ctx.cfg.cdk_deploy_mins * 60)
+        [
+            "npx",
+            "cdk",
+            "deploy",
+            "--all",
+            "--require-approval",
+            "never",
+            "--app",
+            CDK_APP,
+            "--output",
+            f"cdk.out.e2e-{ctx.slug}",
+        ],
+        env=env,
+        cwd=REPO_ROOT,
+        log_path=log,
+        timeout_secs=ctx.cfg.cdk_deploy_mins * 60,
+    )
     ctx.timed("cdk_deploy" + ("_sim" if simulate else ""), t0)
     if rc != 0:
         raise RuntimeError(f"cdk deploy failed (rc={rc}), see {log}")
@@ -807,16 +1007,29 @@ def cdk_destroy(ctx: Ctx, infra: Infra):
     ctx.status("CDK destroy")
     env = build_env_vars(ctx, infra, simulate=False)
     log = ctx.log_dir / f"cdk_destroy_{ctx.slug}.log"
-    run_cmd(["npx", "cdk", "destroy", "--all", "--force",
-             "--app", CDK_APP,
-             "--output", f"cdk.out.e2e-{ctx.slug}"],
-            env=env, cwd=REPO_ROOT, log_path=log,
-            timeout_secs=ctx.cfg.cdk_deploy_mins * 60)
+    run_cmd(
+        [
+            "npx",
+            "cdk",
+            "destroy",
+            "--all",
+            "--force",
+            "--app",
+            CDK_APP,
+            "--output",
+            f"cdk.out.e2e-{ctx.slug}",
+        ],
+        env=env,
+        cwd=REPO_ROOT,
+        log_path=log,
+        timeout_secs=ctx.cfg.cdk_deploy_mins * 60,
+    )
 
 
 # ============================================================================
 # Airflow interaction via the MWAA CLI token API
 # ============================================================================
+
 
 def airflow_cli(env_name: str, region: str, command: str) -> tuple:
     """Run an Airflow CLI command via MWAA's CLI token endpoint (Airflow 2.x
@@ -827,9 +1040,12 @@ def airflow_cli(env_name: str, region: str, command: str) -> tuple:
     req = urllib.request.Request(
         f"https://{tok['WebServerHostname']}/aws_mwaa/cli",
         data=command.encode(),
-        headers={"Authorization": f"Bearer {tok['CliToken']}",
-                 "Content-Type": "text/plain"},
-        method="POST")
+        headers={
+            "Authorization": f"Bearer {tok['CliToken']}",
+            "Content-Type": "text/plain",
+        },
+        method="POST",
+    )
     with urllib.request.urlopen(req, timeout=60) as resp:
         body = json.loads(resp.read())
     out = base64.b64decode(body.get("stdout", "")).decode()
@@ -841,8 +1057,14 @@ def _is_airflow3(version: str) -> bool:
     return version.split(".")[0] == "3"
 
 
-def _rest_api(env_name: str, region: str, method: str, path: str,
-              body: dict = None, query: dict = None) -> dict:
+def _rest_api(
+    env_name: str,
+    region: str,
+    method: str,
+    path: str,
+    body: dict = None,
+    query: dict = None,
+) -> dict:
     """Call the Airflow stable REST API through MWAA InvokeRestApi."""
     mwaa = boto3.client("mwaa", region_name=region)
     kwargs = {"Name": env_name, "Method": method, "Path": path}
@@ -853,23 +1075,31 @@ def _rest_api(env_name: str, region: str, method: str, path: str,
     return mwaa.invoke_rest_api(**kwargs)
 
 
-def airflow_set_variable(ctx: Ctx, env_name: str, region: str,
-                         key: str, value: str):
+def airflow_set_variable(ctx: Ctx, env_name: str, region: str, key: str, value: str):
     if _is_airflow3(ctx.version):
         # POST fails if the variable already exists (leftover from a
         # previous run) — try PATCH first, fall back to POST.
         try:
-            _rest_api(env_name, region, "PATCH", f"/variables/{key}",
-                      body={"key": key, "value": value})
+            _rest_api(
+                env_name,
+                region,
+                "PATCH",
+                f"/variables/{key}",
+                body={"key": key, "value": value},
+            )
         except ClientError:
-            _rest_api(env_name, region, "POST", "/variables",
-                      body={"key": key, "value": value})
+            _rest_api(
+                env_name,
+                region,
+                "POST",
+                "/variables",
+                body={"key": key, "value": value},
+            )
     else:
         airflow_cli(env_name, region, f"variables set {key} {value}")
 
 
-def airflow_get_variable(ctx: Ctx, env_name: str, region: str,
-                         key: str) -> str:
+def airflow_get_variable(ctx: Ctx, env_name: str, region: str, key: str) -> str:
     if _is_airflow3(ctx.version):
         try:
             resp = _rest_api(env_name, region, "GET", f"/variables/{key}")
@@ -877,8 +1107,10 @@ def airflow_get_variable(ctx: Ctx, env_name: str, region: str,
         except ClientError as e:
             # 404 = variable doesn't exist; return empty so callers detect
             # "not found" vs transient errors
-            if "RestApiClientException" in str(type(e).__name__) or \
-               e.response.get("RestApiStatusCode") == 404:
+            if (
+                "RestApiClientException" in str(type(e).__name__)
+                or e.response.get("RestApiStatusCode") == 404
+            ):
                 return ""
             raise
     out, _ = airflow_cli(env_name, region, f"variables get {key}")
@@ -896,18 +1128,27 @@ def airflow_delete_variable(ctx: Ctx, env_name: str, region: str, key: str):
         pass  # variable didn't exist — nothing to clear
 
 
-def airflow_unpause_and_trigger(ctx: Ctx, env_name: str, region: str,
-                                dag_id: str):
+def airflow_unpause_and_trigger(ctx: Ctx, env_name: str, region: str, dag_id: str):
     """Unpause and trigger a DAG. Retries up to 3 times on transient errors
     (the webserver briefly 5xxs after CDK deploys update the DAGs)."""
     for attempt in range(4):
         try:
             if _is_airflow3(ctx.version):
-                _rest_api(env_name, region, "PATCH", f"/dags/{dag_id}",
-                          body={"is_paused": False},
-                          query={"update_mask": "is_paused"})
-                _rest_api(env_name, region, "POST", f"/dags/{dag_id}/dagRuns",
-                          body={"logical_date": None})
+                _rest_api(
+                    env_name,
+                    region,
+                    "PATCH",
+                    f"/dags/{dag_id}",
+                    body={"is_paused": False},
+                    query={"update_mask": "is_paused"},
+                )
+                _rest_api(
+                    env_name,
+                    region,
+                    "POST",
+                    f"/dags/{dag_id}/dagRuns",
+                    body={"logical_date": None},
+                )
             else:
                 airflow_cli(env_name, region, f"dags unpause {dag_id}")
                 airflow_cli(env_name, region, f"dags trigger {dag_id}")
@@ -918,23 +1159,30 @@ def airflow_unpause_and_trigger(ctx: Ctx, env_name: str, region: str,
             time.sleep(15)
 
 
-def airflow_dag_run_states(ctx: Ctx, env_name: str, region: str,
-                           dag_id: str, limit: int = 5) -> list:
+def airflow_dag_run_states(
+    ctx: Ctx, env_name: str, region: str, dag_id: str, limit: int = 5
+) -> list:
     """Return recent DAG run states (newest first), e.g. ['running', 'failed']."""
     if _is_airflow3(ctx.version):
-        resp = _rest_api(env_name, region, "GET", f"/dags/{dag_id}/dagRuns",
-                         query={"limit": str(limit), "order_by": "-run_after"})
+        resp = _rest_api(
+            env_name,
+            region,
+            "GET",
+            f"/dags/{dag_id}/dagRuns",
+            query={"limit": str(limit), "order_by": "-run_after"},
+        )
         runs = resp.get("RestApiResponse", {}).get("dag_runs", [])
         return [r.get("state") for r in runs]
-    out, _ = airflow_cli(env_name, region,
-                         f"dags list-runs -d {dag_id} -o json")
+    out, _ = airflow_cli(env_name, region, f"dags list-runs -d {dag_id} -o json")
     try:
         start = out.index("[")
         runs = json.loads(out[start:])
     except (ValueError, json.JSONDecodeError):
         return []
-    runs.sort(key=lambda r: r.get("execution_date") or
-              r.get("logical_date") or "", reverse=True)
+    runs.sort(
+        key=lambda r: r.get("execution_date") or r.get("logical_date") or "",
+        reverse=True,
+    )
     return [r.get("state") for r in runs[:limit]]
 
 
@@ -949,14 +1197,16 @@ def seed_test_data(ctx: Ctx):
     """Create a marker Airflow variable in the primary env to verify after DR."""
     marker = f"e2e-{ctx.slug}-{int(time.time())}"
     try:
-        airflow_set_variable(ctx, ctx.primary_env, ctx.cfg.primary_region,
-                             MARKER_VAR, marker)
+        airflow_set_variable(
+            ctx, ctx.primary_env, ctx.cfg.primary_region, MARKER_VAR, marker
+        )
         # The DR restore strategy is APPEND: existing variables are NOT
         # overwritten. A leftover marker in the secondary env (previous
         # test on reused infra) would mask the restore — remove it so the
         # restored value can only come from this run's backup.
-        airflow_delete_variable(ctx, ctx.secondary_env,
-                                ctx.cfg.secondary_region, MARKER_VAR)
+        airflow_delete_variable(
+            ctx, ctx.secondary_env, ctx.cfg.secondary_region, MARKER_VAR
+        )
         ctx.marker = marker
         ctx.checks["seed_marker"] = "PASS"
         ctx.board.log(f"Seeded marker variable = {marker}", key=ctx.key)
@@ -972,8 +1222,10 @@ def find_backup_bucket(ctx: Ctx, region: str, stack_suffix: str) -> str:
     paginator = cfn.get_paginator("list_stack_resources")
     for page in paginator.paginate(StackName=stack):
         for res in page["StackResourceSummaries"]:
-            if res["ResourceType"] == "AWS::S3::Bucket" and \
-                    "backup" in res["LogicalResourceId"].lower():
+            if (
+                res["ResourceType"] == "AWS::S3::Bucket"
+                and "backup" in res["LogicalResourceId"].lower()
+            ):
                 return res["PhysicalResourceId"]
     raise RuntimeError(f"No backup bucket found in stack {stack}")
 
@@ -998,7 +1250,9 @@ def _newest_object_ts(s3, bucket: str, prefix: str):
     except (ClientError, Exception) as e:
         # Transient S3 errors (DNS, network, throttle) — return None so the
         # poll loop retries on the next cycle instead of crashing the test.
-        if "Could not connect" in str(e) or "EndpointConnectionError" in str(type(e).__name__):
+        if "Could not connect" in str(e) or "EndpointConnectionError" in str(
+            type(e).__name__
+        ):
             return None
         raise
     return newest
@@ -1026,8 +1280,11 @@ def trigger_and_wait_backup(ctx: Ctx):
     s3 = boto3.client("s3", region_name=region)
     baseline = _newest_object_ts(s3, bucket, "data/")
     if baseline:
-        ctx.board.log(f"Stale backup data present (newest {baseline:%H:%M:%S}) "
-                      f"— waiting for FRESH objects only", key=ctx.key)
+        ctx.board.log(
+            f"Stale backup data present (newest {baseline:%H:%M:%S}) "
+            f"— waiting for FRESH objects only",
+            key=ctx.key,
+        )
 
     def run_states() -> list:
         try:
@@ -1040,14 +1297,15 @@ def trigger_and_wait_backup(ctx: Ctx):
 
     try:
         if has_active(run_states()):
-            ctx.board.log("backup_metadata run already active — waiting for it "
-                          "instead of triggering (avoids Glue concurrency clash)",
-                          key=ctx.key)
+            ctx.board.log(
+                "backup_metadata run already active — waiting for it "
+                "instead of triggering (avoids Glue concurrency clash)",
+                key=ctx.key,
+            )
         else:
             airflow_unpause_and_trigger(ctx, env, region, "backup_metadata")
     except Exception as e:
-        ctx.board.log(f"DAG trigger failed ({e}); relying on schedule",
-                      key=ctx.key)
+        ctx.board.log(f"DAG trigger failed ({e}); relying on schedule", key=ctx.key)
 
     deadline = time.time() + ctx.cfg.backup_dag_wait_mins * 60
     retriggers_left = 3
@@ -1062,18 +1320,25 @@ def trigger_and_wait_backup(ctx: Ctx):
         if fresh and states and states[0] == "success":
             ctx.checks["backup_created"] = "PASS"
             ctx.timed("backup", t0)
-            ctx.board.log(f"Backup run succeeded; fresh data in "
-                          f"s3://{bucket}/data/", key=ctx.key)
+            ctx.board.log(
+                f"Backup run succeeded; fresh data in " f"s3://{bucket}/data/",
+                key=ctx.key,
+            )
             return
         # If nothing is active and no fresh data materialized, retrigger
         # (bounded, spaced out — covers failed runs and lost triggers).
-        if (not fresh and not has_active(states)
-                and retriggers_left > 0
-                and time.time() - last_trigger > 120):
+        if (
+            not fresh
+            and not has_active(states)
+            and retriggers_left > 0
+            and time.time() - last_trigger > 120
+        ):
             retriggers_left -= 1
-            ctx.board.log(f"no active backup run and no fresh data — "
-                          f"retriggering ({retriggers_left} retries left)",
-                          key=ctx.key)
+            ctx.board.log(
+                f"no active backup run and no fresh data — "
+                f"retriggering ({retriggers_left} retries left)",
+                key=ctx.key,
+            )
             try:
                 airflow_unpause_and_trigger(ctx, env, region, "backup_metadata")
             except Exception as e:
@@ -1084,8 +1349,10 @@ def trigger_and_wait_backup(ctx: Ctx):
     ctx.checks["backup_created"] = "FAIL"
     final_states = run_states()
     state_str = final_states[0] if final_states else "unknown"
-    raise RuntimeError(f"Backup run did not complete with fresh data in time "
-                       f"(latest run state: {state_str})")
+    raise RuntimeError(
+        f"Backup run did not complete with fresh data in time "
+        f"(latest run state: {state_str})"
+    )
 
 
 def _list_data_objects(s3, bucket: str) -> dict:
@@ -1094,11 +1361,14 @@ def _list_data_objects(s3, bucket: str) -> dict:
     out = {}
     try:
         for page in s3.get_paginator("list_objects_v2").paginate(
-                Bucket=bucket, Prefix="data/"):
+            Bucket=bucket, Prefix="data/"
+        ):
             for o in page.get("Contents", []):
                 out[o["Key"]] = (o["LastModified"], o["Size"])
     except Exception as e:
-        if "Could not connect" in str(e) or "EndpointConnectionError" in str(type(e).__name__):
+        if "Could not connect" in str(e) or "EndpointConnectionError" in str(
+            type(e).__name__
+        ):
             return {}
         raise
     return out
@@ -1113,23 +1383,25 @@ def wait_replication(ctx: Ctx):
     the secondary with the same size and a timestamp that is not older.
     """
     p_bucket = find_backup_bucket(ctx, ctx.cfg.primary_region, "primary-stack")
-    s_bucket = find_backup_bucket(ctx, ctx.cfg.secondary_region,
-                                  "secondary-stack")
+    s_bucket = find_backup_bucket(ctx, ctx.cfg.secondary_region, "secondary-stack")
     s3p = boto3.client("s3", region_name=ctx.cfg.primary_region)
     s3s = boto3.client("s3", region_name=ctx.cfg.secondary_region)
     deadline = time.time() + 10 * 60
     while time.time() < deadline:
         pk = _list_data_objects(s3p, p_bucket)
         sk = _list_data_objects(s3s, s_bucket)
-        pending = [k for k, (lm, size) in pk.items()
-                   if k not in sk or sk[k][1] != size or sk[k][0] < lm]
+        pending = [
+            k
+            for k, (lm, size) in pk.items()
+            if k not in sk or sk[k][1] != size or sk[k][0] < lm
+        ]
         if pk and not pending:
             ctx.checks["replication"] = "PASS"
-            ctx.board.log(f"All {len(pk)} backup objects replicated",
-                          key=ctx.key)
+            ctx.board.log(f"All {len(pk)} backup objects replicated", key=ctx.key)
             return
-        ctx.status(f"waiting for replication ({len(pending)}/{len(pk)} "
-                   f"objects pending)...")
+        ctx.status(
+            f"waiting for replication ({len(pending)}/{len(pk)} " f"objects pending)..."
+        )
         time.sleep(20)
     ctx.checks["replication"] = "FAIL"
     raise RuntimeError("Backup data never fully replicated to secondary region")
@@ -1156,11 +1428,10 @@ def simulate_dr(ctx: Ctx):
             break
     if not arn:
         raise RuntimeError(f"No state machine found in stack {stack}")
-    ctx.board.log(f"Starting DR simulation on {arn.rsplit(':', 1)[-1]}",
-                  key=ctx.key)
+    ctx.board.log(f"Starting DR simulation on {arn.rsplit(':', 1)[-1]}", key=ctx.key)
     execution = sfn.start_execution(
-        stateMachineArn=arn,
-        input=json.dumps({"simulate_dr": "YES"}))["executionArn"]
+        stateMachineArn=arn, input=json.dumps({"simulate_dr": "YES"})
+    )["executionArn"]
     deadline = time.time() + ctx.cfg.dr_simulation_mins * 60
     while time.time() < deadline:
         desc = sfn.describe_execution(executionArn=execution)
@@ -1189,8 +1460,9 @@ def verify_restore(ctx: Ctx):
         return
     for attempt in range(6):
         try:
-            out = airflow_get_variable(ctx, ctx.secondary_env,
-                                       ctx.cfg.secondary_region, MARKER_VAR)
+            out = airflow_get_variable(
+                ctx, ctx.secondary_env, ctx.cfg.secondary_region, MARKER_VAR
+            )
             if ctx.marker in out:
                 ctx.checks["marker_restored"] = "PASS"
                 return
@@ -1207,6 +1479,7 @@ def verify_restore(ctx: Ctx):
 # ============================================================================
 # Cleanup
 # ============================================================================
+
 
 def delete_mwaa_env(cfg: Config, board: StatusBoard, env_name: str, region: str):
     mwaa = boto3.client("mwaa", region_name=region)
@@ -1262,7 +1535,9 @@ def delete_role(board: StatusBoard, role_name: str):
     try:
         for p in iam.list_role_policies(RoleName=role_name)["PolicyNames"]:
             iam.delete_role_policy(RoleName=role_name, PolicyName=p)
-        for p in iam.list_attached_role_policies(RoleName=role_name)["AttachedPolicies"]:
+        for p in iam.list_attached_role_policies(RoleName=role_name)[
+            "AttachedPolicies"
+        ]:
             iam.detach_role_policy(RoleName=role_name, PolicyArn=p["PolicyArn"])
         iam.delete_role(RoleName=role_name)
         board.log(f"Deleted role {role_name}")
@@ -1275,8 +1550,9 @@ def delete_shared_vpc(cfg: Config, board: StatusBoard, region: str):
     """Delete the shared VPC and all its components."""
     ec2 = boto3.client("ec2", region_name=region)
     vpc_name = f"{cfg.id_prefix}-shared-vpc"
-    vpcs = ec2.describe_vpcs(
-        Filters=[{"Name": "tag:Name", "Values": [vpc_name]}])["Vpcs"]
+    vpcs = ec2.describe_vpcs(Filters=[{"Name": "tag:Name", "Values": [vpc_name]}])[
+        "Vpcs"
+    ]
     if not vpcs:
         return
     vpc_id = vpcs[0]["VpcId"]
@@ -1291,25 +1567,29 @@ def delete_shared_vpc(cfg: Config, board: StatusBoard, region: str):
     for nat in nats:
         deadline = time.time() + 10 * 60
         while time.time() < deadline:
-            state = ec2.describe_nat_gateways(
-                NatGatewayIds=[nat["NatGatewayId"]])["NatGateways"][0]["State"]
+            state = ec2.describe_nat_gateways(NatGatewayIds=[nat["NatGatewayId"]])[
+                "NatGateways"
+            ][0]["State"]
             if state == "deleted":
                 break
             time.sleep(20)
 
     # Release EIPs tagged for this framework
-    for addr in ec2.describe_addresses(Filters=[
-            {"Name": f"tag:{TAG_KEY}", "Values": [cfg.id_prefix]}])["Addresses"]:
+    for addr in ec2.describe_addresses(
+        Filters=[{"Name": f"tag:{TAG_KEY}", "Values": [cfg.id_prefix]}]
+    )["Addresses"]:
         try:
             ec2.release_address(AllocationId=addr["AllocationId"])
         except ClientError:
             pass
 
     # IGWs
-    for igw in ec2.describe_internet_gateways(Filters=[
-            {"Name": "attachment.vpc-id", "Values": [vpc_id]}])["InternetGateways"]:
+    for igw in ec2.describe_internet_gateways(
+        Filters=[{"Name": "attachment.vpc-id", "Values": [vpc_id]}]
+    )["InternetGateways"]:
         ec2.detach_internet_gateway(
-            InternetGatewayId=igw["InternetGatewayId"], VpcId=vpc_id)
+            InternetGatewayId=igw["InternetGatewayId"], VpcId=vpc_id
+        )
         ec2.delete_internet_gateway(InternetGatewayId=igw["InternetGatewayId"])
 
     # Route tables (non-main)
@@ -1317,31 +1597,32 @@ def delete_shared_vpc(cfg: Config, board: StatusBoard, region: str):
         if any(a.get("Main") for a in rtb.get("Associations", [])):
             continue
         for assoc in rtb.get("Associations", []):
-            ec2.disassociate_route_table(
-                AssociationId=assoc["RouteTableAssociationId"])
+            ec2.disassociate_route_table(AssociationId=assoc["RouteTableAssociationId"])
         ec2.delete_route_table(RouteTableId=rtb["RouteTableId"])
 
     # VPC endpoints (created by the DR stack's SFN VPCE option)
     vpces = ec2.describe_vpc_endpoints(Filters=vpc_filter)["VpcEndpoints"]
     if vpces:
-        ec2.delete_vpc_endpoints(
-            VpcEndpointIds=[v["VpcEndpointId"] for v in vpces])
+        ec2.delete_vpc_endpoints(VpcEndpointIds=[v["VpcEndpointId"] for v in vpces])
 
     # Subnets. Lingering ENIs (Lambda VPC ENIs from destroyed stacks, MWAA
     # leftovers) block deletion for up to ~20 min after their owner is gone.
     # Delete available ENIs ourselves, and retry while AWS releases in-use ones.
     deadline = time.time() + 25 * 60
-    pending_subnets = [s["SubnetId"]
-                       for s in ec2.describe_subnets(Filters=vpc_filter)["Subnets"]]
+    pending_subnets = [
+        s["SubnetId"] for s in ec2.describe_subnets(Filters=vpc_filter)["Subnets"]
+    ]
     logged_wait = False
     while pending_subnets and time.time() < deadline:
         for subnet_id in list(pending_subnets):
-            for eni in ec2.describe_network_interfaces(Filters=[
-                    {"Name": "subnet-id", "Values": [subnet_id]}])["NetworkInterfaces"]:
+            for eni in ec2.describe_network_interfaces(
+                Filters=[{"Name": "subnet-id", "Values": [subnet_id]}]
+            )["NetworkInterfaces"]:
                 if eni["Status"] == "available":
                     try:
                         ec2.delete_network_interface(
-                            NetworkInterfaceId=eni["NetworkInterfaceId"])
+                            NetworkInterfaceId=eni["NetworkInterfaceId"]
+                        )
                     except ClientError:
                         pass
             try:
@@ -1353,14 +1634,18 @@ def delete_shared_vpc(cfg: Config, board: StatusBoard, region: str):
                     pending_subnets.remove(subnet_id)
         if pending_subnets:
             if not logged_wait:
-                board.log(f"Waiting for lingering ENIs to release in {region} "
-                          f"({len(pending_subnets)} subnets blocked, "
-                          f"can take ~20 min for Lambda ENIs)...")
+                board.log(
+                    f"Waiting for lingering ENIs to release in {region} "
+                    f"({len(pending_subnets)} subnets blocked, "
+                    f"can take ~20 min for Lambda ENIs)..."
+                )
                 logged_wait = True
             time.sleep(30)
     for subnet_id in pending_subnets:
-        board.log(f"WARN: subnet {subnet_id} still blocked by ENIs; "
-                  f"rerun --cleanup-only later")
+        board.log(
+            f"WARN: subnet {subnet_id} still blocked by ENIs; "
+            f"rerun --cleanup-only later"
+        )
 
     # Security groups (non-default)
     for sg in ec2.describe_security_groups(Filters=vpc_filter)["SecurityGroups"]:
@@ -1373,7 +1658,8 @@ def delete_shared_vpc(cfg: Config, board: StatusBoard, region: str):
             try:
                 if sg.get("IpPermissions"):
                     ec2.revoke_security_group_ingress(
-                        GroupId=sg["GroupId"], IpPermissions=sg["IpPermissions"])
+                        GroupId=sg["GroupId"], IpPermissions=sg["IpPermissions"]
+                    )
                 ec2.delete_security_group(GroupId=sg["GroupId"])
             except ClientError as e2:
                 board.log(f"WARN: SG {sg['GroupId']}: {e2}")
@@ -1382,8 +1668,10 @@ def delete_shared_vpc(cfg: Config, board: StatusBoard, region: str):
         ec2.delete_vpc(VpcId=vpc_id)
         board.log(f"Deleted shared VPC {vpc_id} in {region}")
     except ClientError as e:
-        board.log(f"WARN: VPC {vpc_id} not deleted ({e.response['Error']['Code']}); "
-                  f"rerun --cleanup-only after lingering ENIs are released")
+        board.log(
+            f"WARN: VPC {vpc_id} not deleted ({e.response['Error']['Code']}); "
+            f"rerun --cleanup-only after lingering ENIs are released"
+        )
 
 
 def cleanup_version(ctx: Ctx, infra: Infra):
@@ -1398,7 +1686,9 @@ def cleanup_version(ctx: Ctx, infra: Infra):
     ctx.status("cleanup: MWAA environments")
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as ex:
         f1 = ex.submit(delete_mwaa_env, cfg, board, ctx.primary_env, cfg.primary_region)
-        f2 = ex.submit(delete_mwaa_env, cfg, board, ctx.secondary_env, cfg.secondary_region)
+        f2 = ex.submit(
+            delete_mwaa_env, cfg, board, ctx.secondary_env, cfg.secondary_region
+        )
         f1.result()
         f2.result()
 
@@ -1420,37 +1710,52 @@ def cleanup_everything(cfg: Config, board: StatusBoard):
         cfn = boto3.client("cloudformation", region_name=region)
         to_delete = []
         pages = cfn.get_paginator("list_stacks").paginate(
-            StackStatusFilter=["CREATE_COMPLETE", "UPDATE_COMPLETE",
-                               "ROLLBACK_COMPLETE", "UPDATE_ROLLBACK_COMPLETE",
-                               "CREATE_FAILED", "DELETE_FAILED"])
+            StackStatusFilter=[
+                "CREATE_COMPLETE",
+                "UPDATE_COMPLETE",
+                "ROLLBACK_COMPLETE",
+                "UPDATE_ROLLBACK_COMPLETE",
+                "CREATE_FAILED",
+                "DELETE_FAILED",
+            ]
+        )
         for page in pages:
             for st in page["StackSummaries"]:
                 if st["StackName"].startswith(cfg.id_prefix):
-                    board.log(f"Deleting stack {st['StackName']} ({region}, "
-                              f"{st['StackStatus']})")
+                    board.log(
+                        f"Deleting stack {st['StackName']} ({region}, "
+                        f"{st['StackStatus']})"
+                    )
                     if st["StackStatus"] == "DELETE_FAILED":
                         # Retry, retaining the resources that blocked the
                         # previous attempt (typically CRs whose target env
                         # is already gone) so the rest of the stack goes.
-                        stuck = [e["LogicalResourceId"] for e in
-                                 cfn.describe_stack_events(
-                                     StackName=st["StackName"])["StackEvents"]
-                                 if e["ResourceStatus"] == "DELETE_FAILED"
-                                 and e["LogicalResourceId"] != st["StackName"]]
-                        cfn.delete_stack(StackName=st["StackName"],
-                                         RetainResources=sorted(set(stuck)))
+                        stuck = [
+                            e["LogicalResourceId"]
+                            for e in cfn.describe_stack_events(
+                                StackName=st["StackName"]
+                            )["StackEvents"]
+                            if e["ResourceStatus"] == "DELETE_FAILED"
+                            and e["LogicalResourceId"] != st["StackName"]
+                        ]
+                        cfn.delete_stack(
+                            StackName=st["StackName"],
+                            RetainResources=sorted(set(stuck)),
+                        )
                     else:
                         cfn.delete_stack(StackName=st["StackName"])
                     to_delete.append(st["StackName"])
         for name in to_delete:
             try:
                 cfn.get_waiter("stack_delete_complete").wait(
-                    StackName=name,
-                    WaiterConfig={"Delay": 30, "MaxAttempts": 60})
+                    StackName=name, WaiterConfig={"Delay": 30, "MaxAttempts": 60}
+                )
                 board.log(f"Stack {name} deleted")
             except WaiterError:
-                board.log(f"WARN: stack {name} delete did not finish; "
-                          f"rerun --cleanup-only")
+                board.log(
+                    f"WARN: stack {name} delete did not finish; "
+                    f"rerun --cleanup-only"
+                )
 
     # MWAA environments
     ctxs = []
@@ -1499,8 +1804,10 @@ def cleanup_everything(cfg: Config, board: StatusBoard):
     for b in s3_client.list_buckets()["Buckets"]:
         name = b["Name"]
         if name.startswith(cfg.id_prefix):
-            region = s3_client.get_bucket_location(Bucket=name).get(
-                "LocationConstraint") or "us-east-1"
+            region = (
+                s3_client.get_bucket_location(Bucket=name).get("LocationConstraint")
+                or "us-east-1"
+            )
             empty_and_delete_bucket(board, name, region)
 
     # Shared VPCs (and any leftover per-version VPCs by name prefix)
@@ -1511,10 +1818,12 @@ def cleanup_everything(cfg: Config, board: StatusBoard):
             board.log(f"WARN: shared VPC cleanup ({region}): {e}")
         # legacy per-version VPCs from old runs
         ec2 = boto3.client("ec2", region_name=region)
-        for vpc in ec2.describe_vpcs(Filters=[
-                {"Name": "tag:Name", "Values": [f"{cfg.id_prefix}-*"]}])["Vpcs"]:
-            vname = next((t["Value"] for t in vpc.get("Tags", [])
-                          if t["Key"] == "Name"), "")
+        for vpc in ec2.describe_vpcs(
+            Filters=[{"Name": "tag:Name", "Values": [f"{cfg.id_prefix}-*"]}]
+        )["Vpcs"]:
+            vname = next(
+                (t["Value"] for t in vpc.get("Tags", []) if t["Key"] == "Name"), ""
+            )
             if vname != f"{cfg.id_prefix}-shared-vpc":
                 board.log(f"Found legacy VPC {vpc['VpcId']} ({vname}), deleting...")
                 _force_delete_vpc(board, region, vpc["VpcId"])
@@ -1535,8 +1844,9 @@ def _force_delete_vpc(board: StatusBoard, region: str, vpc_id: str):
         for nat in nats:
             deadline = time.time() + 10 * 60
             while time.time() < deadline:
-                state = ec2.describe_nat_gateways(
-                    NatGatewayIds=[nat["NatGatewayId"]])["NatGateways"][0]["State"]
+                state = ec2.describe_nat_gateways(NatGatewayIds=[nat["NatGatewayId"]])[
+                    "NatGateways"
+                ][0]["State"]
                 if state == "deleted":
                     break
                 time.sleep(15)
@@ -1549,17 +1859,20 @@ def _force_delete_vpc(board: StatusBoard, region: str, vpc_id: str):
                         ec2.release_address(AllocationId=alloc)
                     except ClientError:
                         pass
-        for igw in ec2.describe_internet_gateways(Filters=[
-                {"Name": "attachment.vpc-id", "Values": [vpc_id]}])["InternetGateways"]:
+        for igw in ec2.describe_internet_gateways(
+            Filters=[{"Name": "attachment.vpc-id", "Values": [vpc_id]}]
+        )["InternetGateways"]:
             ec2.detach_internet_gateway(
-                InternetGatewayId=igw["InternetGatewayId"], VpcId=vpc_id)
+                InternetGatewayId=igw["InternetGatewayId"], VpcId=vpc_id
+            )
             ec2.delete_internet_gateway(InternetGatewayId=igw["InternetGatewayId"])
         for rtb in ec2.describe_route_tables(Filters=f)["RouteTables"]:
             if any(a.get("Main") for a in rtb.get("Associations", [])):
                 continue
             for assoc in rtb.get("Associations", []):
                 ec2.disassociate_route_table(
-                    AssociationId=assoc["RouteTableAssociationId"])
+                    AssociationId=assoc["RouteTableAssociationId"]
+                )
             ec2.delete_route_table(RouteTableId=rtb["RouteTableId"])
         for sub in ec2.describe_subnets(Filters=f)["Subnets"]:
             ec2.delete_subnet(SubnetId=sub["SubnetId"])
@@ -1572,13 +1885,16 @@ def _force_delete_vpc(board: StatusBoard, region: str, vpc_id: str):
         ec2.delete_vpc(VpcId=vpc_id)
         board.log(f"Deleted VPC {vpc_id}")
     except ClientError as e:
-        board.log(f"WARN: could not fully delete VPC {vpc_id}: {e} "
-                  f"(re-run --cleanup-only later)")
+        board.log(
+            f"WARN: could not fully delete VPC {vpc_id}: {e} "
+            f"(re-run --cleanup-only later)"
+        )
 
 
 # ============================================================================
 # Reporting
 # ============================================================================
+
 
 def write_report(cfg: Config, results: list, log_dir: Path) -> Path:
     report = {
@@ -1600,8 +1916,10 @@ def print_table(results: list):
     for r in results:
         checks = ", ".join(f"{k}={v}" for k, v in r["checks"].items()) or "-"
         mins = r.get("duration_secs", 0) / 60
-        print(f"{r['version']:<10} {r['strategy']:<14} {r['result']:<8} "
-              f"{mins:>6.1f}m   {checks}")
+        print(
+            f"{r['version']:<10} {r['strategy']:<14} {r['result']:<8} "
+            f"{mins:>6.1f}m   {checks}"
+        )
         for err in r.get("errors", []):
             print(f"{'':<10} ERROR: {err[:100]}")
     print("=" * 78 + "\n")
@@ -1617,14 +1935,18 @@ def bedrock_summary(cfg: Config, results: list, board: StatusBoard):
             "solution. Summarize: overall health, per-version outcomes, any "
             "bugs/gaps the failures suggest in the DR solution itself, and "
             "recommended next steps. Be concise.\n\nResults JSON:\n"
-            + json.dumps(results, indent=2, default=str))
+            + json.dumps(results, indent=2, default=str)
+        )
         resp = rt.invoke_model(
             modelId=cfg.bedrock_model_id,
-            body=json.dumps({
-                "anthropic_version": "bedrock-2023-05-31",
-                "max_tokens": 2048,
-                "messages": [{"role": "user", "content": prompt}],
-            }))
+            body=json.dumps(
+                {
+                    "anthropic_version": "bedrock-2023-05-31",
+                    "max_tokens": 2048,
+                    "messages": [{"role": "user", "content": prompt}],
+                }
+            ),
+        )
         text = json.loads(resp["body"].read())["content"][0]["text"]
         print("\n───────────  AI SUMMARY (Bedrock)  ───────────")
         print(text)
@@ -1638,21 +1960,25 @@ def bedrock_summary(cfg: Config, results: list, board: StatusBoard):
 # Per-version test pipeline
 # ============================================================================
 
-def run_version(ctx: Ctx, infra: Infra, teardown: bool = False,
-                provision: bool = True) -> dict:
+
+def run_version(
+    ctx: Ctx, infra: Infra, teardown: bool = False, provision: bool = True
+) -> dict:
     t0 = time.time()
     result = "PASS"
     reused = False
     try:
         if not provision and infra_ready(ctx):
-            ctx.board.log("Existing MWAA envs AVAILABLE — reusing infrastructure "
-                          "(redeploying DR solution only)", key=ctx.key)
+            ctx.board.log(
+                "Existing MWAA envs AVAILABLE — reusing infrastructure "
+                "(redeploying DR solution only)",
+                key=ctx.key,
+            )
             adopt_existing_infra(ctx)
             reused = True
         else:
             if not provision:
-                ctx.board.log("No reusable MWAA envs found — provisioning",
-                              key=ctx.key)
+                ctx.board.log("No reusable MWAA envs found — provisioning", key=ctx.key)
             infra.provision_for_version(ctx)
             deploy_mwaa(ctx, infra)
         cdk_deploy(ctx, infra)
@@ -1676,16 +2002,21 @@ def run_version(ctx: Ctx, infra: Infra, teardown: bool = False,
             except Exception as e:
                 ctx.board.log(f"WARN cleanup: {e}", key=ctx.key)
         elif teardown:
-            ctx.board.log("FAIL — resources KEPT despite --teardown so you "
-                          "can fix and rerun; use --cleanup-only to remove.",
-                          key=ctx.key)
+            ctx.board.log(
+                "FAIL — resources KEPT despite --teardown so you "
+                "can fix and rerun; use --cleanup-only to remove.",
+                key=ctx.key,
+            )
         else:
             # Default: keep everything. The framework exists to iterate on
             # the DR solution — reruns adopt these envs and retest in
             # minutes instead of re-provisioning for ~1h.
-            ctx.board.log(f"{result} — infrastructure kept. Rerun "
-                          f"./run_e2e.py to test again on the same envs; "
-                          f"--cleanup-only removes everything.", key=ctx.key)
+            ctx.board.log(
+                f"{result} — infrastructure kept. Rerun "
+                f"./run_e2e.py to test again on the same envs; "
+                f"--cleanup-only removes everything.",
+                key=ctx.key,
+            )
     ctx.board.finish(ctx.key, result)
     return {
         "version": ctx.version,
@@ -1704,6 +2035,7 @@ def run_version(ctx: Ctx, infra: Infra, teardown: bool = False,
 # Main
 # ============================================================================
 
+
 def dry_run_plan(cfg: Config):
     print("\n─────────  DRY RUN — execution plan  ─────────")
     print(f"Account: {cfg.account_id} | {cfg.primary_region} → {cfg.secondary_region}")
@@ -1714,43 +2046,63 @@ def dry_run_plan(cfg: Config):
         for s in cfg.dr_strategies:
             p = f"{cfg.id_prefix}-{slug(v)}"
             print(f"\n── v{v} / {s} ──")
-            print(f"3. Buckets: {cfg.id_prefix}-{cfg.account_id[:6]}-{slug(v)}-{{pri,sec}}-dags")
+            print(
+                f"3. Buckets: {cfg.id_prefix}-{cfg.account_id[:6]}-{slug(v)}-{{pri,sec}}-dags"
+            )
             print(f"4. Roles:   {p}-{{pri,sec}}-role")
-            print(f"5. MWAA:    {p}-primary ({cfg.primary_region}), "
-                  f"{p}-secondary ({cfg.secondary_region})  [~30 min]")
+            print(
+                f"5. MWAA:    {p}-primary ({cfg.primary_region}), "
+                f"{p}-secondary ({cfg.secondary_region})  [~30 min]"
+            )
             print(f"6. CDK:     {p}-primary-stack + {p}-secondary-stack")
             print("7. Seed marker variable → trigger backup → wait replication")
             print("8. Start recovery SFN with simulate_dr=YES → wait success")
             print("9. Verify marker variable restored in secondary env")
-            print("10. Keep infra for reruns (pass --teardown to destroy "
-                  "stacks, MWAA envs, buckets, roles on PASS)")
-    print("\nFinal: delete shared VPCs, write JSON report, print table, Bedrock summary")
+            print(
+                "10. Keep infra for reruns (pass --teardown to destroy "
+                "stacks, MWAA envs, buckets, roles on PASS)"
+            )
+    print(
+        "\nFinal: delete shared VPCs, write JSON report, print table, Bedrock summary"
+    )
     print("──────────────────────────────────────────────\n")
 
 
 def main():
-    ap = argparse.ArgumentParser(description=__doc__,
-                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     ap.add_argument("--dry-run", action="store_true", help="Show plan, do nothing")
-    ap.add_argument("--cleanup-only", action="store_true",
-                    help="Delete all e2e resources and exit")
-    ap.add_argument("--teardown", action="store_true",
-                    help="Tear down a version's resources after it PASSES "
-                         "(and shared VPCs when everything passed). Default "
-                         "is to KEEP all infrastructure so the script can be "
-                         "rerun repeatedly against the same MWAA envs; use "
-                         "--cleanup-only to remove everything.")
-    ap.add_argument("--provision-infrastructure", action="store_true",
-                    help="Force full infra provisioning (VPCs, buckets, roles, "
-                         "MWAA envs) even if they already exist. Without this "
-                         "flag, existing AVAILABLE MWAA envs are reused: only "
-                         "the DR solution is redeployed and retested, and the "
-                         "infra is kept afterwards.")
+    ap.add_argument(
+        "--cleanup-only", action="store_true", help="Delete all e2e resources and exit"
+    )
+    ap.add_argument(
+        "--teardown",
+        action="store_true",
+        help="Tear down a version's resources after it PASSES "
+        "(and shared VPCs when everything passed). Default "
+        "is to KEEP all infrastructure so the script can be "
+        "rerun repeatedly against the same MWAA envs; use "
+        "--cleanup-only to remove everything.",
+    )
+    ap.add_argument(
+        "--provision-infrastructure",
+        action="store_true",
+        help="Force full infra provisioning (VPCs, buckets, roles, "
+        "MWAA envs) even if they already exist. Without this "
+        "flag, existing AVAILABLE MWAA envs are reused: only "
+        "the DR solution is redeployed and retested, and the "
+        "infra is kept afterwards.",
+    )
     ap.add_argument("--versions", nargs="+", help="Override versions to test")
-    ap.add_argument("--regions", nargs=2, metavar=("PRIMARY", "SECONDARY"),
-                    help="Override primary/secondary regions from the config. "
-                         "Handy with --cleanup-only to remove leftovers in "
-                         "previously used regions after a config change.")
+    ap.add_argument(
+        "--regions",
+        nargs=2,
+        metavar=("PRIMARY", "SECONDARY"),
+        help="Override primary/secondary regions from the config. "
+        "Handy with --cleanup-only to remove leftovers in "
+        "previously used regions after a config change.",
+    )
     ap.add_argument("--sequential", action="store_true", help="Force sequential mode")
     ap.add_argument("--config", default=str(SCRIPT_DIR / "e2e_config.yaml"))
     args = ap.parse_args()
@@ -1770,8 +2122,10 @@ def main():
     log_dir = SCRIPT_DIR / "logs" / datetime.now().strftime("%Y%m%d-%H%M%S")
     log_dir.mkdir(parents=True, exist_ok=True)
     board = StatusBoard(log_dir)
-    board.log(f"Run started | account={cfg.account_id} | "
-              f"versions={cfg.versions} | parallel={cfg.parallel} | logs={log_dir}")
+    board.log(
+        f"Run started | account={cfg.account_id} | "
+        f"versions={cfg.versions} | parallel={cfg.parallel} | logs={log_dir}"
+    )
 
     if args.cleanup_only:
         try:
@@ -1784,33 +2138,50 @@ def main():
             board.logfile.write(traceback.format_exc())
             board.logfile.flush()
             board.log(f"FATAL during cleanup: {e}")
-            board.log("Rerun './run_e2e.py --cleanup-only' to remove what's left "
-                      f"(full traceback in {board.logfile.name}).")
+            board.log(
+                "Rerun './run_e2e.py --cleanup-only' to remove what's left "
+                f"(full traceback in {board.logfile.name})."
+            )
             return 1
 
     try:
         # Preflight: the CDK app needs aws_cdk importable by the interpreter
         # we pin via --app (this script's interpreter)
-        rc = subprocess.run([sys.executable, "-c", "import aws_cdk"],
-                            capture_output=True).returncode
+        rc = subprocess.run(
+            [sys.executable, "-c", "import aws_cdk"], capture_output=True
+        ).returncode
         if rc != 0:
-            board.log(f"ERROR: `{sys.executable}` cannot import aws_cdk — "
-                      "the CDK app (app.py) will fail to synth.")
-            board.log(f"Fix: {sys.executable} -m pip install -r requirements.txt   (from repo root)")
+            board.log(
+                f"ERROR: `{sys.executable}` cannot import aws_cdk — "
+                "the CDK app (app.py) will fail to synth."
+            )
+            board.log(
+                f"Fix: {sys.executable} -m pip install -r requirements.txt   (from repo root)"
+            )
             return 1
-        if subprocess.run(["npx", "cdk", "--version"],
-                          capture_output=True).returncode != 0:
+        if (
+            subprocess.run(["npx", "cdk", "--version"], capture_output=True).returncode
+            != 0
+        ):
             board.log("ERROR: `npx cdk` not available. Install Node.js + CDK.")
             return 1
 
         # CDK bootstrap
         board.log("CDK bootstrap...")
-        rc = run_cmd(["npx", "cdk", "bootstrap",
-                      "--app", CDK_APP,
-                      f"aws://{cfg.account_id}/{cfg.primary_region}",
-                      f"aws://{cfg.account_id}/{cfg.secondary_region}"],
-                     cwd=REPO_ROOT, log_path=log_dir / "bootstrap.log",
-                     timeout_secs=600)
+        rc = run_cmd(
+            [
+                "npx",
+                "cdk",
+                "bootstrap",
+                "--app",
+                CDK_APP,
+                f"aws://{cfg.account_id}/{cfg.primary_region}",
+                f"aws://{cfg.account_id}/{cfg.secondary_region}",
+            ],
+            cwd=REPO_ROOT,
+            log_path=log_dir / "bootstrap.log",
+            timeout_secs=600,
+        )
         if rc != 0:
             board.log("ERROR: CDK bootstrap failed, see bootstrap.log")
             return 1
@@ -1826,22 +2197,33 @@ def main():
 
         # Version tests
         board.start_printer()
-        ctxs = [Ctx(version=v, strategy=s, cfg=cfg, board=board, log_dir=log_dir)
-                for v in cfg.versions for s in cfg.dr_strategies]
+        ctxs = [
+            Ctx(version=v, strategy=s, cfg=cfg, board=board, log_dir=log_dir)
+            for v in cfg.versions
+            for s in cfg.dr_strategies
+        ]
         results = []
         if cfg.parallel and len(ctxs) > 1:
             board.log(f"Running {len(ctxs)} tests in PARALLEL")
             with concurrent.futures.ThreadPoolExecutor(max_workers=len(ctxs)) as ex:
-                futures = {ex.submit(run_version, c, infra, args.teardown,
-                                     args.provision_infrastructure): c
-                           for c in ctxs}
+                futures = {
+                    ex.submit(
+                        run_version,
+                        c,
+                        infra,
+                        args.teardown,
+                        args.provision_infrastructure,
+                    ): c
+                    for c in ctxs
+                }
                 for fut in concurrent.futures.as_completed(futures):
                     results.append(fut.result())
         else:
             board.log(f"Running {len(ctxs)} tests SEQUENTIALLY")
             for c in ctxs:
-                results.append(run_version(c, infra, args.teardown,
-                                           args.provision_infrastructure))
+                results.append(
+                    run_version(c, infra, args.teardown, args.provision_infrastructure)
+                )
 
         board.stop_printer()
 
@@ -1855,9 +2237,11 @@ def main():
                 except Exception as e:
                     board.log(f"WARN: shared VPC cleanup ({region}): {e}")
         else:
-            board.log("Infrastructure kept. Rerun './run_e2e.py' to test "
-                      "again on the same envs, or "
-                      "'./run_e2e.py --cleanup-only' to remove everything.")
+            board.log(
+                "Infrastructure kept. Rerun './run_e2e.py' to test "
+                "again on the same envs, or "
+                "'./run_e2e.py --cleanup-only' to remove everything."
+            )
 
         # Reporting
         results.sort(key=lambda r: r["version"])
@@ -1871,8 +2255,10 @@ def main():
     except KeyboardInterrupt:
         print("\n[ABORT] Interrupted — terminating child processes...")
         kill_children()
-        print("[ABORT] Resources may be left running. "
-              "Run './run_e2e.py --cleanup-only' to remove them.")
+        print(
+            "[ABORT] Resources may be left running. "
+            "Run './run_e2e.py --cleanup-only' to remove them."
+        )
         return 130
     except Exception as e:
         # Graceful fatal: concise message on the console, full traceback
@@ -1881,8 +2267,10 @@ def main():
         board.logfile.write(traceback.format_exc())
         board.logfile.flush()
         board.log(f"FATAL: {e}")
-        board.log(f"Full traceback in {board.logfile.name}. Resources already "
-                  f"created are kept — './run_e2e.py --cleanup-only' removes them.")
+        board.log(
+            f"Full traceback in {board.logfile.name}. Resources already "
+            f"created are kept — './run_e2e.py --cleanup-only' removes them."
+        )
         kill_children()
         return 1
 
