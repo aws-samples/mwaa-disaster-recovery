@@ -419,3 +419,10 @@ $RECYCLE.BIN/
 *.lnk
 
 # End of https://www.toptal.com/developers/gitignore/api/visualstudiocode,python,node,macos,windows,linux
+
+# E2E test runtime artifacts
+tests/e2e/logs/
+tests/e2e/reports/
+tests/e2e/.env.bak
+tests/e2e/__pycache__/
+cdk.out.e2e-*/

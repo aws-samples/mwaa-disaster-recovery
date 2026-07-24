@@ -19,19 +19,67 @@ import csv
 import json
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from io import StringIO
 
 import boto3
 from airflow import DAG
 from airflow.decorators import task
 from airflow.models import Variable
+from airflow.operators.empty import EmptyOperator
 from mwaa_dr.framework.credential_extractor import CredentialExtractor
 from mwaa_dr.framework.factory.base_dr_factory import BaseDRFactory
 from mwaa_dr.framework.model.base_table import BaseTable
 from mwaa_dr.framework.mwaa_rest_api_client import MwaaRestApiClient
 
+try:
+    from airflow.providers.amazon.aws.operators.glue import GlueJobOperator
+except ImportError:
+    GlueJobOperator = None  # Not available in test/CI environments
+
 logger = logging.getLogger(__name__)
+
+
+def _get_vpc_requirements(env_name, region):
+    """Get VPC networking requirements for a Glue connection.
+
+    Uses DR_SUBNET_ID and DR_SECURITY_GROUP_IDS Airflow variables if set (avoids
+    mwaa:GetEnvironment which is restricted in AF 3.2.1+). Falls back to the
+    MWAA API for environments that allow it.
+    """
+    from airflow.models import Variable
+
+    subnet_id = Variable.get("DR_SUBNET_ID", default_var="")
+    security_groups = Variable.get("DR_SECURITY_GROUP_IDS", default_var="")
+
+    if subnet_id and security_groups:
+        # Use pre-configured variables (set by CDK)
+        sg_list = [sg.strip() for sg in security_groups.split(",")]
+        ec2_client = boto3.client("ec2", region_name=region)
+        subnet_response = ec2_client.describe_subnets(SubnetIds=[subnet_id])
+        availability_zone = subnet_response["Subnets"][0]["AvailabilityZone"]
+        return {
+            "SubnetId": subnet_id,
+            "SecurityGroupIdList": sg_list,
+            "AvailabilityZone": availability_zone,
+        }
+
+    # Fallback: get from MWAA environment (requires mwaa:GetEnvironment)
+    mwaa_client = boto3.client("mwaa", region_name=region)
+    env_response = mwaa_client.get_environment(Name=env_name)
+    network_config = env_response["Environment"]["NetworkConfiguration"]
+    subnet_ids = network_config["SubnetIds"]
+    security_group_ids = network_config["SecurityGroupIds"]
+
+    ec2_client = boto3.client("ec2", region_name=region)
+    subnet_response = ec2_client.describe_subnets(SubnetIds=[subnet_ids[0]])
+    availability_zone = subnet_response["Subnets"][0]["AvailabilityZone"]
+
+    return {
+        "SubnetId": subnet_ids[0],
+        "SecurityGroupIdList": security_group_ids,
+        "AvailabilityZone": availability_zone,
+    }
 
 
 class GlueDRFactory(BaseDRFactory):
@@ -54,34 +102,43 @@ class GlueDRFactory(BaseDRFactory):
     # --- Glue job helpers ---
 
     def get_glue_role_name(self) -> str:
-        """Get the Glue IAM role ARN from the GLUE_ROLE_ARN Airflow variable.
+        """Get the Glue IAM role name from the GLUE_ROLE_ARN Airflow variable.
 
-        Returns:
-            str: The ARN of the IAM role for Glue jobs.
+        The variable may contain a full ARN or just the role name.
+        GlueJobOperator expects the role name (not ARN) in newer provider versions.
         """
-        return Variable.get("GLUE_ROLE_ARN")
+        role_value = Variable.get("GLUE_ROLE_ARN", default_var="")
+        # Extract role name from ARN if full ARN is provided
+        if role_value.startswith("arn:"):
+            return role_value.split("/")[-1]
+        return role_value
+
+    def get_glue_connection_name(self) -> str:
+        """Get the Glue JDBC connection name (deterministic: {env_name}_conn)."""
+        env_name = os.environ.get("MWAA_ENV_NAME", "") or Variable.get(
+            "DR_MWAA_ENV_NAME", default_var=""
+        )
+        return f"{env_name}_conn"
+
+    def get_glue_job_name(self, suffix: str) -> str:
+        """Construct a Glue job name namespaced by the MWAA environment.
+
+        Format: {env_name}_{dag_id}_{suffix}
+        This ensures multiple deployments in the same account/region don't
+        share or overwrite each other's Glue jobs.
+        """
+        env_name = os.environ.get("MWAA_ENV_NAME", "") or Variable.get(
+            "DR_MWAA_ENV_NAME", default_var=""
+        )
+        return f"{env_name}_{self.dag_id}_{suffix}"
 
     def get_script_location(self, script_name: str) -> str:
         """Construct the S3 location for a Glue script.
 
-        The script is expected to be deployed at
-        ``s3://{dags_bucket}/scripts/{script_name}.py`` by the CDK stack.
-
-        Args:
-            script_name: The base name of the Glue script (without extension).
-
-        Returns:
-            str: The full S3 URI for the Glue script.
+        Uses the DR_DAGS_BUCKET Airflow variable (set by CDK).
+        No API calls at parse time to avoid silent failures.
         """
-        dags_s3_path = os.environ.get("DAGS_S3_PATH", "")
-        if dags_s3_path.startswith("s3://"):
-            # DAGS_S3_PATH is like "s3://bucket-name/dags" — extract bucket
-            parts = dags_s3_path.replace("s3://", "").split("/", 1)
-            bucket = parts[0]
-        else:
-            # Fall back: bucket name is the DAGS_S3_PATH itself or empty
-            bucket = dags_s3_path
-
+        bucket = Variable.get("DR_DAGS_BUCKET", default_var="")
         return f"s3://{bucket}/scripts/{script_name}.py"
 
     def get_table_definitions(self) -> list:
@@ -182,13 +239,15 @@ class GlueDRFactory(BaseDRFactory):
         """Create and return a configured MwaaRestApiClient.
 
         Reads the MWAA environment name from the ``MWAA_ENV_NAME`` environment
-        variable and the AWS region from ``AWS_REGION`` (falling back to
-        ``AWS_DEFAULT_REGION``).
+        variable (or ``DR_MWAA_ENV_NAME`` Airflow variable as fallback) and the
+        AWS region from ``AWS_REGION`` (falling back to ``AWS_DEFAULT_REGION``).
 
         Returns:
             MwaaRestApiClient: A client configured for the current MWAA environment.
         """
-        env_name = os.environ.get("MWAA_ENV_NAME", "")
+        env_name = os.environ.get("MWAA_ENV_NAME", "") or Variable.get(
+            "DR_MWAA_ENV_NAME", default_var=""
+        )
         region = os.environ.get("AWS_REGION", os.environ.get("AWS_DEFAULT_REGION", ""))
         return MwaaRestApiClient(env_name, region)
 
@@ -284,7 +343,7 @@ class GlueDRFactory(BaseDRFactory):
 
     # --- REST API restore helpers ---
 
-    def restore_variables_via_api(self):
+    def restore_variables_via_api(self, context=None):
         """Restore Airflow variables from a CSV backup in S3 via the MWAA REST API.
 
         Reads the pipe-delimited CSV file at
@@ -307,8 +366,9 @@ class GlueDRFactory(BaseDRFactory):
 
         client = self.get_mwaa_rest_api_client()
 
-        # Read backup CSV from S3
-        backup_bucket = self.bucket()
+        # Read backup CSV from S3 — use dag_run conf bucket when available
+        # (Step Functions passes the correct backup bucket in conf)
+        backup_bucket = self.bucket(context)
         s3_key = f"{self.path_prefix}/variable.csv"
         s3_client = boto3.client("s3")
 
@@ -380,7 +440,7 @@ class GlueDRFactory(BaseDRFactory):
 
         logger.info("Variable restore complete (strategy=%s).", strategy)
 
-    def restore_connections_via_api(self):
+    def restore_connections_via_api(self, context=None):
         """Restore Airflow connections from a CSV backup in S3 via the MWAA REST API.
 
         Reads the pipe-delimited CSV file at
@@ -403,8 +463,8 @@ class GlueDRFactory(BaseDRFactory):
 
         client = self.get_mwaa_rest_api_client()
 
-        # Read backup CSV from S3
-        backup_bucket = self.bucket()
+        # Read backup CSV from S3 — use dag_run conf bucket when available
+        backup_bucket = self.bucket(context)
         s3_key = f"{self.path_prefix}/connection.csv"
         s3_client = boto3.client("s3")
 
@@ -557,74 +617,41 @@ class GlueDRFactory(BaseDRFactory):
         with dag:
 
             @task
-            def extract_credentials():
-                """Extract database credentials from MWAA worker environment."""
-                creds = CredentialExtractor.extract()
-                return {
-                    "jdbc_url": creds.jdbc_url,
-                    "username": creds.username,
-                    "password": creds.password,
-                    "host": creds.host,
-                    "port": creds.port,
-                    "database": creds.database,
-                }
+            def setup_glue_connection():
+                """Extract credentials and create/reuse a Glue JDBC connection.
 
-            @task
-            def create_glue_connection(credentials):
-                """Create or reuse a Glue JDBC connection using MWAA VPC networking."""
-                env_name = os.environ.get("MWAA_ENV_NAME", "")
+                Credentials stay within this task — never exposed via XCom.
+                """
+                creds = CredentialExtractor.extract()
+                env_name = os.environ.get("MWAA_ENV_NAME", "") or Variable.get(
+                    "DR_MWAA_ENV_NAME", default_var=""
+                )
                 region = os.environ.get(
                     "AWS_REGION", os.environ.get("AWS_DEFAULT_REGION", "")
                 )
                 connection_name = f"{env_name}_conn"
-
                 glue_client = boto3.client("glue", region_name=region)
 
-                # Check if connection already exists
+                conn_input = {
+                    "Name": connection_name,
+                    "ConnectionType": "JDBC",
+                    "ConnectionProperties": {
+                        "JDBC_CONNECTION_URL": creds.jdbc_url,
+                        "USERNAME": creds.username,
+                        "PASSWORD": creds.password,
+                    },
+                    "PhysicalConnectionRequirements": _get_vpc_requirements(
+                        env_name, region
+                    ),
+                }
                 try:
                     glue_client.get_connection(Name=connection_name)
-                    logger.info(
-                        "Glue connection '%s' already exists, reusing.",
-                        connection_name,
+                    glue_client.update_connection(
+                        Name=connection_name, ConnectionInput=conn_input
                     )
-                    return connection_name
                 except glue_client.exceptions.EntityNotFoundException:
-                    logger.info(
-                        "Glue connection '%s' not found, creating new connection.",
-                        connection_name,
-                    )
-
-                # Get MWAA VPC config
-                mwaa_client = boto3.client("mwaa", region_name=region)
-                env_response = mwaa_client.get_environment(Name=env_name)
-                network_config = env_response["Environment"]["NetworkConfiguration"]
-                subnet_ids = network_config["SubnetIds"]
-                security_group_ids = network_config["SecurityGroupIds"]
-
-                # Get availability zone for the first subnet
-                ec2_client = boto3.client("ec2", region_name=region)
-                subnet_response = ec2_client.describe_subnets(SubnetIds=[subnet_ids[0]])
-                availability_zone = subnet_response["Subnets"][0]["AvailabilityZone"]
-
-                # Create the Glue connection
-                glue_client.create_connection(
-                    ConnectionInput={
-                        "Name": connection_name,
-                        "ConnectionType": "JDBC",
-                        "ConnectionProperties": {
-                            "JDBC_CONNECTION_URL": credentials["jdbc_url"],
-                            "USERNAME": credentials["username"],
-                            "PASSWORD": credentials["password"],
-                        },
-                        "PhysicalConnectionRequirements": {
-                            "SubnetId": subnet_ids[0],
-                            "SecurityGroupIdList": security_group_ids,
-                            "AvailabilityZone": availability_zone,
-                        },
-                    }
-                )
-                logger.info("Created Glue connection '%s'.", connection_name)
-                return connection_name
+                    glue_client.create_connection(ConnectionInput=conn_input)
+                logger.info("Glue connection '%s' ready.", connection_name)
 
             @task
             def backup_variables_via_api():
@@ -637,8 +664,7 @@ class GlueDRFactory(BaseDRFactory):
                 factory.backup_connections_via_api()
 
             # Build the DAG structure
-            creds = extract_credentials()
-            conn_name = create_glue_connection(creds)
+            setup_task = setup_glue_connection()
 
             # Filter out variable and connection from table definitions
             table_defs = [
@@ -651,17 +677,31 @@ class GlueDRFactory(BaseDRFactory):
             backup_bucket = factory.bucket()
             max_age = Variable.get("DR_MAX_AGE_IN_DAYS", default_var="0")
 
-            from airflow.providers.amazon.aws.operators.glue import GlueJobOperator
-
             export_job = GlueJobOperator(
                 task_id="glue_export",
-                job_name=f"{factory.dag_id}_export",
+                # A lingering Glue run (job max concurrency is 1) fails
+                # StartJobRun with ConcurrentRunsExceeded — retry instead
+                # of failing the whole workflow.
+                retries=4,
+                retry_delay=timedelta(minutes=2),
+                job_name=factory.get_glue_job_name("export"),
                 script_location=factory.get_script_location("mwaa_metadb_export"),
                 iam_role_name=factory.get_glue_role_name(),
+                update_config=True,
+                replace_script_file=True,
+                deferrable=False,
+                create_job_kwargs={
+                    "GlueVersion": "4.0",
+                    "NumberOfWorkers": 2,
+                    "WorkerType": "G.1X",
+                    "Connections": {
+                        "Connections": [factory.get_glue_connection_name()]
+                    },
+                },
                 script_args={
                     "--S3_OUTPUT_PATH": f"s3://{backup_bucket}/{factory.path_prefix}",
                     "--EXPORT_TABLES": json.dumps(table_defs),
-                    "--GLUE_CONNECTION_NAME": conn_name,
+                    "--GLUE_CONNECTION_NAME": factory.get_glue_connection_name(),
                     "--MAX_AGE_IN_DAYS": str(max_age),
                     "--TABLE_DEPENDENCY_ORDER": json.dumps(dependency_order),
                 },
@@ -670,7 +710,7 @@ class GlueDRFactory(BaseDRFactory):
                 ),
             )
 
-            conn_name >> export_job
+            setup_task >> export_job
 
             # Variables and connections backup run in parallel with the Glue job
             backup_variables_via_api()
@@ -700,101 +740,73 @@ class GlueDRFactory(BaseDRFactory):
         default_args = {
             "owner": "airflow",
             "start_date": datetime(2022, 1, 1),
-            "on_failure_callback": self.notify_failure_to_sfn,
         }
 
+        # NOTE: the failure callback must be DAG-level, not in default_args.
+        # As a per-task callback it fires on task attempt failures even when
+        # the task will retry (observed on MWAA Airflow 3), sending a
+        # premature send_task_failure to Step Functions while the run is
+        # still recovering. DAG-level fires once, on terminal run failure.
         dag = DAG(
             dag_id=self.dag_id,
             schedule=None,
             catchup=False,
             default_args=default_args,
+            on_failure_callback=self.notify_failure_to_sfn,
         )
 
         with dag:
 
             @task
-            def extract_credentials():
-                """Extract database credentials from MWAA worker environment."""
-                creds = CredentialExtractor.extract()
-                return {
-                    "jdbc_url": creds.jdbc_url,
-                    "username": creds.username,
-                    "password": creds.password,
-                    "host": creds.host,
-                    "port": creds.port,
-                    "database": creds.database,
-                }
+            def setup_glue_connection():
+                """Extract credentials and create/reuse a Glue JDBC connection.
 
-            @task
-            def create_glue_connection(credentials):
-                """Create or reuse a Glue JDBC connection using MWAA VPC networking."""
-                env_name = os.environ.get("MWAA_ENV_NAME", "")
+                Credentials stay within this task — never exposed via XCom.
+                """
+                creds = CredentialExtractor.extract()
+                env_name = os.environ.get("MWAA_ENV_NAME", "") or Variable.get(
+                    "DR_MWAA_ENV_NAME", default_var=""
+                )
                 region = os.environ.get(
                     "AWS_REGION", os.environ.get("AWS_DEFAULT_REGION", "")
                 )
                 connection_name = f"{env_name}_conn"
-
                 glue_client = boto3.client("glue", region_name=region)
 
-                # Check if connection already exists
+                conn_input = {
+                    "Name": connection_name,
+                    "ConnectionType": "JDBC",
+                    "ConnectionProperties": {
+                        "JDBC_CONNECTION_URL": creds.jdbc_url,
+                        "USERNAME": creds.username,
+                        "PASSWORD": creds.password,
+                    },
+                    "PhysicalConnectionRequirements": _get_vpc_requirements(
+                        env_name, region
+                    ),
+                }
                 try:
                     glue_client.get_connection(Name=connection_name)
-                    logger.info(
-                        "Glue connection '%s' already exists, reusing.",
-                        connection_name,
+                    glue_client.update_connection(
+                        Name=connection_name, ConnectionInput=conn_input
                     )
-                    return connection_name
                 except glue_client.exceptions.EntityNotFoundException:
-                    logger.info(
-                        "Glue connection '%s' not found, creating new connection.",
-                        connection_name,
-                    )
-
-                # Get MWAA VPC config
-                mwaa_client = boto3.client("mwaa", region_name=region)
-                env_response = mwaa_client.get_environment(Name=env_name)
-                network_config = env_response["Environment"]["NetworkConfiguration"]
-                subnet_ids = network_config["SubnetIds"]
-                security_group_ids = network_config["SecurityGroupIds"]
-
-                # Get availability zone for the first subnet
-                ec2_client = boto3.client("ec2", region_name=region)
-                subnet_response = ec2_client.describe_subnets(SubnetIds=[subnet_ids[0]])
-                availability_zone = subnet_response["Subnets"][0]["AvailabilityZone"]
-
-                # Create the Glue connection
-                glue_client.create_connection(
-                    ConnectionInput={
-                        "Name": connection_name,
-                        "ConnectionType": "JDBC",
-                        "ConnectionProperties": {
-                            "JDBC_CONNECTION_URL": credentials["jdbc_url"],
-                            "USERNAME": credentials["username"],
-                            "PASSWORD": credentials["password"],
-                        },
-                        "PhysicalConnectionRequirements": {
-                            "SubnetId": subnet_ids[0],
-                            "SecurityGroupIdList": security_group_ids,
-                            "AvailabilityZone": availability_zone,
-                        },
-                    }
-                )
-                logger.info("Created Glue connection '%s'.", connection_name)
-                return connection_name
+                    glue_client.create_connection(ConnectionInput=conn_input)
+                logger.info("Glue connection '%s' ready.", connection_name)
 
             @task
-            def restore_variables_via_api_task():
+            def restore_variables_via_api_task(**context):
                 """Restore Airflow variables via the MWAA REST API from S3."""
-                factory.restore_variables_via_api()
+                factory.restore_variables_via_api(context=context)
 
             @task
-            def restore_connections_via_api_task():
+            def restore_connections_via_api_task(**context):
                 """Restore Airflow connections via the MWAA REST API from S3."""
-                factory.restore_connections_via_api()
+                factory.restore_connections_via_api(context=context)
 
             @task
             def notify_success_to_sfn(**context):
-                """Send success callback to StepFunctions."""
+                """Send success callback to StepFunctions if all upstreams passed."""
                 dag_run = context.get("dag_run")
                 task_token = (
                     dag_run.conf.get("task_token") if dag_run and dag_run.conf else None
@@ -806,23 +818,62 @@ class GlueDRFactory(BaseDRFactory):
                     )
                     return
 
-                task_instances = dag_run.get_task_instances()
-                task_states = [f"{ti.task_id} => {ti.state}" for ti in task_instances]
+                # Check if any upstream task failed. Use dag_run.get_task_instances
+                # where available (AF 2.x), otherwise fall through to send success
+                # (with all_done trigger_rule, if we're running then everything
+                # finished — the failure callback handles the unhappy path).
+                try:
+                    all_tis = dag_run.get_task_instances()
+                    our_id = (
+                        context.get("task_instance").task_id
+                        if context.get("task_instance")
+                        else "notify_success_to_sfn"
+                    )
+                    failed = [
+                        ti.task_id
+                        for ti in all_tis
+                        if ti.task_id not in (our_id, "notify_failure_to_sfn")
+                        and ti.state not in ("success", "skipped", None)
+                    ]
+                    if failed:
+                        logger.info(
+                            "Skipping success callback — tasks not all "
+                            "successful: %s",
+                            failed,
+                        )
+                        return
+                except Exception as e:
+                    # AF 3.x RuntimeTaskInstance may not support this — fall
+                    # through and send success (failure task handles the inverse)
+                    logger.info(
+                        "Could not inspect upstream states (%s), "
+                        "proceeding with success callback.",
+                        e,
+                    )
+
                 result = {
                     "dag": dag_run.dag_id,
                     "dag_run": dag_run.run_id,
-                    "tasks": task_states,
                     "status": "Success",
                     "location": f"s3://{factory.bucket()}/{factory.path_prefix}",
                 }
 
                 sfn = boto3.client("stepfunctions")
-                sfn.send_task_success(taskToken=task_token, output=json.dumps(result))
-                logger.info("Sent task success to StepFunctions.")
+                try:
+                    sfn.send_task_success(
+                        taskToken=task_token, output=json.dumps(result)
+                    )
+                    logger.info("Sent task success to StepFunctions.")
+                except sfn.exceptions.TaskTimedOut:
+                    logger.warning(
+                        "SFN task token expired (TaskTimedOut) — the "
+                        "Step Functions execution already completed or "
+                        "timed out. The restore itself succeeded."
+                    )
 
-            @task(trigger_rule="one_failed")
+            @task
             def notify_failure_to_sfn(**context):
-                """Send failure callback to StepFunctions on any upstream failure."""
+                """Send failure callback to StepFunctions if any upstream failed."""
                 dag_run = context.get("dag_run")
                 task_token = (
                     dag_run.conf.get("task_token") if dag_run and dag_run.conf else None
@@ -834,26 +885,58 @@ class GlueDRFactory(BaseDRFactory):
                     )
                     return
 
-                task_instances = dag_run.get_task_instances()
-                task_states = [f"{ti.task_id} => {ti.state}" for ti in task_instances]
+                # Check if any upstream task actually failed
+                try:
+                    all_tis = dag_run.get_task_instances()
+                    our_id = (
+                        context.get("task_instance").task_id
+                        if context.get("task_instance")
+                        else "notify_failure_to_sfn"
+                    )
+                    failed = [
+                        ti.task_id
+                        for ti in all_tis
+                        if ti.task_id not in (our_id, "notify_success_to_sfn")
+                        and ti.state not in ("success", "skipped", None)
+                    ]
+                except Exception:
+                    logger.info(
+                        "Could not inspect upstream states on AF 3.x, "
+                        "skipping failure callback (success callback "
+                        "handles the happy path)."
+                    )
+                    return
+
+                if not failed:
+                    logger.info(
+                        "Skipping failure callback — all upstream tasks succeeded."
+                    )
+                    return
+
                 result = {
                     "dag": dag_run.dag_id,
                     "dag_run": dag_run.run_id,
-                    "tasks": task_states,
+                    "tasks": failed,
                     "status": "Fail",
                 }
 
                 sfn = boto3.client("stepfunctions")
-                sfn.send_task_failure(
-                    taskToken=task_token,
-                    error="Restore Failure",
-                    cause=json.dumps(result),
-                )
-                logger.info("Sent task failure to StepFunctions.")
+                try:
+                    sfn.send_task_failure(
+                        taskToken=task_token,
+                        error="Restore Failure",
+                        cause=json.dumps(result),
+                    )
+                    logger.info("Sent task failure to StepFunctions.")
+                except sfn.exceptions.TaskTimedOut:
+                    logger.warning(
+                        "SFN task token expired (TaskTimedOut) — the "
+                        "Step Functions execution already completed or "
+                        "timed out."
+                    )
 
             # Build the DAG structure
-            creds = extract_credentials()
-            conn_name = create_glue_connection(creds)
+            setup_task = setup_glue_connection()
 
             # Filter out variable and connection from table definitions
             table_defs = [
@@ -865,17 +948,31 @@ class GlueDRFactory(BaseDRFactory):
 
             backup_bucket = factory.bucket()
 
-            from airflow.providers.amazon.aws.operators.glue import GlueJobOperator
-
             import_job = GlueJobOperator(
                 task_id="glue_import",
-                job_name=f"{factory.dag_id}_import",
+                # A lingering Glue run (job max concurrency is 1) fails
+                # StartJobRun with ConcurrentRunsExceeded — retry instead
+                # of failing the whole workflow.
+                retries=4,
+                retry_delay=timedelta(minutes=2),
+                job_name=factory.get_glue_job_name("import"),
                 script_location=factory.get_script_location("mwaa_metadb_import"),
                 iam_role_name=factory.get_glue_role_name(),
+                update_config=True,
+                replace_script_file=True,
+                deferrable=False,
+                create_job_kwargs={
+                    "GlueVersion": "4.0",
+                    "NumberOfWorkers": 2,
+                    "WorkerType": "G.1X",
+                    "Connections": {
+                        "Connections": [factory.get_glue_connection_name()]
+                    },
+                },
                 script_args={
                     "--S3_INPUT_PATH": f"s3://{backup_bucket}/{factory.path_prefix}",
                     "--IMPORT_TABLES": json.dumps(table_defs),
-                    "--GLUE_CONNECTION_NAME": conn_name,
+                    "--GLUE_CONNECTION_NAME": factory.get_glue_connection_name(),
                     "--TABLE_DEPENDENCY_ORDER": json.dumps(dependency_order),
                 },
                 region_name=os.environ.get(
@@ -883,18 +980,25 @@ class GlueDRFactory(BaseDRFactory):
                 ),
             )
 
-            conn_name >> import_job
+            setup_task >> import_job
 
             # Variables and connections restore run in parallel with the Glue job
             restore_vars = restore_variables_via_api_task()
             restore_conns = restore_connections_via_api_task()
 
-            # All restore tasks must complete before success notification
+            # All restore tasks must complete before success notification.
+            # Use an EmptyOperator with all_done as a join point — @task
+            # with trigger_rule doesn't fire reliably on Airflow 3.x.
+            join = EmptyOperator(
+                task_id="join_all_done",
+                trigger_rule="all_success",
+            )
             success = notify_success_to_sfn()
             failure = notify_failure_to_sfn()
 
-            [import_job, restore_vars, restore_conns] >> success
-            [import_job, restore_vars, restore_conns] >> failure
+            [import_job, restore_vars, restore_conns] >> join
+            join >> success
+            join >> failure
 
         return dag
 
@@ -919,91 +1023,63 @@ class GlueDRFactory(BaseDRFactory):
         default_args = {
             "owner": "airflow",
             "start_date": datetime(2022, 1, 1),
-            "on_failure_callback": self.notify_failure_to_sfn,
         }
 
+        # NOTE: the failure callback must be DAG-level, not in default_args.
+        # As a per-task callback it fires on task attempt failures even when
+        # the task will retry (observed on MWAA Airflow 3), sending a
+        # premature send_task_failure to Step Functions while the run is
+        # still recovering. DAG-level fires once, on terminal run failure.
         dag = DAG(
             dag_id=self.dag_id,
             schedule=None,
             catchup=False,
             default_args=default_args,
+            on_failure_callback=self.notify_failure_to_sfn,
         )
 
         with dag:
 
             @task
-            def extract_credentials():
-                """Extract database credentials from MWAA worker environment."""
-                creds = CredentialExtractor.extract()
-                return {
-                    "jdbc_url": creds.jdbc_url,
-                    "username": creds.username,
-                    "password": creds.password,
-                    "host": creds.host,
-                    "port": creds.port,
-                    "database": creds.database,
-                }
+            def setup_glue_connection():
+                """Extract credentials and create/reuse a Glue JDBC connection.
 
-            @task
-            def create_glue_connection(credentials):
-                """Create or reuse a Glue JDBC connection using MWAA VPC networking."""
-                env_name = os.environ.get("MWAA_ENV_NAME", "")
+                Credentials stay within this task — never exposed via XCom.
+                """
+                creds = CredentialExtractor.extract()
+                env_name = os.environ.get("MWAA_ENV_NAME", "") or Variable.get(
+                    "DR_MWAA_ENV_NAME", default_var=""
+                )
                 region = os.environ.get(
                     "AWS_REGION", os.environ.get("AWS_DEFAULT_REGION", "")
                 )
                 connection_name = f"{env_name}_conn"
-
                 glue_client = boto3.client("glue", region_name=region)
 
-                # Check if connection already exists
+                conn_input = {
+                    "Name": connection_name,
+                    "ConnectionType": "JDBC",
+                    "ConnectionProperties": {
+                        "JDBC_CONNECTION_URL": creds.jdbc_url,
+                        "USERNAME": creds.username,
+                        "PASSWORD": creds.password,
+                    },
+                    "PhysicalConnectionRequirements": _get_vpc_requirements(
+                        env_name, region
+                    ),
+                }
                 try:
                     glue_client.get_connection(Name=connection_name)
-                    logger.info(
-                        "Glue connection '%s' already exists, reusing.",
-                        connection_name,
+                    glue_client.update_connection(
+                        Name=connection_name, ConnectionInput=conn_input
                     )
-                    return connection_name
                 except glue_client.exceptions.EntityNotFoundException:
-                    logger.info(
-                        "Glue connection '%s' not found, creating new connection.",
-                        connection_name,
-                    )
-
-                # Get MWAA VPC config
-                mwaa_client = boto3.client("mwaa", region_name=region)
-                env_response = mwaa_client.get_environment(Name=env_name)
-                network_config = env_response["Environment"]["NetworkConfiguration"]
-                subnet_ids = network_config["SubnetIds"]
-                security_group_ids = network_config["SecurityGroupIds"]
-
-                # Get availability zone for the first subnet
-                ec2_client = boto3.client("ec2", region_name=region)
-                subnet_response = ec2_client.describe_subnets(SubnetIds=[subnet_ids[0]])
-                availability_zone = subnet_response["Subnets"][0]["AvailabilityZone"]
-
-                # Create the Glue connection
-                glue_client.create_connection(
-                    ConnectionInput={
-                        "Name": connection_name,
-                        "ConnectionType": "JDBC",
-                        "ConnectionProperties": {
-                            "JDBC_CONNECTION_URL": credentials["jdbc_url"],
-                            "USERNAME": credentials["username"],
-                            "PASSWORD": credentials["password"],
-                        },
-                        "PhysicalConnectionRequirements": {
-                            "SubnetId": subnet_ids[0],
-                            "SecurityGroupIdList": security_group_ids,
-                            "AvailabilityZone": availability_zone,
-                        },
-                    }
-                )
-                logger.info("Created Glue connection '%s'.", connection_name)
-                return connection_name
+                    glue_client.create_connection(ConnectionInput=conn_input)
+                logger.info("Glue connection '%s' ready.", connection_name)
 
             @task
             def notify_success_to_sfn(**context):
-                """Send success callback to StepFunctions."""
+                """Send success callback to StepFunctions if all upstreams passed."""
                 dag_run = context.get("dag_run")
                 task_token = (
                     dag_run.conf.get("task_token") if dag_run and dag_run.conf else None
@@ -1015,22 +1091,55 @@ class GlueDRFactory(BaseDRFactory):
                     )
                     return
 
-                task_instances = dag_run.get_task_instances()
-                task_states = [f"{ti.task_id} => {ti.state}" for ti in task_instances]
+                try:
+                    all_tis = dag_run.get_task_instances()
+                    our_id = (
+                        context.get("task_instance").task_id
+                        if context.get("task_instance")
+                        else "notify_success_to_sfn"
+                    )
+                    failed = [
+                        ti.task_id
+                        for ti in all_tis
+                        if ti.task_id not in (our_id, "notify_failure_to_sfn")
+                        and ti.state not in ("success", "skipped", None)
+                    ]
+                    if failed:
+                        logger.info(
+                            "Skipping success callback — tasks not all "
+                            "successful: %s",
+                            failed,
+                        )
+                        return
+                except Exception as e:
+                    logger.info(
+                        "Could not inspect upstream states (%s), "
+                        "proceeding with success callback.",
+                        e,
+                    )
+
                 result = {
                     "dag": dag_run.dag_id,
                     "dag_run": dag_run.run_id,
-                    "tasks": task_states,
                     "status": "Success",
                 }
 
                 sfn = boto3.client("stepfunctions")
-                sfn.send_task_success(taskToken=task_token, output=json.dumps(result))
-                logger.info("Sent task success to StepFunctions.")
+                try:
+                    sfn.send_task_success(
+                        taskToken=task_token, output=json.dumps(result)
+                    )
+                    logger.info("Sent task success to StepFunctions.")
+                except sfn.exceptions.TaskTimedOut:
+                    logger.warning(
+                        "SFN task token expired (TaskTimedOut) — the "
+                        "Step Functions execution already completed or "
+                        "timed out. The restore itself succeeded."
+                    )
 
-            @task(trigger_rule="one_failed")
+            @task
             def notify_failure_to_sfn(**context):
-                """Send failure callback to StepFunctions on any upstream failure."""
+                """Send failure callback to StepFunctions if any upstream failed."""
                 dag_run = context.get("dag_run")
                 task_token = (
                     dag_run.conf.get("task_token") if dag_run and dag_run.conf else None
@@ -1042,40 +1151,85 @@ class GlueDRFactory(BaseDRFactory):
                     )
                     return
 
-                task_instances = dag_run.get_task_instances()
-                task_states = [f"{ti.task_id} => {ti.state}" for ti in task_instances]
+                try:
+                    all_tis = dag_run.get_task_instances()
+                    our_id = (
+                        context.get("task_instance").task_id
+                        if context.get("task_instance")
+                        else "notify_failure_to_sfn"
+                    )
+                    failed = [
+                        ti.task_id
+                        for ti in all_tis
+                        if ti.task_id not in (our_id, "notify_success_to_sfn")
+                        and ti.state not in ("success", "skipped", None)
+                    ]
+                except Exception:
+                    logger.info(
+                        "Could not inspect upstream states on AF 3.x, "
+                        "skipping failure callback (success callback "
+                        "handles the happy path)."
+                    )
+                    return
+
+                if not failed:
+                    logger.info(
+                        "Skipping failure callback — all upstream tasks succeeded."
+                    )
+                    return
+
                 result = {
                     "dag": dag_run.dag_id,
                     "dag_run": dag_run.run_id,
-                    "tasks": task_states,
+                    "tasks": failed,
                     "status": "Fail",
                 }
 
                 sfn = boto3.client("stepfunctions")
-                sfn.send_task_failure(
-                    taskToken=task_token,
-                    error="Cleanup Failure",
-                    cause=json.dumps(result),
-                )
-                logger.info("Sent task failure to StepFunctions.")
+                try:
+                    sfn.send_task_failure(
+                        taskToken=task_token,
+                        error="Cleanup Failure",
+                        cause=json.dumps(result),
+                    )
+                    logger.info("Sent task failure to StepFunctions.")
+                except sfn.exceptions.TaskTimedOut:
+                    logger.warning(
+                        "SFN task token expired (TaskTimedOut) — the "
+                        "Step Functions execution already completed or "
+                        "timed out."
+                    )
 
             # Build the DAG structure
-            creds = extract_credentials()
-            conn_name = create_glue_connection(creds)
+            setup_task = setup_glue_connection()
 
             table_defs = factory.get_table_definitions()
             dependency_order = factory.get_table_dependency_order()
 
-            from airflow.providers.amazon.aws.operators.glue import GlueJobOperator
-
             cleanup_job = GlueJobOperator(
                 task_id="glue_cleanup",
-                job_name=f"{factory.dag_id}_cleanup",
+                # A lingering Glue run (job max concurrency is 1) fails
+                # StartJobRun with ConcurrentRunsExceeded — retry instead
+                # of failing the whole workflow.
+                retries=4,
+                retry_delay=timedelta(minutes=2),
+                job_name=factory.get_glue_job_name("cleanup"),
                 script_location=factory.get_script_location("mwaa_metadb_cleanup"),
                 iam_role_name=factory.get_glue_role_name(),
+                update_config=True,
+                replace_script_file=True,
+                deferrable=False,
+                create_job_kwargs={
+                    "GlueVersion": "4.0",
+                    "NumberOfWorkers": 2,
+                    "WorkerType": "G.1X",
+                    "Connections": {
+                        "Connections": [factory.get_glue_connection_name()]
+                    },
+                },
                 script_args={
                     "--CLEANUP_TABLES": json.dumps(table_defs),
-                    "--GLUE_CONNECTION_NAME": conn_name,
+                    "--GLUE_CONNECTION_NAME": factory.get_glue_connection_name(),
                     "--TABLE_DEPENDENCY_ORDER": json.dumps(dependency_order),
                 },
                 region_name=os.environ.get(
@@ -1083,14 +1237,21 @@ class GlueDRFactory(BaseDRFactory):
                 ),
             )
 
-            conn_name >> cleanup_job
+            setup_task >> cleanup_job
 
-            # Notify StepFunctions on success or failure
+            # Notify StepFunctions on success or failure.
+            # Use an EmptyOperator with all_done as a join point — @task
+            # with trigger_rule doesn't fire reliably on Airflow 3.x.
+            join = EmptyOperator(
+                task_id="join_all_done",
+                trigger_rule="all_success",
+            )
             success = notify_success_to_sfn()
             failure = notify_failure_to_sfn()
 
-            cleanup_job >> success
-            cleanup_job >> failure
+            cleanup_job >> join
+            join >> success
+            join >> failure
 
         return dag
 

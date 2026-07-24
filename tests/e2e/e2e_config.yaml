@@ -1,0 +1,44 @@
+# E2E Test Configuration for MWAA Disaster Recovery Solution
+# The AWS account is always auto-detected from active credentials.
+
+test_run:
+  # Prefix for all resource names (and the cleanup tag value)
+  id_prefix: mwaa-e2e
+  # Run version tests in parallel (true) or sequentially (false)
+  parallel: true
+
+aws:
+  primary_region: eu-west-1
+  secondary_region: eu-west-2
+
+# MWAA versions to test (must be in config.py SUPPORTED_MWAA_VERSIONS)
+versions:
+  - "2.10.3"
+  - "2.11.0"
+  - "3.0.6"
+  - "3.2.1"
+
+# DR strategies to test per version: WARM_STANDBY, BACKUP_RESTORE
+dr_strategies:
+  - WARM_STANDBY
+
+mwaa:
+  environment_class: mw1.small
+  max_workers: 2
+  min_workers: 1
+
+# AI-powered result summary
+bedrock:
+  enabled: false
+  model_id: us.anthropic.claude-sonnet-4-5-20250929-v1:0
+  region: us-east-1
+
+# Phase timeouts (minutes unless noted)
+timeouts:
+  # eu-west-2 has been observed taking 60+ min to create envs (eu-west-1
+  # takes ~35 min with identical config) — give MWAA plenty of headroom
+  mwaa_creation_mins: 75
+  backup_dag_wait_mins: 30
+  dr_simulation_mins: 45
+  cdk_deploy_mins: 45
+  poll_interval_secs: 30

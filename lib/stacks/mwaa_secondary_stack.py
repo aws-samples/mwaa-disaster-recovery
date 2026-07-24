@@ -29,6 +29,8 @@ from aws_cdk import aws_stepfunctions_tasks as tasks
 from constructs import Construct
 
 import config
+from lib.dr_constructs.airflow_cli import AirflowCli
+from lib.functions.airflow_cli_client import AirflowCliCommand, AirflowCliInput
 from lib.stacks.mwaa_base_stack import MwaaBaseStack, VpcInfo
 
 
@@ -463,7 +465,14 @@ class MwaaSecondaryStack(MwaaBaseStack):
         trigger_fn.add_to_role_policy(
             iam.PolicyStatement(
                 resources=[mwaa_arn],
-                actions=["airflow:CreateCliToken"],
+                actions=["airflow:CreateCliToken", "airflow:InvokeRestApi"],
+            )
+        )
+        # InvokeRestApi requires the Airflow role resource ARN
+        trigger_fn.add_to_role_policy(
+            iam.PolicyStatement(
+                resources=[f"{mwaa_arn.replace(':environment/', ':role/')}/Admin"],
+                actions=["airflow:InvokeRestApi"],
             )
         )
         return trigger_fn
@@ -765,12 +774,30 @@ class MwaaSecondaryStack(MwaaBaseStack):
         )
 
         # VPC networking permissions for Glue
+        # VPC networking permissions for Glue (full set per AWS documentation)
         glue_role.add_to_policy(
             iam.PolicyStatement(
                 actions=[
                     "ec2:CreateNetworkInterface",
                     "ec2:DeleteNetworkInterface",
                     "ec2:DescribeNetworkInterfaces",
+                    "ec2:DescribeSubnets",
+                    "ec2:DescribeSecurityGroups",
+                    "ec2:DescribeVpcEndpoints",
+                    "ec2:DescribeRouteTables",
+                    "ec2:DescribeVpcs",
+                    "ec2:CreateTags",
+                    "ec2:DeleteTags",
+                ],
+                resources=["*"],
+            )
+        )
+
+        # Glue connection access (needed by the job to read its own connection)
+        glue_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "glue:GetConnection",
                 ],
                 resources=["*"],
             )
@@ -782,10 +809,12 @@ class MwaaSecondaryStack(MwaaBaseStack):
                 actions=[
                     "s3:GetObject",
                     "s3:PutObject",
+                    "s3:DeleteObject",
                 ],
                 resources=[
                     self._backup_bucket.arn_for_objects("*"),
                     self._source_bucket.arn_for_objects("scripts/*"),
+                    f"arn:aws:s3:::{conf.primary_dags_bucket_name}/*",
                 ],
             )
         )
@@ -798,6 +827,7 @@ class MwaaSecondaryStack(MwaaBaseStack):
                 resources=[
                     self._backup_bucket.bucket_arn,
                     self._source_bucket.bucket_arn,
+                    f"arn:aws:s3:::{conf.primary_dags_bucket_name}",
                 ],
             )
         )
@@ -822,21 +852,36 @@ class MwaaSecondaryStack(MwaaBaseStack):
                 actions=[
                     "glue:CreateJob",
                     "glue:GetJob",
+                    "glue:UpdateJob",
                     "glue:StartJobRun",
                     "glue:GetJobRun",
                     "glue:CreateConnection",
                     "glue:GetConnection",
+                    "glue:UpdateConnection",
                 ],
                 resources=["*"],
             )
         )
 
-        # Grant MWAA execution role MWAA and EC2 permissions
+        # Grant MWAA execution role permission to read and pass the Glue role
+        # (the Glue hook calls iam:GetRole before creating the job)
+        mwaa_role.add_to_principal_policy(
+            iam.PolicyStatement(
+                actions=["iam:GetRole", "iam:PassRole"],
+                resources=[glue_role.role_arn],
+            )
+        )
+
+        # Grant MWAA execution role MWAA and EC2 permissions.
+        # airflow:InvokeRestApi is used by the v3.x restore path to write
+        # variables/connections; it authorizes against the Airflow role
+        # sub-resource (arn:...:role/{env}/{airflow-role}), covered by "*".
         mwaa_role.add_to_principal_policy(
             iam.PolicyStatement(
                 actions=[
-                    "mwaa:GetEnvironment",
-                    "mwaa:CreateWebLoginToken",
+                    "airflow:GetEnvironment",
+                    "airflow:CreateWebLoginToken",
+                    "airflow:InvokeRestApi",
                     "ec2:DescribeSubnets",
                     "ec2:DescribeSecurityGroups",
                 ],
@@ -855,6 +900,65 @@ class MwaaSecondaryStack(MwaaBaseStack):
                     }
                 },
             )
+        )
+
+        # Set Airflow variables needed by Glue DR DAGs on secondary
+        glue_vars_cli = AirflowCli(
+            self,
+            conf.get_name("airflow-cli-glue-vars"),
+            env_name=conf.secondary_mwaa_environment_name,
+            env_version=conf.mwaa_version,
+            vpc_info=self._vpc,
+            cli_input=AirflowCliInput(
+                create=[
+                    AirflowCliCommand(
+                        command=f"variables set GLUE_ROLE_ARN {glue_role.role_arn}"
+                    ),
+                    AirflowCliCommand(
+                        command=f"variables set DR_MWAA_ENV_NAME {conf.secondary_mwaa_environment_name}"
+                    ),
+                    AirflowCliCommand(
+                        command=f"variables set DR_BACKUP_BUCKET {conf.primary_dags_bucket_name}"
+                    ),
+                    AirflowCliCommand(
+                        command=f"variables set DR_DAGS_BUCKET {conf.secondary_dags_bucket_name}"
+                    ),
+                    AirflowCliCommand(
+                        command=f"variables set DR_SUBNET_ID {conf.secondary_subnet_ids[0]}"
+                    ),
+                    AirflowCliCommand(
+                        command=f"variables set DR_SECURITY_GROUP_IDS {','.join(conf.secondary_security_group_ids)}"
+                    ),
+                ],
+                update=[
+                    AirflowCliCommand(
+                        command=f"variables set GLUE_ROLE_ARN {glue_role.role_arn}"
+                    ),
+                    AirflowCliCommand(
+                        command=f"variables set DR_MWAA_ENV_NAME {conf.secondary_mwaa_environment_name}"
+                    ),
+                    AirflowCliCommand(
+                        command=f"variables set DR_BACKUP_BUCKET {conf.primary_dags_bucket_name}"
+                    ),
+                    AirflowCliCommand(
+                        command=f"variables set DR_DAGS_BUCKET {conf.secondary_dags_bucket_name}"
+                    ),
+                    AirflowCliCommand(
+                        command=f"variables set DR_SUBNET_ID {conf.secondary_subnet_ids[0]}"
+                    ),
+                    AirflowCliCommand(
+                        command=f"variables set DR_SECURITY_GROUP_IDS {','.join(conf.secondary_security_group_ids)}"
+                    ),
+                ],
+                delete=[
+                    AirflowCliCommand(command="variables delete GLUE_ROLE_ARN"),
+                    AirflowCliCommand(command="variables delete DR_MWAA_ENV_NAME"),
+                    AirflowCliCommand(command="variables delete DR_BACKUP_BUCKET"),
+                    AirflowCliCommand(command="variables delete DR_DAGS_BUCKET"),
+                    AirflowCliCommand(command="variables delete DR_SUBNET_ID"),
+                    AirflowCliCommand(command="variables delete DR_SECURITY_GROUP_IDS"),
+                ],
+            ),
         )
 
     def setup_sfn_vpce(

@@ -71,12 +71,24 @@ def on_delete(event):
     props = event["ResourceProperties"]
     cli_input = AirflowCliInput.from_json(props["airflow_cli_input"])
 
-    results = execute_commands(cli_input.delete)
+    # Best-effort: if the MWAA environment is already gone (deleted before
+    # the stack), there is nothing to run the CLI against — failing here
+    # would leave the stack stuck in DELETE_FAILED and leak its resources.
+    try:
+        results = execute_commands(cli_input.delete)
+        reason = "Successfully executed Airflow CLI commands"
+    except Exception as e:  # noqa: BLE001 - never block stack deletion
+        print(
+            f"Ignoring Airflow CLI failure on Delete "
+            f"(environment likely deleted): {e}"
+        )
+        results = {"count": 0}
+        reason = f"Skipped Airflow CLI commands on delete: {e}"
 
     return {
         "PhysicalResourceId": resource_id,
         "Data": results,
-        "Reason": "Successfully executed Airflow CLI commands",
+        "Reason": reason,
     }
 
 
@@ -91,4 +103,5 @@ def execute_commands(commands):
 
     result = {"results": json_results}
     print(f"Command results: {result}")
-    return result
+    # Truncate results to avoid CloudFormation 4096 byte response limit
+    return {"count": len(json_results)}

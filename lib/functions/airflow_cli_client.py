@@ -134,7 +134,10 @@ class AirflowCliClient:
         print(f"Executing CLI command: {payload} ...")
         token = self.setup()
 
-        url = f'https://{token["WebServerHostname"]}/aws_mwaa/cli'
+        # AF 3.x redirects /aws_mwaa/cli to /aws_mwaa/cli/ (trailing slash required)
+        sem_ver = self.environment_version.split(".")
+        cli_path = "/aws_mwaa/cli/" if int(sem_ver[0]) >= 3 else "/aws_mwaa/cli"
+        url = f'https://{token["WebServerHostname"]}{cli_path}'
         headers = {
             "Authorization": f'Bearer {token["CliToken"]}',
             "Content-Type": "text/plain",
@@ -180,30 +183,45 @@ class AirflowCliClient:
         :param dag_name: The name of the DAG.
         """
         result = self.execute(AirflowCliCommand(command=f"dags unpause {dag_name}"))
-        if "paused: False" not in result.stdout:
+        if (
+            "paused: False" not in result.stdout
+            and "| False" not in result.stdout
+            and "No paused DAGs" not in result.stdout
+        ):
             raise AirflowCliException(
                 f"The dag, {dag_name}, failed to unpause with the following error: {result}",
                 result=result,
             )
         return result
 
-    def trigger_dag(self, dag_name: str, configuration: dict):
+    def trigger_dag(self, dag_name: str, configuration: dict, run_id: str = None):
         """
         Triggers a DAG.
 
         :param dag_name: The name of the DAG.
         :param configuration: A dictionary of configuration.
+        :param run_id: Optional explicit run ID (recommended for AF 3.x).
         """
         sem_ver = self.environment_version.split(".")
 
         command = ""
         expected_result = ""
 
+        run_id_flag = f" -r {run_id}" if run_id else ""
+
         if int(sem_ver[0]) <= 2 and int(sem_ver[1]) <= 5:
-            command = f"dags trigger {dag_name}"
+            command = f"dags trigger{run_id_flag} {dag_name}"
             expected_result = "triggered: True"
+        elif int(sem_ver[0]) >= 3:
+            from datetime import datetime, timezone
+
+            logical_date = datetime.now(timezone.utc).strftime(
+                "%Y-%m-%dT%H:%M:%S+00:00"
+            )
+            command = f"dags trigger -o json{run_id_flag} --logical-date {logical_date} {dag_name}"
+            expected_result = dag_name
         else:
-            command = f"dags trigger -o json {dag_name}"
+            command = f"dags trigger -o json{run_id_flag} {dag_name}"
             expected_result = '"external_trigger": "True"'
 
         result = self.execute(

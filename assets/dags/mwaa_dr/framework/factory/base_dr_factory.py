@@ -22,8 +22,16 @@ from datetime import datetime
 from airflow import DAG, settings
 from airflow.exceptions import AirflowFailException
 from airflow.models import Variable
-from airflow.operators.dummy import DummyOperator
-from airflow.operators.python_operator import PythonOperator
+
+try:
+    from airflow.operators.dummy import DummyOperator
+except ImportError:
+    from airflow.operators.empty import EmptyOperator as DummyOperator
+
+try:
+    from airflow.operators.python_operator import PythonOperator
+except ImportError:
+    from airflow.operators.python import PythonOperator
 from airflow.utils.task_group import TaskGroup
 from mwaa_dr.framework.model.base_table import S3, BaseTable
 from mwaa_dr.framework.model.dependency_model import DependencyModel
@@ -148,10 +156,11 @@ class BaseDRFactory(ABC):
             dict: The DAG run result.
         """
         dag_run = context.get("dag_run")
-        task_instances = dag_run.get_task_instances()
-        task_states = []
-        for task in task_instances:
-            task_states.append(f"{task.task_id} => {task.state}")
+        try:
+            task_instances = dag_run.get_task_instances()
+            task_states = [f"{task.task_id} => {task.state}" for task in task_instances]
+        except AttributeError:
+            task_states = []
         return {"dag": dag_run.dag_id, "dag_run": dag_run.run_id, "tasks": task_states}
 
     def notify_success_to_sfn(self, **context):

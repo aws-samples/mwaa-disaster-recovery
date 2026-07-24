@@ -88,7 +88,7 @@ def test_on_create(aws_mwaa, warm_standby_env_vars):
     ]
     expected_result = {
         "PhysicalResourceId": "airflow-cli-request-id",
-        "Data": {"results": results},
+        "Data": {"count": len(results)},
         "Reason": "Successfully executed Airflow CLI commands",
     }
 
@@ -124,7 +124,7 @@ def test_on_update(aws_mwaa, warm_standby_env_vars):
     ]
     expected_result = {
         "PhysicalResourceId": "airflow-cli-id-1",
-        "Data": {"results": results},
+        "Data": {"count": len(results)},
         "Reason": "Successfully executed Airflow CLI commands",
     }
 
@@ -160,7 +160,7 @@ def test_on_delete(aws_mwaa, warm_standby_env_vars):
     ]
     expected_result = {
         "PhysicalResourceId": "airflow-cli-id-1",
-        "Data": {"results": results},
+        "Data": {"count": len(results)},
         "Reason": "Successfully executed Airflow CLI commands",
     }
 

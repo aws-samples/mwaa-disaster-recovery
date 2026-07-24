@@ -16,6 +16,10 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 
 import json
+import time
+from datetime import datetime, timezone
+
+import boto3
 from airflow_cli_client import AirflowCliClient
 
 
@@ -30,7 +34,7 @@ def handler(event, context):
     dr_type = event["dr_type"]
     connection_restore_strategy = event["connection_restore_strategy"]
     variable_restore_strategy = event["variable_restore_strategy"]
-    config = {
+    conf = {
         "bucket": bucket,
         "dr_type": dr_type,
         "connection_restore_strategy": connection_restore_strategy,
@@ -38,14 +42,82 @@ def handler(event, context):
         "task_token": task_token,
     }
 
-    airflow_cli = AirflowCliClient(mwaa_env_name, mwaa_env_version)
+    sem_ver = mwaa_env_version.split(".")
+    is_v3 = int(sem_ver[0]) >= 3
 
-    print(f"Unpausing DAG {dag} ...")
-    result = airflow_cli.unpause_dag(dag)
-    print(f"Unpausing result: {result}")
+    # Unpause the DAG first
+    if is_v3:
+        # AF 3.x: CLI unpause output format varies and may contain warnings
+        # that break stdout parsing — use the REST API instead.
+        print(f"Unpausing DAG {dag} via InvokeRestApi ...")
+        client = boto3.client("mwaa")
+        client.invoke_rest_api(
+            Name=mwaa_env_name,
+            Method="PATCH",
+            Path=f"/dags/{dag}",
+            Body={"is_paused": False},
+            QueryParameters={"update_mask": "is_paused"},
+        )
+    else:
+        airflow_cli = AirflowCliClient(mwaa_env_name, mwaa_env_version)
+        print(f"Unpausing DAG {dag} ...")
+        result = airflow_cli.unpause_dag(dag)
+        print(f"Unpausing result: {result}")
 
-    print(f"Triggering DAG {dag} with config {config} ...")
-    result = airflow_cli.trigger_dag(dag, config)
-    print(f"DAG trigger result: {result}")
+    if is_v3:
+        # AF 3.x: Use InvokeRestApi to trigger DAGs (CLI triggers don't persist)
+        print(f"Triggering DAG {dag} via InvokeRestApi ...")
+        result = _trigger_via_rest_api(mwaa_env_name, dag, conf)
+        print(f"DAG trigger result: {json.dumps(result)}")
+        return json.dumps(result)
+    else:
+        # AF 2.x: Use CLI to trigger DAGs
+        print(f"Triggering DAG {dag} via CLI ...")
+        result = airflow_cli.trigger_dag(dag, conf)
+        print(f"DAG trigger result: {result}")
+        return result.to_json()
 
-    return result.to_json()
+
+def _trigger_via_rest_api(env_name, dag_id, conf):
+    """Trigger a DAG via MWAA InvokeRestApi.
+
+    Retries transient webserver errors (RestApiServerException / 5xx) —
+    the MWAA webserver briefly returns 5xx after deployments update
+    requirements or DAGs.
+    """
+    client = boto3.client("mwaa")
+    logical_date = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    attempts = 6
+    for attempt in range(1, attempts + 1):
+        try:
+            response = client.invoke_rest_api(
+                Name=env_name,
+                Method="POST",
+                Path=f"/dags/{dag_id}/dagRuns",
+                Body={"conf": conf, "logical_date": logical_date},
+            )
+        except client.exceptions.RestApiServerException as e:
+            if attempt == attempts:
+                raise
+            print(
+                f"Transient webserver error triggering {dag_id} "
+                f"(attempt {attempt}/{attempts}): {e}; retrying in 20s"
+            )
+            time.sleep(20)
+            continue
+        status = response.get("RestApiStatusCode", 0)
+        data = response.get("RestApiResponse", {})
+        if status >= 500 and attempt < attempts:
+            print(
+                f"Webserver 5xx triggering {dag_id} "
+                f"(attempt {attempt}/{attempts}): {status} {data}; retrying in 20s"
+            )
+            time.sleep(20)
+            continue
+        if status >= 400:
+            raise Exception(f"Failed to trigger DAG {dag_id}: {status} {data}")
+        print(
+            f"DAG {dag_id} triggered: run_id={data.get('dag_run_id')}, state={data.get('state')}"
+        )
+        return data
