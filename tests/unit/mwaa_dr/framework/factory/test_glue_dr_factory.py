@@ -581,7 +581,9 @@ class TestGlueDRFactory:
         mock_glue_operator_class.assert_called_once()
         glue_call_kwargs = mock_glue_operator_class.call_args
         expect(glue_call_kwargs.kwargs["task_id"]).to.equal("glue_export")
-        expect(glue_call_kwargs.kwargs["job_name"]).to.equal("test-env_backup_dag_export")
+        expect(glue_call_kwargs.kwargs["job_name"]).to.equal(
+            "test-env_backup_dag_export"
+        )
         expect(glue_call_kwargs.kwargs["script_location"]).to.contain(
             "mwaa_metadb_export"
         )
