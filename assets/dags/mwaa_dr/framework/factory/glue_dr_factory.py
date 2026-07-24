@@ -883,10 +883,10 @@ class GlueDRFactory(BaseDRFactory):
                         and ti.state not in ("success", "skipped", None)
                     ]
                 except Exception:
-                    # AF 3.x — can't inspect states; assume failure since this
-                    # task's trigger_rule is all_done and the dag-level
-                    # on_failure_callback also fires on terminal failure.
-                    failed = ["unknown (state inspection unavailable)"]
+                    logger.info("Could not inspect upstream states on AF 3.x, "
+                                "skipping failure callback (success callback "
+                                "handles the happy path).")
+                    return
 
                 if not failed:
                     logger.info(
@@ -1126,7 +1126,10 @@ class GlueDRFactory(BaseDRFactory):
                         and ti.state not in ("success", "skipped", None)
                     ]
                 except Exception:
-                    failed = ["unknown (state inspection unavailable)"]
+                    logger.info("Could not inspect upstream states on AF 3.x, "
+                                "skipping failure callback (success callback "
+                                "handles the happy path).")
+                    return
 
                 if not failed:
                     logger.info(
